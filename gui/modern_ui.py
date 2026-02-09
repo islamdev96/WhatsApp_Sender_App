@@ -22,27 +22,54 @@ from utils.scheduler import Scheduler
 from utils.campaign_manager import CampaignManager
 
 # ─── Color Palette (Premium) ────────────────────────────────────────────────
-COLORS = {
+PALETTE_DARK = {
     # Main branding
-    "primary":       "#00E676",      # Bright Neon Green
-    "primary_hover": "#00C853",      # Deep Emerald
-    "primary_dark":  "#050505",      # Very Dark Background (Sidebar)
-    
+    "primary":       "#00E676",  # Neon Green
+    "primary_hover": "#00C853",
+    "primary_dark":  "#0B1220",  # Sidebar / base (Slate Dark)
+
     # Status colors
-    "danger":        "#FF3D00",      # Vibrant Red
+    "danger":        "#FF3D00",
     "danger_hover":  "#DD2C00",
-    "warning":       "#FF9100",      # Deep Orange
+    "warning":       "#FFB020",
     "success":       "#00E676",
-    "info":          "#2979FF",      # Bright Blue
-    
-    # UI Elements (Dark Mode focused)
-    "card_bg":       "#1A1A1A",      # Dark Card Background
-    "bg_dark":       "#121212",      # Main Background
-    "text_main":     "#FFFFFF",
-    "text_muted":    "#B0BEC5",
-    "accent":        "#651FFF",      # Deep Purple Accent
-    "border":        "#333333",
+    "info":          "#38BDF8",
+
+    # UI Elements
+    "card_bg":       "#152238",
+    "bg_dark":       "#0E1726",
+    "text_main":     "#F1F5F9",
+    "text_muted":    "#9AA4B2",
+    "accent":        "#22D3EE",
+    "accent_hover":  "#06B6D4",
+    "border":        "#263142",
 }
+
+PALETTE_LIGHT = {
+    # Main branding
+    "primary":       "#00B15D",
+    "primary_hover": "#009E52",
+    "primary_dark":  "#FFFFFF",  # Sidebar / base in light mode
+
+    # Status colors
+    "danger":        "#DC2626",
+    "danger_hover":  "#B91C1C",
+    "warning":       "#F59E0B",
+    "success":       "#16A34A",
+    "info":          "#0284C7",
+
+    # UI Elements
+    "card_bg":       "#F8FAFC",
+    "bg_dark":       "#FFFFFF",
+    "text_main":     "#0F172A",
+    "text_muted":    "#64748B",
+    "accent":        "#0EA5E9",
+    "accent_hover":  "#0284C7",
+    "border":        "#E2E8F0",
+}
+
+# Active palette (filled at runtime based on appearance mode)
+COLORS = {}
 
 # ─── Typography & Styling ─────────────────────────────────────────────────────
 FONTS = {
@@ -85,6 +112,7 @@ class ModernWhatsAppApp(ctk.CTk):
         mode = self.config.get("appearance_mode", "dark")
         ctk.set_appearance_mode(mode)
         ctk.set_default_color_theme("green")
+        self._apply_palette(mode)
 
         # ── Window Setup ──
         self.title("WhatsApp Sender Pro")
@@ -113,6 +141,11 @@ class ModernWhatsAppApp(ctk.CTk):
 
         # ── Save on close ──
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _apply_palette(self, mode):
+        palette = PALETTE_DARK if str(mode).lower() == "dark" else PALETTE_LIGHT
+        COLORS.clear()
+        COLORS.update(palette)
 
     # ═══════════════════════════════════════════════════════════════════════
     #  LAYOUT
@@ -277,10 +310,12 @@ class ModernWhatsAppApp(ctk.CTk):
         ctk.CTkLabel(left, text="نص الرسالة:", font=("Segoe UI", 13, "bold"),
                      text_color=COLORS["text_main"]).pack(anchor="e", padx=25)
         
-        self.msg_text = ctk.CTkTextbox(left, height=180, corner_radius=12,
-                                       font=("Segoe UI", 13), border_color=COLORS["border"],
-                                       fg_color=COLORS["bg_dark"])
-        self.msg_text.pack(fill="both", expand=True, padx=20, pady=(5, 10))
+        self.message_textbox = ctk.CTkTextbox(left, height=180, corner_radius=12,
+                                              font=("Segoe UI", 13), border_color=COLORS["border"],
+                                              fg_color=COLORS["bg_dark"])
+        self.message_textbox.pack(fill="both", expand=True, padx=20, pady=(5, 10))
+        # Backward-compatible alias (if any code still refers to msg_text)
+        self.msg_text = self.message_textbox
 
         # -- Checkboxes --
         chk_frame = ctk.CTkFrame(left, fg_color="transparent")
@@ -360,7 +395,7 @@ class ModernWhatsAppApp(ctk.CTk):
         sched_btn_row = ctk.CTkFrame(right, fg_color="transparent")
         sched_btn_row.pack(fill="x", padx=15, pady=3)
         self.btn_schedule = ctk.CTkButton(sched_btn_row, text="⏰ جدولة", width=90, height=32,
-                                          fg_color=COLORS["accent"], hover_color="#5A4BD1",
+                                          fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
                                           font=ctk.CTkFont(size=12, weight="bold"),
                                           command=self._schedule_send)
         self.btn_schedule.pack(side="right", padx=3)
@@ -400,7 +435,7 @@ class ModernWhatsAppApp(ctk.CTk):
         ctk.CTkButton(right, text="📖 أكواد الأخطاء",
                       font=ctk.CTkFont(size=12),
                       fg_color=COLORS["accent"],
-                      hover_color="#5A4BD1",
+                      hover_color=COLORS["accent_hover"],
                       height=34, corner_radius=8,
                       command=self._show_error_codes).pack(fill="x", padx=15, pady=(8, 12))
 
@@ -1123,6 +1158,8 @@ class ModernWhatsAppApp(ctk.CTk):
         mode = self.appearance_switch.get()
         ctk.set_appearance_mode(mode)
         self.config.set_and_save("appearance_mode", mode)
+        self._apply_palette(mode)
+        messagebox.showinfo("تم", "تم تغيير المظهر. يُفضّل إعادة تشغيل التطبيق لتطبيق الألوان بالكامل.")
 
     def _load_saved_state(self):
         # Load last used files

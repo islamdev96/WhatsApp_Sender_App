@@ -1,5 +1,5 @@
 {
-  "appearance_mode": "dark",
+  "appearance_mode": "light",
   "language": "ar",
   "last_contacts_file": "C:/Users/Islam Glab/Desktop/test_my_number.csv",
   "last_image_file": "C:/Users/Islam Glab/Desktop/1.jpg",
@@ -11,6 +11,8 @@
   "batch_size": 30,
   "batch_pause_min": 180,
   "batch_pause_max": 240,
-  "window_width": 1920,
-  "window_height": 1001
+  "window_width": 1924,
+  "window_height": 1055,
+  "last_video_file": "",
+  "last_doc_file": ""
 }
