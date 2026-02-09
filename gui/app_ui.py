@@ -5,6 +5,8 @@ import queue
 import time
 import random
 import os
+import csv
+import datetime
 from automation.whatsapp_bot import WhatsAppBot
 from utils.helpers import read_contacts, create_contacts_template
 
@@ -38,9 +40,11 @@ class WhatsAppSenderApp:
         self.stop_event = threading.Event()
         self.ui_queue = queue.Queue()
         self.send_text_with_image = tk.BooleanVar(value=True)
+        self.background_mode = tk.BooleanVar(value=False)
         self.batch_size = tk.IntVar(value=30)
         self.batch_pause_min = tk.IntVar(value=180)
         self.batch_pause_max = tk.IntVar(value=240)
+        self.results_log = []
         
         # User Data Dir for session
         self.user_data_dir = os.path.join(os.getcwd(), "chrome_profile")
@@ -92,6 +96,7 @@ class WhatsAppSenderApp:
         self.message_text = scrolledtext.ScrolledText(msg_frame, height=6, font=("Segoe UI", 10))
         self.message_text.pack(fill="x", pady=5)
         ttk.Checkbutton(msg_frame, text="إرسال نص مع الصورة", variable=self.send_text_with_image).pack(anchor="e")
+        ttk.Checkbutton(msg_frame, text="🖥️ تشغيل في الخلفية (تصغير المتصفح أثناء الإرسال)", variable=self.background_mode).pack(anchor="e")
 
         # 3. Settings
         settings_frame = ttk.LabelFrame(main_container, text=" إعدادات الوقت الأساسية ", padding="10")
@@ -251,7 +256,9 @@ class WhatsAppSenderApp:
             try:
                 self.log("جاري فتح المتصفح...")
                 self.bot = WhatsAppBot(self.user_data_dir)
+                # Always show browser normally during QR login, even if background mode is on
                 self.bot.open_whatsapp()
+                self.bot.background_mode = False
                 self.bot.bring_to_front()
                 self.log("يرجى فتح واتساب على الهاتف ومسح QR لتسجيل الدخول...")
                 if self.bot.wait_for_login(timeout=60):
@@ -282,9 +289,18 @@ class WhatsAppSenderApp:
             self.report_error("ERR-21", "لم يتم تسجيل الدخول بعد. يرجى مسح QR من الهاتف.", dialog=True, level="warning")
             return
 
-        self.bot.bring_to_front()
+        # Apply background mode setting
+        if self.background_mode.get():
+            self.bot.background_mode = True
+            self.bot.minimize()
+            self.log("🖥️ وضع الخلفية مفعّل — المتصفح مُصغّر.")
+        else:
+            self.bot.background_mode = False
+            self.bot.bring_to_front()
+
         self.is_running = True
         self.stop_event.clear()
+        self.results_log = []
         self.btn_start.config(state="disabled")
         self.btn_stop.config(state="normal")
         
@@ -320,6 +336,7 @@ class WhatsAppSenderApp:
         return mapping.get(res, ("ERR-99", f"خطأ غير معروف ({res})", None))
 
     def run_automation(self, msg_template, img_path):
+        start_time = datetime.datetime.now()
         try:
             contacts = read_contacts(self.contacts_file_path.get())
             if not contacts:
@@ -355,13 +372,20 @@ class WhatsAppSenderApp:
                 
                 res = self.bot.send_message(c['phone'], c['name'], msg_template, img_path, self.stop_event)
                 
+                # Track result for final report
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                error_code = ""
+
                 if res == "SUCCESS":
                     self.sent += 1
                     self.log(f"✅ تم الإرسال لـ {c['name']}")
+                    self.results_log.append({"phone": c['phone'], "name": c['name'], "status": "نجاح", "error_code": "", "timestamp": timestamp})
                 elif res == "INVALID":
                     self.invalid += 1
                     self.log(f"🚫 [ERR-20] الرقم {c['phone']} ليس عليه واتساب أو غير صحيح.")
+                    self.results_log.append({"phone": c['phone'], "name": c['name'], "status": "بدون واتساب", "error_code": "ERR-20", "timestamp": timestamp})
                 elif res == "STOPPED":
+                    self.results_log.append({"phone": c['phone'], "name": c['name'], "status": "توقف", "error_code": "", "timestamp": timestamp})
                     break
                 else:
                     self.failed += 1
@@ -369,6 +393,7 @@ class WhatsAppSenderApp:
                     self.log(f"❌ [{code}] {message} - {c['name']} ({c['phone']})")
                     if detail:
                         self.log(f"   تفاصيل: {detail}")
+                    self.results_log.append({"phone": c['phone'], "name": c['name'], "status": "فشل", "error_code": code, "timestamp": timestamp})
 
                 counter_text = f"✅ {self.sent} | ❌ {self.failed} | 🚫 {self.invalid}"
                 self._run_on_ui(lambda text=counter_text: self.counters_var.set(text))
@@ -390,12 +415,14 @@ class WhatsAppSenderApp:
                             if self.stop_event.is_set(): break
                             time.sleep(1)
 
+            # Generate final report
+            duration = datetime.datetime.now() - start_time
+            self._generate_final_report(duration)
+
             if self.stop_event.is_set():
                 self.log("🛑 تم إيقاف العملية.")
-                self._show_dialog("info", "تم الإيقاف", "تم إيقاف العملية بناءً على طلبك.")
             else:
                 self.log("🏁 انتهت العملية.")
-                self._show_dialog("info", "انتهى", "تم الانتهاء من القائمة.")
             
         except Exception as e:
             self.report_error("ERR-99", "حدث خطأ عام أثناء الإرسال.", detail=str(e), dialog=True)
@@ -403,3 +430,63 @@ class WhatsAppSenderApp:
             self.is_running = False
             self._run_on_ui(lambda: self.btn_start.config(state="normal"))
             self._run_on_ui(lambda: self.btn_stop.config(state="disabled"))
+
+    def _generate_final_report(self, duration):
+        """Shows a summary dialog and saves results to CSV."""
+        total = self.sent + self.failed + self.invalid
+        if total == 0:
+            return
+
+        # Calculate percentages
+        pct_ok = (self.sent / total * 100) if total else 0
+        pct_fail = (self.failed / total * 100) if total else 0
+        pct_inv = (self.invalid / total * 100) if total else 0
+
+        # Format duration
+        mins, secs = divmod(int(duration.total_seconds()), 60)
+        hrs, mins = divmod(mins, 60)
+        if hrs:
+            dur_text = f"{hrs} ساعة {mins} دقيقة {secs} ثانية"
+        elif mins:
+            dur_text = f"{mins} دقيقة {secs} ثانية"
+        else:
+            dur_text = f"{secs} ثانية"
+
+        # Save CSV
+        csv_path = self._save_report_csv()
+        csv_note = f"\n\n📄 تم حفظ التقرير: {csv_path}" if csv_path else ""
+
+        summary = (
+            f"📊 تقرير الإرسال النهائي\n"
+            f"{'─' * 35}\n"
+            f"📋 الإجمالي: {total}\n"
+            f"✅ نجاح: {self.sent} ({pct_ok:.1f}%)\n"
+            f"❌ فشل: {self.failed} ({pct_fail:.1f}%)\n"
+            f"🚫 بدون واتساب: {self.invalid} ({pct_inv:.1f}%)\n"
+            f"⏱ المدة: {dur_text}"
+            f"{csv_note}"
+        )
+
+        self.log(f"\n📊 التقرير النهائي: ✅{self.sent} | ❌{self.failed} | 🚫{self.invalid} | ⏱{dur_text}")
+        self._show_dialog("info", "تقرير الإرسال", summary)
+
+    def _save_report_csv(self):
+        """Saves per-contact results to a timestamped CSV file."""
+        if not self.results_log:
+            return None
+        try:
+            reports_dir = os.path.join(os.getcwd(), "reports")
+            os.makedirs(reports_dir, exist_ok=True)
+            filename = f"report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            filepath = os.path.join(reports_dir, filename)
+
+            with open(filepath, 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.DictWriter(f, fieldnames=["phone", "name", "status", "error_code", "timestamp"])
+                writer.writeheader()
+                writer.writerows(self.results_log)
+
+            self.log(f"📄 تم حفظ التقرير في: {filepath}")
+            return filepath
+        except Exception as e:
+            self.log(f"⚠ تعذر حفظ التقرير: {e}")
+            return None

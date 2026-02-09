@@ -14,6 +14,7 @@ class WhatsAppBot:
     def __init__(self, user_data_dir):
         self.user_data_dir = user_data_dir
         self.driver = None
+        self.background_mode = False
 
         # Common locators (mix XPath + CSS for robustness)
         self.SEARCH_BOX_LOCATORS = [
@@ -138,7 +139,7 @@ class WhatsAppBot:
             return False
         return self._find_any(self.SEARCH_BOX_LOCATORS) is not None or self._find_any(self.CHAT_INPUT_LOCATORS) is not None
 
-    def setup_driver(self):
+    def setup_driver(self, start_minimized=False):
         """Initializes the Chrome driver with session persistence."""
         if not os.path.exists(self.user_data_dir):
             os.makedirs(self.user_data_dir)
@@ -148,9 +149,12 @@ class WhatsAppBot:
         options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option('useAutomationExtension', False)
+        if start_minimized:
+            options.add_argument("--start-minimized")
         
         service = Service(ChromeDriverManager().install())
         self.driver = webdriver.Chrome(service=service, options=options)
+        self.background_mode = start_minimized
         return self.driver
 
     def open_whatsapp(self):
@@ -171,8 +175,18 @@ class WhatsAppBot:
         """Brings the browser window to the front."""
         if self.driver:
             try:
+                if self.background_mode:
+                    return  # Don't bring to front in background mode
                 self.driver.execute_script("window.focus();")
                 self.driver.maximize_window()
+            except:
+                pass
+
+    def minimize(self):
+        """Minimizes the browser window."""
+        if self.driver:
+            try:
+                self.driver.minimize_window()
             except:
                 pass
 
