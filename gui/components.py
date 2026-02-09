@@ -116,7 +116,7 @@ class RichTextFrame(ctk.CTkFrame):
         ctk.CTkLabel(self.toolbar, text="الرسالة", font=("Segoe UI", 13, "bold")).pack(side="right", padx=5)
         
         # Insert Variable
-        self.var_option = ctk.CTkOptionMenu(self.toolbar, values=["{name}", "{var1}"], width=80, height=24,
+        self.var_option = ctk.CTkOptionMenu(self.toolbar, values=["{name}", "{phone}", "{var1}", "{var2}", "{var3}", "{var4}", "{var5}"], width=90, height=24,
                                             command=self._insert_var)
         self.var_option.set("متغير")
         self.var_option.pack(side="left", padx=2)

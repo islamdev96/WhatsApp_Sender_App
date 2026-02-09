@@ -4,7 +4,8 @@ Built with CustomTkinter for a professional, world-class look and feel.
 Features: Dark/Light mode, tabbed interface, dashboard, templates, settings persistence.
 """
 import customtkinter as ctk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
+import re
 import threading
 import queue
 import time
@@ -13,7 +14,7 @@ import os
 import csv
 import datetime
 
-from .components import AttachmentManager, RichTextFrame
+from .components import RichTextFrame, AttachmentManager
 
 from automation.whatsapp_bot import WhatsAppBot
 from utils.helpers import read_contacts, read_contacts_auto
@@ -133,12 +134,19 @@ class ModernWhatsAppApp(ctk.CTk):
         self.sent = 0
         self.failed = 0
         self.invalid = 0
-        self.attachments = []
         self.pending_start_payload = None
         self.pending_check_contacts = None
         self.is_checking = False
         self.log_dir = os.path.join(os.getcwd(), "reports", "logs")
         self.log_file_path = os.path.join(self.log_dir, f"app_{datetime.datetime.now().strftime('%Y%m%d')}.log")
+        self.pause_event = threading.Event()
+        self.is_paused = False
+        self.progress_win = None
+        self.progress_tree = None
+        self.progress_count_label = None
+        self.progress_status_label = None
+        self.progress_bar_small = None
+        self.last_report_path = None
 
         # ── Profiles ──
         self.profiles_dir = os.path.join(os.getcwd(), self.config.get("profiles_dir", os.path.join("data", "profiles")))
@@ -337,63 +345,33 @@ class ModernWhatsAppApp(ctk.CTk):
 
         # 1. Contacts
         self._create_file_row(left, "👥 ملف الأرقام", "contacts_entry", self._browse_contacts)
+        ctk.CTkButton(left, text="📥 استيراد متقدم", height=30,
+                      fg_color=COLORS["card_bg"], hover_color=COLORS["border"],
+                      font=ctk.CTkFont(size=12, weight="bold"),
+                      command=self._open_import_dialog).pack(fill="x", padx=20, pady=(2, 8))
+        ctk.CTkButton(left, text="🧮 مولد أرقام", height=30,
+                      fg_color=COLORS["card_bg"], hover_color=COLORS["border"],
+                      font=ctk.CTkFont(size=12, weight="bold"),
+                      command=self._open_number_generator).pack(fill="x", padx=20, pady=(0, 8))
 
-        # Attachments Panel
-        attach_card = ctk.CTkFrame(left, corner_radius=12, fg_color=COLORS["card_bg"])
-        attach_card.pack(fill="x", padx=15, pady=(6, 10))
+        # Attachments Panel (New)
+        self.attachment_manager = AttachmentManager(left, fg_color=COLORS["card_bg"], corner_radius=12)
+        self.attachment_manager.pack(fill="x", padx=15, pady=(6, 10))
 
-        attach_header = ctk.CTkFrame(attach_card, fg_color="transparent")
-        attach_header.pack(fill="x", padx=10, pady=(8, 4))
-        ctk.CTkLabel(attach_header, text="المرفقات (صور/فيديو/مستندات)",
-                     font=("Segoe UI", 12, "bold"), text_color=COLORS["text_main"]).pack(side="right")
+        # Message Section (New)
+        self.message_editor = RichTextFrame(left, fg_color=COLORS["bg_dark"], corner_radius=12)
+        self.message_editor.pack(fill="both", expand=True, padx=20, pady=(5, 10))
+        self.message_textbox = self.message_editor.text_box # Alias for backward compatibility
+        self.msg_text = self.message_editor.text_box # Alias
 
-        self.attach_type_var = ctk.StringVar(value="صور")
-        self.attach_type_menu = ctk.CTkOptionMenu(
-            attach_header,
-            values=["صور", "فيديو", "PDF", "مستندات", "صوت"],
-            variable=self.attach_type_var,
-            width=110,
-            height=28,
-            fg_color=COLORS["bg_dark"],
-            button_color=COLORS["primary"],
-            button_hover_color=COLORS["primary_hover"],
-            text_color=COLORS["text_main"],
-            dropdown_fg_color=COLORS["card_bg"],
-            dropdown_text_color=COLORS["text_main"],
-        )
-        self.attach_type_menu.pack(side="left", padx=6)
-
-        ctk.CTkButton(attach_header, text="➕ إضافة", width=70, height=28,
-                      fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
-                      command=self._add_attachment).pack(side="left", padx=4)
-        ctk.CTkButton(attach_header, text="🧹 مسح", width=60, height=28,
-                      fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
-                      command=self._clear_attachments).pack(side="left", padx=4)
-
-        attach_cols = ctk.CTkFrame(attach_card, fg_color="transparent")
-        attach_cols.pack(fill="x", padx=10, pady=(0, 2))
-        ctk.CTkLabel(attach_cols, text="الملف", width=260, anchor="e",
-                     font=("Segoe UI", 11), text_color=COLORS["text_muted"]).pack(side="right")
-        ctk.CTkLabel(attach_cols, text="النوع", width=70, anchor="center",
-                     font=("Segoe UI", 11), text_color=COLORS["text_muted"]).pack(side="right")
-        ctk.CTkLabel(attach_cols, text="Caption", width=150, anchor="center",
-                     font=("Segoe UI", 11), text_color=COLORS["text_muted"]).pack(side="right")
-        ctk.CTkLabel(attach_cols, text="", width=40).pack(side="right")
-
-        self.attachments_list = ctk.CTkScrollableFrame(attach_card, corner_radius=8, height=120)
-        self.attachments_list.pack(fill="x", padx=10, pady=(0, 8))
-
-        # -- Message Section --
-        # -- Message Input --
-        ctk.CTkLabel(left, text="نص الرسالة:", font=("Segoe UI", 13, "bold"),
-                     text_color=COLORS["text_main"]).pack(anchor="e", padx=25)
+        ctk.CTkLabel(left, text="ملاحظة: لفصل رسائل متعددة استخدم --- بين كل رسالة",
+                     font=("Segoe UI", 10), text_color=COLORS["text_muted"]).pack(anchor="e", padx=25, pady=(0, 8))
         
-        self.message_textbox = ctk.CTkTextbox(left, height=180, corner_radius=12,
-                                              font=("Segoe UI", 13), border_color=COLORS["border"],
-                                              fg_color=COLORS["bg_dark"])
-        self.message_textbox.pack(fill="both", expand=True, padx=20, pady=(5, 10))
-        # Backward-compatible alias (if any code still refers to msg_text)
-        self.msg_text = self.message_textbox
+
+
+
+        
+
 
         # -- Checkboxes --
         chk_frame = ctk.CTkFrame(left, fg_color="transparent")
@@ -407,6 +385,11 @@ class ModernWhatsAppApp(ctk.CTk):
         self.bg_mode_var = ctk.BooleanVar(value=False)
         ctk.CTkCheckBox(chk_frame, text="🖥️ تشغيل في الخلفية",
                         variable=self.bg_mode_var,
+                        font=ctk.CTkFont(size=12)).pack(side="right", padx=5)
+
+        self.spin_text_var = ctk.BooleanVar(value=self.config.get("enable_spintax", True))
+        ctk.CTkCheckBox(chk_frame, text="🎲 تدوير النص (Spintax)",
+                        variable=self.spin_text_var,
                         font=ctk.CTkFont(size=12)).pack(side="right", padx=5)
 
         # RIGHT: Controls + Progress
@@ -904,78 +887,421 @@ class ModernWhatsAppApp(ctk.CTk):
             self.contacts_entry.delete(0, "end")
             self.contacts_entry.insert(0, path)
 
-    def _map_attachment_choice(self, choice):
-        choice = (choice or "").strip()
-        if choice == "صور":
-            return "image", [("Images", "*.jpg;*.jpeg;*.png;*.webp")]
-        if choice == "فيديو":
-            return "video", [("Video", "*.mp4;*.mkv;*.avi;*.3gp;*.mov")]
-        if choice == "PDF":
-            return "document", [("PDF", "*.pdf")]
-        if choice == "صوت":
-            return "document", [("Audio", "*.mp3;*.wav;*.m4a;*.ogg")]
-        # مستندات
-        return "document", [("Documents", "*.pdf;*.docx;*.pptx;*.xlsx;*.txt;*.zip;*.rar")]
+    def _open_import_dialog(self):
+        win = ctk.CTkToplevel(self)
+        win.title("استيراد الأرقام")
+        win.geometry("900x620")
+        win.minsize(880, 580)
+        win.grab_set()
 
-    def _add_attachment(self):
-        media_type, filetypes = self._map_attachment_choice(self.attach_type_var.get())
-        paths = filedialog.askopenfilenames(filetypes=filetypes)
-        if not paths:
-            return
-        for path in paths:
-            if not path:
-                continue
-            item = {"type": media_type, "path": path}
-            if media_type in ("image", "video"):
-                item["caption_var"] = ctk.StringVar(value="")
-            self.attachments.append(item)
-        self._render_attachments()
+        file_var = ctk.StringVar(value="")
+        header_var = ctk.BooleanVar(value=True)
+        custom_delim_var = ctk.BooleanVar(value=False)
+        delim_var = ctk.StringVar(value=",")
+        dedup_var = ctk.BooleanVar(value=True)
 
-    def _clear_attachments(self):
-        self.attachments = []
-        self._render_attachments()
+        headers = []
+        preview_rows = []
 
-    def _remove_attachment(self, index):
-        if 0 <= index < len(self.attachments):
-            self.attachments.pop(index)
-        self._render_attachments()
+        # Top: File picker
+        file_frame = ctk.CTkFrame(win, corner_radius=10)
+        file_frame.pack(fill="x", padx=15, pady=(15, 8))
+        ctk.CTkLabel(file_frame, text="اختر الملف:", font=ctk.CTkFont(size=12, weight="bold")).pack(side="right", padx=10)
+        file_entry = ctk.CTkEntry(file_frame, textvariable=file_var, height=32, corner_radius=8)
+        file_entry.pack(side="right", fill="x", expand=True, padx=10, pady=8)
 
-    def _render_attachments(self):
-        for w in self.attachments_list.winfo_children():
-            w.destroy()
-        if not self.attachments:
-            ctk.CTkLabel(self.attachments_list, text="لا توجد مرفقات بعد",
-                         font=("Segoe UI", 11), text_color=COLORS["text_muted"]).pack(pady=8)
-            return
+        def _browse_file():
+            path = filedialog.askopenfilename(filetypes=[("CSV/Excel", "*.csv;*.xlsx;*.xls;*.txt")])
+            if path:
+                file_var.set(path)
+                _load_preview()
 
-        for idx, att in enumerate(self.attachments):
-            row = ctk.CTkFrame(self.attachments_list, fg_color="transparent")
-            row.pack(fill="x", pady=2)
+        ctk.CTkButton(file_frame, text="Browse", width=90, height=32,
+                      fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
+                      command=_browse_file).pack(side="left", padx=10)
 
-            filename = os.path.basename(att.get("path", ""))
-            ctk.CTkLabel(row, text=filename, width=260, anchor="e",
-                         font=("Segoe UI", 11)).pack(side="right", padx=4)
+        # Settings
+        settings_frame = ctk.CTkFrame(win, corner_radius=10)
+        settings_frame.pack(fill="x", padx=15, pady=(0, 8))
+        ctk.CTkLabel(settings_frame, text="إعدادات", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="e", padx=12, pady=(8, 4))
 
-            ctk.CTkLabel(row, text=att.get("type", "-"), width=70,
-                         font=("Segoe UI", 11), anchor="center").pack(side="right")
+        settings_row = ctk.CTkFrame(settings_frame, fg_color="transparent")
+        settings_row.pack(fill="x", padx=10, pady=(0, 8))
+        ctk.CTkCheckBox(settings_row, text="اعتبر أول صف عناوين", variable=header_var,
+                        command=lambda: _load_preview()).pack(side="right", padx=6)
+        ctk.CTkCheckBox(settings_row, text="فاصل مخصص", variable=custom_delim_var,
+                        command=lambda: _load_preview()).pack(side="right", padx=6)
+        delim_entry = ctk.CTkEntry(settings_row, textvariable=delim_var, width=60, height=28)
+        delim_entry.pack(side="right", padx=6)
+        ctk.CTkCheckBox(settings_row, text="إزالة التكرارات", variable=dedup_var).pack(side="right", padx=6)
+        ctk.CTkButton(settings_row, text="تحديث المعاينة", height=28,
+                      fg_color=COLORS["card_bg"], hover_color=COLORS["border"],
+                      command=lambda: _load_preview()).pack(side="left", padx=6)
 
-            caption_var = att.get("caption_var")
-            if caption_var:
-                cap_entry = ctk.CTkEntry(row, textvariable=caption_var, width=150, height=28,
-                                         corner_radius=6, fg_color=COLORS["bg_dark"],
-                                         border_color=COLORS["border"])
-                cap_entry.pack(side="right", padx=4)
+        # Field Mapping
+        mapping_frame = ctk.CTkFrame(win, corner_radius=10)
+        mapping_frame.pack(fill="x", padx=15, pady=(0, 8))
+        ctk.CTkLabel(mapping_frame, text="تعيين الحقول", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="e", padx=12, pady=(8, 4))
+
+        map_row = ctk.CTkFrame(mapping_frame, fg_color="transparent")
+        map_row.pack(fill="x", padx=10, pady=(0, 8))
+
+        def _make_field(label, var):
+            frame = ctk.CTkFrame(map_row, fg_color="transparent")
+            frame.pack(side="right", padx=6)
+            ctk.CTkLabel(frame, text=label, font=ctk.CTkFont(size=11)).pack()
+            menu = ctk.CTkOptionMenu(frame, values=["—"], variable=var, width=120,
+                                     fg_color=COLORS["bg_dark"], text_color=COLORS["text_main"],
+                                     button_color=COLORS["primary"], button_hover_color=COLORS["primary_hover"],
+                                     dropdown_fg_color=COLORS["card_bg"], dropdown_text_color=COLORS["text_main"])
+            menu.pack()
+            return menu
+
+        name_var = ctk.StringVar(value="—")
+        phone_var = ctk.StringVar(value="—")
+        var1_var = ctk.StringVar(value="—")
+        var2_var = ctk.StringVar(value="—")
+        var3_var = ctk.StringVar(value="—")
+        var4_var = ctk.StringVar(value="—")
+        var5_var = ctk.StringVar(value="—")
+
+        menus = {
+            "name": _make_field("الاسم", name_var),
+            "phone": _make_field("الرقم", phone_var),
+            "var1": _make_field("Var1", var1_var),
+            "var2": _make_field("Var2", var2_var),
+            "var3": _make_field("Var3", var3_var),
+            "var4": _make_field("Var4", var4_var),
+            "var5": _make_field("Var5", var5_var),
+        }
+
+        # Preview
+        preview_frame = ctk.CTkFrame(win, corner_radius=10)
+        preview_frame.pack(fill="both", expand=True, padx=15, pady=(0, 8))
+        ctk.CTkLabel(preview_frame, text="معاينة البيانات (أول 30 صف)", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="e", padx=12, pady=(8, 4))
+        preview_list = ctk.CTkScrollableFrame(preview_frame, corner_radius=8)
+        preview_list.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+        def _set_menu_values(values):
+            vals = ["—"] + values
+            for m in menus.values():
+                m.configure(values=vals)
+
+        def _guess_field(headers_list):
+            def find(keys):
+                for h in headers_list:
+                    hl = h.lower()
+                    for k in keys:
+                        if k in hl:
+                            return h
+                return "—"
+            return {
+                "name": find(["name", "full", "given", "اسم", "الاسم"]),
+                "phone": find(["phone", "mobile", "number", "رقم", "هاتف", "phone 1 - value"]),
+                "var1": find(["var1", "var 1", "variable1", "v1", "custom1"]),
+                "var2": find(["var2", "var 2", "variable2", "v2", "custom2"]),
+                "var3": find(["var3", "var 3", "variable3", "v3", "custom3"]),
+                "var4": find(["var4", "var 4", "variable4", "v4", "custom4"]),
+                "var5": find(["var5", "var 5", "variable5", "v5", "custom5"]),
+            }
+
+        def _render_preview():
+            for w in preview_list.winfo_children():
+                w.destroy()
+            if not headers:
+                ctk.CTkLabel(preview_list, text="لا توجد بيانات للعرض",
+                             font=ctk.CTkFont(size=11), text_color=COLORS["text_muted"]).pack(pady=10)
+                return
+            max_cols = min(len(headers), 8)
+            head_row = ctk.CTkFrame(preview_list, fg_color=COLORS["card_bg"])
+            head_row.pack(fill="x", pady=2)
+            for i in range(max_cols):
+                ctk.CTkLabel(head_row, text=headers[i], width=120, anchor="e",
+                             font=ctk.CTkFont(size=11, weight="bold")).pack(side="right", padx=2)
+            for row in preview_rows:
+                r = ctk.CTkFrame(preview_list, fg_color="transparent")
+                r.pack(fill="x", pady=1)
+                for i in range(max_cols):
+                    val = row[i] if i < len(row) else ""
+                    ctk.CTkLabel(r, text=str(val), width=120, anchor="e",
+                                 font=ctk.CTkFont(size=10)).pack(side="right", padx=2)
+
+        def _read_csv(path):
+            import csv
+            rows = []
+            delim = None
+            if custom_delim_var.get() and delim_var.get().strip():
+                delim = delim_var.get().strip()
+            try:
+                with open(path, "r", encoding="utf-8-sig", errors="ignore") as f:
+                    sample = f.read(2048)
+                    f.seek(0)
+                    if not delim:
+                        try:
+                            dialect = csv.Sniffer().sniff(sample, delimiters=[",", ";", "\t", "|"])
+                            delim = dialect.delimiter
+                        except Exception:
+                            delim = ","
+                    reader = csv.reader(f, delimiter=delim)
+                    for row in reader:
+                        rows.append(row)
+            except Exception:
+                rows = []
+            return rows
+
+        def _read_excel(path):
+            try:
+                import openpyxl
+                wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+                ws = wb.active
+                rows = []
+                for row in ws.iter_rows(values_only=True):
+                    rows.append([str(c) if c is not None else "" for c in row])
+                wb.close()
+                return rows
+            except Exception:
+                return []
+
+        def _load_preview():
+            nonlocal headers, preview_rows
+            path = file_var.get().strip()
+            headers = []
+            preview_rows = []
+            if not path or not os.path.exists(path):
+                _render_preview()
+                return
+            ext = os.path.splitext(path)[1].lower()
+            rows = _read_excel(path) if ext in (".xlsx", ".xls") else _read_csv(path)
+            if not rows:
+                _render_preview()
+                return
+            if header_var.get():
+                headers = [h.strip() if h else f"Col{i+1}" for i, h in enumerate(rows[0])]
+                data_rows = rows[1:]
             else:
-                ctk.CTkLabel(row, text="—", width=150, anchor="center",
-                             font=("Segoe UI", 11), text_color=COLORS["text_muted"]).pack(side="right", padx=4)
+                headers = [f"Col{i+1}" for i in range(len(rows[0]))]
+                data_rows = rows
+            preview_rows = data_rows[:30]
+            _set_menu_values(headers)
+            guess = _guess_field(headers)
+            name_var.set(guess["name"])
+            phone_var.set(guess["phone"])
+            var1_var.set(guess["var1"])
+            var2_var.set(guess["var2"])
+            var3_var.set(guess["var3"])
+            var4_var.set(guess["var4"])
+            var5_var.set(guess["var5"])
+            _render_preview()
 
-            ctk.CTkButton(row, text="✖", width=28, height=26,
-                          fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
-                          command=lambda i=idx: self._remove_attachment(i)).pack(side="right", padx=4)
+        def _read_all_rows(path):
+            ext = os.path.splitext(path)[1].lower()
+            return _read_excel(path) if ext in (".xlsx", ".xls") else _read_csv(path)
 
-    # ═══════════════════════════════════════════════════════════════════════
-    #  TEMPLATES MANAGEMENT
-    # ═══════════════════════════════════════════════════════════════════════
+        def _import_now():
+            path = file_var.get().strip()
+            if not path or not os.path.exists(path):
+                messagebox.showerror("خطأ", "يرجى اختيار ملف صالح.")
+                return
+
+            rows = _read_all_rows(path)
+            if not rows:
+                messagebox.showerror("خطأ", "تعذر قراءة الملف.")
+                return
+
+            if header_var.get():
+                hdrs = [h.strip() if h else f"Col{i+1}" for i, h in enumerate(rows[0])]
+                data_rows = rows[1:]
+            else:
+                hdrs = [f"Col{i+1}" for i in range(len(rows[0]))]
+                data_rows = rows
+
+            def col_index(col_name):
+                if not col_name or col_name == "—":
+                    return None
+                try:
+                    return hdrs.index(col_name)
+                except ValueError:
+                    return None
+
+            idx_name = col_index(name_var.get())
+            idx_phone = col_index(phone_var.get())
+            idx_v1 = col_index(var1_var.get())
+            idx_v2 = col_index(var2_var.get())
+            idx_v3 = col_index(var3_var.get())
+            idx_v4 = col_index(var4_var.get())
+            idx_v5 = col_index(var5_var.get())
+
+            from utils.helpers import normalize_phone
+
+            contacts = []
+            seen = set()
+            invalid = 0
+            for row in data_rows:
+                phone_raw = row[idx_phone] if idx_phone is not None and idx_phone < len(row) else ""
+                phone = normalize_phone(phone_raw)
+                if not phone:
+                    invalid += 1
+                    continue
+                if dedup_var.get() and phone in seen:
+                    continue
+                seen.add(phone)
+
+                name = row[idx_name] if idx_name is not None and idx_name < len(row) else ""
+                c = {
+                    "name": str(name).strip() if name is not None else "",
+                    "phone": phone,
+                }
+                if idx_v1 is not None and idx_v1 < len(row):
+                    c["var1"] = str(row[idx_v1]) if row[idx_v1] is not None else ""
+                if idx_v2 is not None and idx_v2 < len(row):
+                    c["var2"] = str(row[idx_v2]) if row[idx_v2] is not None else ""
+                if idx_v3 is not None and idx_v3 < len(row):
+                    c["var3"] = str(row[idx_v3]) if row[idx_v3] is not None else ""
+                if idx_v4 is not None and idx_v4 < len(row):
+                    c["var4"] = str(row[idx_v4]) if row[idx_v4] is not None else ""
+                if idx_v5 is not None and idx_v5 < len(row):
+                    c["var5"] = str(row[idx_v5]) if row[idx_v5] is not None else ""
+                contacts.append(c)
+
+            if not contacts:
+                messagebox.showwarning("تنبيه", "لم يتم العثور على أرقام صالحة.")
+                return
+
+            imports_dir = os.path.join(os.getcwd(), "data", "imports")
+            os.makedirs(imports_dir, exist_ok=True)
+            filename = f"import_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            filepath = os.path.join(imports_dir, filename)
+
+            import csv as _csv
+            with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
+                writer = _csv.DictWriter(f, fieldnames=["Name", "Phone", "Var1", "Var2", "Var3", "Var4", "Var5"])
+                writer.writeheader()
+                for c in contacts:
+                    writer.writerow({
+                        "Name": c.get("name", ""),
+                        "Phone": c.get("phone", ""),
+                        "Var1": c.get("var1", ""),
+                        "Var2": c.get("var2", ""),
+                        "Var3": c.get("var3", ""),
+                        "Var4": c.get("var4", ""),
+                        "Var5": c.get("var5", ""),
+                    })
+
+            self.contacts_entry.delete(0, "end")
+            self.contacts_entry.insert(0, filepath)
+            self.config.set("last_contacts_file", filepath)
+            self.config.save()
+
+            messagebox.showinfo("تم", f"تم الاستيراد: {len(contacts)} رقم\nغير صالح: {invalid}")
+            win.destroy()
+
+        # Bottom buttons
+        btn_row = ctk.CTkFrame(win, fg_color="transparent")
+        btn_row.pack(fill="x", padx=15, pady=(0, 15))
+        ctk.CTkButton(btn_row, text="إلغاء", width=90, height=32,
+                      fg_color=COLORS["card_bg"], hover_color=COLORS["border"],
+                      command=win.destroy).pack(side="left", padx=6)
+        ctk.CTkButton(btn_row, text="استيراد", width=100, height=32,
+                      fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
+                      command=_import_now).pack(side="left", padx=6)
+
+        _load_preview()
+
+    def _open_number_generator(self):
+        win = ctk.CTkToplevel(self)
+        win.title("مولد أرقام")
+        win.geometry("520x420")
+        win.minsize(480, 400)
+        win.grab_set()
+
+        cc_var = ctk.StringVar(value="20")
+        base_var = ctk.StringVar(value="10")
+        start_var = ctk.StringVar(value="00000000")
+        end_var = ctk.StringVar(value="00000010")
+        pad_var = ctk.StringVar(value="8")
+        name_prefix_var = ctk.StringVar(value="Lead")
+
+        preview_box = ctk.CTkTextbox(win, height=180, corner_radius=10,
+                                     font=ctk.CTkFont(size=11),
+                                     fg_color=COLORS["bg_dark"])
+        preview_box.pack(fill="both", expand=True, padx=12, pady=(10, 8))
+
+        def _render_preview(numbers):
+            preview_box.delete("1.0", "end")
+            for n in numbers[:50]:
+                preview_box.insert("end", f"{n}\n")
+
+        def _generate_numbers():
+            try:
+                cc = cc_var.get().strip()
+                base = base_var.get().strip()
+                pad = int(pad_var.get().strip() or "0")
+                start = int(start_var.get().strip())
+                end = int(end_var.get().strip())
+            except Exception:
+                messagebox.showerror("خطأ", "تحقق من القيم المدخلة.")
+                return []
+            if start > end:
+                start, end = end, start
+            numbers = []
+            for i in range(start, end + 1):
+                body = str(i).zfill(pad) if pad > 0 else str(i)
+                numbers.append(f"{cc}{base}{body}")
+            return numbers
+
+        def _refresh_preview():
+            nums = _generate_numbers()
+            _render_preview(nums)
+
+        def _save_and_use():
+            nums = _generate_numbers()
+            if not nums:
+                return
+            imports_dir = os.path.join(os.getcwd(), "data", "imports")
+            os.makedirs(imports_dir, exist_ok=True)
+            filename = f"generated_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            filepath = os.path.join(imports_dir, filename)
+
+            import csv as _csv
+            with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
+                writer = _csv.DictWriter(f, fieldnames=["Name", "Phone"])
+                writer.writeheader()
+                prefix = name_prefix_var.get().strip() or "Lead"
+                for idx, n in enumerate(nums, start=1):
+                    writer.writerow({"Name": f"{prefix} {idx}", "Phone": n})
+
+            self.contacts_entry.delete(0, "end")
+            self.contacts_entry.insert(0, filepath)
+            self.config.set("last_contacts_file", filepath)
+            self.config.save()
+            messagebox.showinfo("تم", f"تم توليد {len(nums)} رقم.")
+            win.destroy()
+
+        form = ctk.CTkFrame(win, corner_radius=10)
+        form.pack(fill="x", padx=12, pady=(0, 8))
+
+        def _row(label, var):
+            r = ctk.CTkFrame(form, fg_color="transparent")
+            r.pack(fill="x", padx=8, pady=4)
+            ctk.CTkLabel(r, text=label, width=120, anchor="e").pack(side="right")
+            ctk.CTkEntry(r, textvariable=var, height=28).pack(side="right", fill="x", expand=True, padx=6)
+
+        _row("رمز الدولة", cc_var)
+        _row("بداية الرقم", start_var)
+        _row("نهاية الرقم", end_var)
+        _row("طول الجزء", pad_var)
+        _row("بداية إضافية", base_var)
+        _row("اسم افتراضي", name_prefix_var)
+
+        btns = ctk.CTkFrame(win, fg_color="transparent")
+        btns.pack(fill="x", padx=12, pady=(0, 12))
+        ctk.CTkButton(btns, text="معاينة", width=90, height=30,
+                      fg_color=COLORS["card_bg"], hover_color=COLORS["border"],
+                      command=_refresh_preview).pack(side="left", padx=6)
+        ctk.CTkButton(btns, text="حفظ واستخدام", width=110, height=30,
+                      fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
+                      command=_save_and_use).pack(side="left", padx=6)
+
     def _refresh_templates_list(self):
         for w in self.templates_listbox.winfo_children():
             w.destroy()
@@ -1366,8 +1692,9 @@ class ModernWhatsAppApp(ctk.CTk):
             if os.path.exists(def_csv):
                 self.contacts_entry.insert(0, def_csv)
 
-        self.attachments = []
-        self._render_attachments()
+        if hasattr(self, "attachment_manager"):
+            self.attachment_manager.clear()
+
 
         # Load last message
         last_msg = self.config.get("last_message", "")
@@ -1377,12 +1704,14 @@ class ModernWhatsAppApp(ctk.CTk):
         # Load checkboxes
         self.send_text_var.set(self.config.get("send_text_with_image", True))
         self.bg_mode_var.set(self.config.get("background_mode", False))
+        self.spin_text_var.set(self.config.get("enable_spintax", True))
 
     def _save_current_state(self):
         self.config.set("last_contacts_file", self.contacts_entry.get())
         self.config.set("last_message", self.message_textbox.get("1.0", "end").strip())
         self.config.set("send_text_with_image", self.send_text_var.get())
         self.config.set("background_mode", self.bg_mode_var.get())
+        self.config.set("enable_spintax", self.spin_text_var.get())
         # Save window size
         self.config.set("window_width", self.winfo_width())
         self.config.set("window_height", self.winfo_height())
@@ -1394,6 +1723,145 @@ class ModernWhatsAppApp(ctk.CTk):
         if self.bot:
             self.bot.close()
         self.destroy()
+
+    # ─── Progress Window ─────────────────────────────────────────────────────
+    def _open_progress_window(self, total):
+        def _do():
+            if self.progress_win and self.progress_win.winfo_exists():
+                try:
+                    self.progress_win.destroy()
+                except Exception:
+                    pass
+            self.progress_win = ctk.CTkToplevel(self)
+            self.progress_win.title("عملية الإرسال")
+            self.progress_win.geometry("920x540")
+            self.progress_win.minsize(900, 520)
+            self.progress_win.grab_set()
+
+            header = ctk.CTkFrame(self.progress_win, corner_radius=10)
+            header.pack(fill="x", padx=12, pady=(12, 6))
+            self.progress_count_label = ctk.CTkLabel(
+                header, text=f"Sending Process (0/{total})", font=ctk.CTkFont(size=14, weight="bold")
+            )
+            self.progress_count_label.pack(side="left", padx=12, pady=8)
+
+            self.progress_bar_small = ctk.CTkProgressBar(header, height=12, corner_radius=6,
+                                                         progress_color=COLORS["primary"])
+            self.progress_bar_small.pack(fill="x", expand=True, padx=12, pady=8)
+            self.progress_bar_small.set(0)
+
+            table_frame = ctk.CTkFrame(self.progress_win, corner_radius=10)
+            table_frame.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+
+            columns = ("id", "type", "date", "status", "message")
+            self.progress_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=14)
+            self.progress_tree.heading("id", text="ID")
+            self.progress_tree.heading("type", text="Type")
+            self.progress_tree.heading("date", text="Sending Date")
+            self.progress_tree.heading("status", text="Status")
+            self.progress_tree.heading("message", text="Message")
+            self.progress_tree.column("id", width=150, anchor="center")
+            self.progress_tree.column("type", width=80, anchor="center")
+            self.progress_tree.column("date", width=150, anchor="center")
+            self.progress_tree.column("status", width=90, anchor="center")
+            self.progress_tree.column("message", width=350, anchor="w")
+
+            style = ttk.Style(self.progress_win)
+            try:
+                style.theme_use("clam")
+            except Exception:
+                pass
+            style.configure(
+                "Treeview",
+                background="#111827" if ctk.get_appearance_mode() == "Dark" else "#FFFFFF",
+                foreground="#E5E7EB" if ctk.get_appearance_mode() == "Dark" else "#111827",
+                fieldbackground="#111827" if ctk.get_appearance_mode() == "Dark" else "#FFFFFF",
+                rowheight=24,
+            )
+            style.configure("Treeview.Heading", font=("Segoe UI", 10, "bold"))
+
+            tree_scroll = ttk.Scrollbar(table_frame, orient="vertical", command=self.progress_tree.yview)
+            self.progress_tree.configure(yscrollcommand=tree_scroll.set)
+            self.progress_tree.pack(side="left", fill="both", expand=True, padx=(10, 0), pady=10)
+            tree_scroll.pack(side="right", fill="y", pady=10, padx=(0, 10))
+
+            footer = ctk.CTkFrame(self.progress_win, corner_radius=10)
+            footer.pack(fill="x", padx=12, pady=(0, 12))
+            self.progress_status_label = ctk.CTkLabel(
+                footer, text="Ready", font=ctk.CTkFont(size=11), text_color=COLORS["text_muted"]
+            )
+            self.progress_status_label.pack(side="left", padx=12, pady=8)
+
+            ctk.CTkButton(footer, text="Export", width=90, height=28,
+                          fg_color=COLORS["card_bg"], hover_color=COLORS["border"],
+                          command=self._export_last_report).pack(side="right", padx=6)
+            self.pause_btn = ctk.CTkButton(footer, text="Pause", width=90, height=28,
+                                           fg_color=COLORS["warning"], hover_color=COLORS["warning"],
+                                           command=self._toggle_pause)
+            self.pause_btn.pack(side="right", padx=6)
+            ctk.CTkButton(footer, text="Close", width=90, height=28,
+                          fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+                          command=self._close_progress_window).pack(side="right", padx=6)
+
+        self._run_on_ui(_do)
+
+    def _close_progress_window(self):
+        if self.progress_win and self.progress_win.winfo_exists():
+            self.progress_win.destroy()
+        self.progress_win = None
+        self.progress_tree = None
+        self.progress_count_label = None
+        self.progress_status_label = None
+        self.progress_bar_small = None
+
+    def _export_last_report(self):
+        if self.last_report_path and os.path.exists(self.last_report_path):
+            self._open_csv(self.last_report_path)
+        else:
+            messagebox.showinfo("تنبيه", "لا يوجد تقرير للتصدير بعد.")
+
+    def _toggle_pause(self):
+        if not self.is_running:
+            return
+        if self.is_paused:
+            self.pause_event.clear()
+            self.is_paused = False
+            if hasattr(self, "pause_btn"):
+                self.pause_btn.configure(text="Pause")
+            self._set_progress_status("Resumed...")
+        else:
+            self.pause_event.set()
+            self.is_paused = True
+            if hasattr(self, "pause_btn"):
+                self.pause_btn.configure(text="Resume")
+            self._set_progress_status("Paused")
+
+    def _set_progress_status(self, text):
+        def _do():
+            if self.progress_status_label:
+                self.progress_status_label.configure(text=text)
+        self._run_on_ui(_do)
+
+    def _add_progress_row(self, row_values):
+        def _do():
+            if self.progress_tree:
+                self.progress_tree.insert("", "end", values=row_values)
+                self.progress_tree.see(self.progress_tree.get_children()[-1])
+        self._run_on_ui(_do)
+
+    def _update_progress_header(self, processed, total, current_phone=None, eta_seconds=None):
+        def _do():
+            if self.progress_count_label:
+                self.progress_count_label.configure(text=f"Sending Process ({processed}/{total})")
+            if self.progress_bar_small:
+                self.progress_bar_small.set(processed / total if total else 0)
+            if self.progress_status_label and current_phone:
+                if eta_seconds is not None:
+                    mins, secs = divmod(int(eta_seconds), 60)
+                    self.progress_status_label.configure(text=f"Sending message to: {current_phone} | ETA: {mins:02d}:{secs:02d}")
+                else:
+                    self.progress_status_label.configure(text=f"Sending message to: {current_phone}")
+        self._run_on_ui(_do)
 
     # ═══════════════════════════════════════════════════════════════════════
     #  BOT ACTIONS
@@ -1492,21 +1960,24 @@ class ModernWhatsAppApp(ctk.CTk):
 
     def _prepare_content(self):
         msg_template = self.message_textbox.get("1.0", "end").strip()
+        # Get attachments from the new manager
+        raw_attachments = self.attachment_manager.get_attachments()
         attachments = []
 
-        for att in self.attachments:
+        for att in raw_attachments:
             path = att.get("path", "").strip()
             if not path:
                 continue
             if not os.path.exists(path):
                 self.report_error("ERR-09", f"الملف غير موجود: {path}", dialog=True)
                 return None, None
-            item = {"type": att.get("type", "document"), "path": path}
-            cap_var = att.get("caption_var")
-            if cap_var:
-                cap = cap_var.get().strip()
-                if cap:
-                    item["caption"] = cap
+            
+            # Map to format expected by bot
+            item = {
+                "type": att.get("type", "document"),
+                "path": path,
+                "caption": att.get("caption", "").strip()
+            }
             attachments.append(item)
 
         # Check if empty
@@ -1551,6 +2022,57 @@ class ModernWhatsAppApp(ctk.CTk):
             types = "بدون مرفقات"
         self.log(f"🧪 فحص قبل الإرسال: جهات={len(contacts)} | رسالة={msg_len} حرف | مرفقات={types}")
 
+    def _apply_template(self, text, contact):
+        if not text:
+            return ""
+        out = str(text)
+        mapping = {
+            "name": contact.get("name", ""),
+            "phone": contact.get("phone", ""),
+            "var1": contact.get("var1", ""),
+            "var2": contact.get("var2", ""),
+            "var3": contact.get("var3", ""),
+            "var4": contact.get("var4", ""),
+            "var5": contact.get("var5", ""),
+        }
+        for k, v in mapping.items():
+            out = out.replace("{" + k + "}", str(v) if v is not None else "")
+        if self.spin_text_var.get():
+            out = self._apply_spintax(out)
+        return out
+
+    def _apply_spintax(self, text):
+        # Only replace braces that contain a '|', so {name} stays intact.
+        pattern = re.compile(r"\{([^{}]*\|[^{}]*)\}")
+        prev = None
+        while prev != text:
+            prev = text
+
+            def _pick(match):
+                opts = match.group(1).split("|")
+                return random.choice(opts).strip()
+
+            text = pattern.sub(_pick, text)
+        return text
+
+    def _format_attachments_for_contact(self, attachments, contact):
+        if not attachments:
+            return []
+        formatted = []
+        for att in attachments:
+            item = {"type": att.get("type", "document"), "path": att.get("path")}
+            cap = att.get("caption")
+            if cap:
+                item["caption"] = self._apply_template(cap, contact)
+            formatted.append(item)
+        return formatted
+
+    def _split_messages(self, text):
+        if not text:
+            return []
+        parts = re.split(r"\n\s*---\s*\n", text)
+        return [p.strip() for p in parts if p.strip()]
+
     def _begin_send(self, contacts, msg_template, attachments):
         if self.is_running:
             return
@@ -1567,6 +2089,8 @@ class ModernWhatsAppApp(ctk.CTk):
         # 5. Start Thread
         self.is_running = True
         self.stop_event.clear()
+        self.pause_event.clear()
+        self.is_paused = False
 
         self._log_preflight(contacts, msg_template, attachments)
 
@@ -1576,6 +2100,10 @@ class ModernWhatsAppApp(ctk.CTk):
             self.btn_check.configure(state="disabled")
         self.progress_bar.set(0)
         self.status_label.configure(text="جاري العمل...")
+        if hasattr(self, "pause_btn"):
+            self.pause_btn.configure(text="Pause")
+
+        self._open_progress_window_pro(len(contacts))
 
         threading.Thread(
             target=self._run_automation,
@@ -1647,6 +2175,11 @@ class ModernWhatsAppApp(ctk.CTk):
     def _stop_action(self):
         if messagebox.askyesno("تأكيد", "هل تريد إيقاف العملية؟"):
             self.stop_event.set()
+            if self.pause_event.is_set():
+                self.pause_event.clear()
+                self.is_paused = False
+                if hasattr(self, "pause_btn"):
+                    self.pause_btn.configure(text="Pause")
             self.log("🛑 طلب إيقاف...")
 
     def _map_bot_error(self, res):
@@ -1726,6 +2259,8 @@ class ModernWhatsAppApp(ctk.CTk):
         for i, c in enumerate(contacts):
             if self.stop_event.is_set():
                 break
+            while self.pause_event.is_set() and not self.stop_event.is_set():
+                time.sleep(0.3)
 
             # Batch pause
             if i > 0 and i % batch_size == 0:
@@ -1739,6 +2274,11 @@ class ModernWhatsAppApp(ctk.CTk):
             processed = i + 1
             self._run_on_ui(lambda: self.status_label.configure(text=f"جاري إرسال {processed}/{total} إلى {name}..."))
             self._run_on_ui(lambda: self.progress_bar.set(processed / total))
+            elapsed = (datetime.datetime.now() - start_time).total_seconds()
+            eta = None
+            if processed > 0 and total > processed:
+                eta = (elapsed / processed) * (total - processed)
+            self._update_progress_header_pro(processed, total, phone)
 
             if not phone:
                 self.invalid += 1
@@ -1751,14 +2291,22 @@ class ModernWhatsAppApp(ctk.CTk):
                 self.report_error("ERR-21", dialog=True, level="warning")
                 break
 
+            # Prepare personalized content
+            msg_for_contact = self._apply_template(msg_template, c)
+            atts_for_contact = self._format_attachments_for_contact(attachments, c)
+            segments = self._split_messages(msg_for_contact)
+            primary_msg = segments[0] if segments else msg_for_contact
+            extra_msgs = segments[1:] if segments else []
+
             # Send Message + Attachments with retries
             res = None
             for attempt in range(max_retries + 1):
                 res = self.bot.send_message(
                     phone=phone,
                     name=name,
-                    message_template=msg_template,
-                    attachments=attachments,
+                    message_template=primary_msg,
+                    extra_messages=extra_msgs,
+                    attachments=atts_for_contact,
                     stop_event=self.stop_event,
                     send_text_with_image=self.send_text_var.get()
                 )
@@ -1778,20 +2326,24 @@ class ModernWhatsAppApp(ctk.CTk):
                 self.sent += 1
                 self.log(f"✅ تم الإرسال لـ {name}")
                 self.results_log.append({"phone": phone, "name": name, "status": "نجاح", "error_code": "-", "timestamp": timestamp})
+                self._add_progress_row_pro([phone, "Contact", timestamp, "Sent", "Success"], tag="success")
                 consecutive_failures = 0
             elif res == "INVALID":
                 self.invalid += 1
                 self.log(f"🚫 [ERR-20] الرقم {phone} غير صحيح.")
                 self.results_log.append({"phone": phone, "name": name, "status": "بدون واتساب", "error_code": "ERR-20", "timestamp": timestamp})
+                self._add_progress_row_pro([phone, "Contact", timestamp, "Invalid", "No WhatsApp"], tag="invalid")
                 consecutive_failures = 0
             elif res == "STOPPED":
                 self.results_log.append({"phone": phone, "name": name, "status": "توقف", "error_code": "-", "timestamp": timestamp})
+                self._add_progress_row_pro([phone, "Contact", timestamp, "Stopped", "User stopped"], tag="stopped")
                 break
             else:
                 self.failed += 1
                 err_code = res if res.startswith("ERR") else "ERR-UNKNOWN"
                 self.log(f"❌ فشل: {phone} | {res}")
                 self.results_log.append({"phone": phone, "name": name, "status": "فشل", "error_code": err_code, "timestamp": timestamp})
+                self._add_progress_row_pro([phone, "Contact", timestamp, "Failed", str(res)], tag="failed")
                 consecutive_failures += 1
                 if consecutive_failures >= max_consecutive_failures:
                     self.log(f"⛔ تم الإيقاف تلقائياً بعد {consecutive_failures} فشل متتالي لتقليل المخاطر.")
@@ -1808,6 +2360,7 @@ class ModernWhatsAppApp(ctk.CTk):
         
         # Save Campaign
         csv_path = self._generate_final_report(duration)
+        self.last_report_path = csv_path
         
         # Determine status
         c_status = "Completed" if not self.stop_event.is_set() else "Stopped"
@@ -1841,10 +2394,14 @@ class ModernWhatsAppApp(ctk.CTk):
             self.report_error("ERR-99", "حدث خطأ عام أثناء الإرسال.", detail=str(e), dialog=True)
         finally:
             self.is_running = False
+            self.pause_event.clear()
+            self.is_paused = False
             self._run_on_ui(lambda: self.btn_start.configure(state="normal"))
             self._run_on_ui(lambda: self.btn_stop.configure(state="disabled"))
             if hasattr(self, "btn_check"):
                 self._run_on_ui(lambda: self.btn_check.configure(state="normal"))
+            if hasattr(self, "pause_btn"):
+                self._run_on_ui(lambda: self.pause_btn.configure(text="Pause"))
             self._run_on_ui(lambda: self.status_label.configure(text="جاهز..."))
 
     def _run_number_check(self, contacts):
@@ -1986,3 +2543,150 @@ class ModernWhatsAppApp(ctk.CTk):
         except Exception as e:
             self.log(f"⚠ تعذر حفظ التقرير: {e}")
             return None
+
+    # ═══════════════════════════════════════════════════════════════════════
+    #  PRO VERSION PROGRESS WINDOW (APPENDED)
+    # ═══════════════════════════════════════════════════════════════════════
+    def _open_progress_window_pro(self, total):
+        def _do():
+            if self.progress_win and self.progress_win.winfo_exists():
+                try:
+                    self.progress_win.destroy()
+                except Exception:
+                    pass
+            self.progress_win = ctk.CTkToplevel(self)
+            self.progress_win.title("Auto WhatsApp Sender — Live Tracking")
+            self.progress_win.geometry("950x650")
+            self.progress_win.minsize(900, 550)
+            self.progress_win.grab_set()
+            
+            # Focus
+            self.progress_win.after(100, self.progress_win.lift)
+
+            # Main Container
+            main_cont = ctk.CTkFrame(self.progress_win, corner_radius=0, fg_color=COLORS["bg_dark"])
+            main_cont.pack(fill="both", expand=True)
+
+            # 1. Top Header (Counters)
+            header = ctk.CTkFrame(main_cont, corner_radius=10, fg_color=COLORS["card_bg"])
+            header.pack(fill="x", padx=15, pady=(15, 10))
+            
+            # Title & Counter
+            top_row = ctk.CTkFrame(header, fg_color="transparent")
+            top_row.pack(fill="x", padx=15, pady=(10, 5))
+            
+            self.progress_count_label = ctk.CTkLabel(
+                top_row, text=f"Sending Process (0/{total})", 
+                font=("Segoe UI", 16, "bold"), text_color=COLORS["text_main"]
+            )
+            self.progress_count_label.pack(side="left")
+            
+            status_chip = ctk.CTkLabel(
+                top_row, text="Running 🚀", 
+                font=("Segoe UI", 12, "bold"), text_color=COLORS["bg_dark"],
+                fg_color=COLORS["primary"], corner_radius=6, padx=10, pady=2
+            )
+            status_chip.pack(side="right")
+            self.progress_state_label = status_chip
+
+            # Progress Bar (Thick & Green)
+            self.progress_bar_small = ctk.CTkProgressBar(header, height=16, corner_radius=8,
+                                                         progress_color=COLORS["success"],
+                                                         border_color=COLORS["border"], border_width=1)
+            self.progress_bar_small.pack(fill="x", expand=True, padx=15, pady=(5, 15))
+            self.progress_bar_small.set(0)
+
+            # 2. Data Grid (Treeview)
+            table_frame = ctk.CTkFrame(main_cont, corner_radius=10, fg_color=COLORS["card_bg"])
+            table_frame.pack(fill="both", expand=True, padx=15, pady=(0, 10))
+
+            columns = ("id", "type", "date", "status", "message")
+            self.progress_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15)
+            
+            # Conference Style columns
+            self.progress_tree.heading("id", text="Phone / ID")
+            self.progress_tree.heading("type", text="Type")
+            self.progress_tree.heading("date", text="Time")
+            self.progress_tree.heading("status", text="Status")
+            self.progress_tree.heading("message", text="Result / Message")
+            
+            self.progress_tree.column("id", width=160, anchor="w")
+            self.progress_tree.column("type", width=80, anchor="center")
+            self.progress_tree.column("date", width=140, anchor="center")
+            self.progress_tree.column("status", width=100, anchor="center")
+            self.progress_tree.column("message", width=300, anchor="w")
+
+            # Styling the Treeview
+            style = ttk.Style(self.progress_win)
+            try:
+                style.theme_use("clam")
+            except:
+                pass
+            
+            bg_color = "#1E293B" if ctk.get_appearance_mode() == "Dark" else "#FFFFFF"
+            fg_color = "#F1F5F9" if ctk.get_appearance_mode() == "Dark" else "#0F172A"
+            row_height = 30
+            
+            style.configure(
+                "Treeview",
+                background=bg_color,
+                foreground=fg_color,
+                fieldbackground=bg_color,
+                rowheight=row_height,
+                font=("Segoe UI", 11),
+                borderwidth=0
+            )
+            style.configure("Treeview.Heading", font=("Segoe UI", 11, "bold"), background=COLORS["primary_dark"], foreground=COLORS["primary"])
+            style.map("Treeview", background=[("selected", COLORS["primary"])], foreground=[("selected", "black")])
+
+            # Tags for coloring rows
+            self.progress_tree.tag_configure("success", foreground=COLORS["success"])
+            self.progress_tree.tag_configure("failed", foreground=COLORS["danger"])
+            self.progress_tree.tag_configure("waiting", foreground=COLORS["text_muted"])
+            self.progress_tree.tag_configure("invalid", foreground=COLORS["warning"])
+            self.progress_tree.tag_configure("stopped", foreground=COLORS["info"])
+
+            tree_scroll = ctk.CTkScrollbar(table_frame, command=self.progress_tree.yview)
+            self.progress_tree.configure(yscrollcommand=tree_scroll.set)
+            self.progress_tree.pack(side="left", fill="both", expand=True, padx=2, pady=2)
+            tree_scroll.pack(side="right", fill="y", padx=2, pady=2)
+
+            # 3. Footer Controls
+            footer = ctk.CTkFrame(main_cont, corner_radius=10, fg_color=COLORS["card_bg"], height=60)
+            footer.pack(fill="x", padx=15, pady=(0, 15))
+            
+            self.progress_status_label = ctk.CTkLabel(
+                footer, text="Starting...", font=("Segoe UI", 12), text_color=COLORS["text_muted"]
+            )
+            self.progress_status_label.pack(side="left", padx=20, pady=15)
+
+            # Buttons
+            btn_style = {"width": 100, "height": 32, "font": ("Segoe UI", 12, "bold")}
+            
+            ctk.CTkButton(footer, text="Close ✖", fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+                          command=self._close_progress_window, **btn_style).pack(side="right", padx=10)
+                          
+            self.pause_btn = ctk.CTkButton(footer, text="Pause ⏸", fg_color=COLORS["warning"], hover_color="#E0A800",
+                                           text_color="black", command=self._toggle_pause, **btn_style)
+            self.pause_btn.pack(side="right", padx=5)
+            
+            ctk.CTkButton(footer, text="Export CSV 📥", fg_color=COLORS["info"], hover_color="#0284C7",
+                          command=self._export_last_report, **btn_style).pack(side="right", padx=5)
+
+        self._run_on_ui(_do)
+
+    def _add_progress_row_pro(self, row_values, tag="waiting"):
+        def _do():
+            if self.progress_tree:
+                self.progress_tree.insert("", "0", values=row_values, tags=(tag,))
+        self._run_on_ui(_do)
+
+    def _update_progress_header_pro(self, processed, total, current_phone=None):
+        def _do():
+            if self.progress_count_label:
+                self.progress_count_label.configure(text=f"Sending Process ({processed}/{total})")
+            if self.progress_bar_small:
+                self.progress_bar_small.set(processed / total if total else 0)
+            if self.progress_status_label and current_phone:
+                self.progress_status_label.configure(text=f"Processing: {current_phone}")
+        self._run_on_ui(_do)

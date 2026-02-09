@@ -236,7 +236,7 @@ class WhatsAppBot:
             except:
                 pass
 
-    def send_message(self, phone, name, message_template, attachments=None, stop_event=None, send_text_with_image=True):
+    def send_message(self, phone, name, message_template, attachments=None, extra_messages=None, stop_event=None, send_text_with_image=True):
         """Sends a message and optionally multiple attachments (image, video, document)."""
         if stop_event and stop_event.is_set():
             return "STOPPED"
@@ -303,10 +303,34 @@ class WhatsAppBot:
                     text_res = self._send_text(message)
                     if text_res != "SUCCESS":
                         return text_res
+                # Send extra messages (if any)
+                if extra_messages:
+                    for m in extra_messages:
+                        if stop_event and stop_event.is_set():
+                            return "STOPPED"
+                        if not m:
+                            continue
+                        text_res = self._send_text(m)
+                        if text_res != "SUCCESS":
+                            return text_res
+                        time.sleep(0.4)
                 return "SUCCESS"
             else:
                 # Text Only
-                return self._send_text(message)
+                res = self._send_text(message)
+                if res != "SUCCESS":
+                    return res
+                if extra_messages:
+                    for m in extra_messages:
+                        if stop_event and stop_event.is_set():
+                            return "STOPPED"
+                        if not m:
+                            continue
+                        text_res = self._send_text(m)
+                        if text_res != "SUCCESS":
+                            return text_res
+                        time.sleep(0.4)
+                return "SUCCESS"
 
         except Exception as e:
             return f"ERR_GENERAL: {str(e)[:100]}"

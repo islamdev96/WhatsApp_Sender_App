@@ -22,6 +22,7 @@ DEFAULT_CONFIG = {
     "retry_delay_min": 3,
     "retry_delay_max": 6,
     "max_consecutive_failures": 5,
+    "enable_spintax": True,
     "profile_name": "Default",
     "profiles_dir": os.path.join("data", "profiles"),
     "window_width": 1000,

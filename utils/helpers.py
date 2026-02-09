@@ -17,6 +17,10 @@ def _normalize_phone(phone):
         phone = '20' + phone
     return phone
 
+def normalize_phone(phone):
+    """Public wrapper for phone normalization."""
+    return _normalize_phone(phone)
+
 
 def read_contacts(file_path):
     """Reads contacts from a CSV file and returns a list of dictionaries."""
@@ -33,10 +37,21 @@ def read_contacts(file_path):
                 phone = normalized_row.get('phone') or normalized_row.get('mobile') or \
                         normalized_row.get('number') or normalized_row.get('phone 1 - value')
                 name = normalized_row.get('name') or normalized_row.get('given name') or 'Customer'
+                var1 = normalized_row.get('var1') or normalized_row.get('variable1') or normalized_row.get('v1')
+                var2 = normalized_row.get('var2') or normalized_row.get('variable2') or normalized_row.get('v2')
+                var3 = normalized_row.get('var3') or normalized_row.get('variable3') or normalized_row.get('v3')
+                var4 = normalized_row.get('var4') or normalized_row.get('variable4') or normalized_row.get('v4')
+                var5 = normalized_row.get('var5') or normalized_row.get('variable5') or normalized_row.get('v5')
 
                 phone = _normalize_phone(phone)
                 if phone:
-                    contacts.append({'phone': phone, 'name': name.strip()})
+                    c = {'phone': phone, 'name': name.strip()}
+                    if var1: c['var1'] = var1
+                    if var2: c['var2'] = var2
+                    if var3: c['var3'] = var3
+                    if var4: c['var4'] = var4
+                    if var5: c['var5'] = var5
+                    contacts.append(c)
     except Exception as e:
         print(f"Error reading CSV: {e}")
 
@@ -67,6 +82,18 @@ def read_contacts_excel(file_path):
                 phone_col = i
             if h in ('name', 'given name', 'اسم', 'الاسم'):
                 name_col = i
+        var_cols = {}
+        for i, h in enumerate(headers):
+            if h in ('var1', 'variable1', 'v1'):
+                var_cols['var1'] = i
+            if h in ('var2', 'variable2', 'v2'):
+                var_cols['var2'] = i
+            if h in ('var3', 'variable3', 'v3'):
+                var_cols['var3'] = i
+            if h in ('var4', 'variable4', 'v4'):
+                var_cols['var4'] = i
+            if h in ('var5', 'variable5', 'v5'):
+                var_cols['var5'] = i
 
         if phone_col is None:
             # Try first two columns: assume col 0=name, col 1=phone
@@ -85,7 +112,13 @@ def read_contacts_excel(file_path):
 
             phone = _normalize_phone(phone_val)
             if phone:
-                contacts.append({'phone': phone, 'name': str(name_val or 'Customer').strip()})
+                c = {'phone': phone, 'name': str(name_val or 'Customer').strip()}
+                for k, idx in var_cols.items():
+                    if idx < len(row):
+                        val = row[idx].value
+                        if val is not None:
+                            c[k] = str(val)
+                contacts.append(c)
 
         wb.close()
     except Exception as e:
@@ -110,8 +143,8 @@ def create_contacts_template(file_path):
     try:
         with open(file_path, 'w', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
-            writer.writerow(['Name', 'Phone'])
-            writer.writerow(['Client Name', '010XXXXXXXX'])
+            writer.writerow(['Name', 'Phone', 'Var1', 'Var2', 'Var3', 'Var4', 'Var5'])
+            writer.writerow(['Client Name', '010XXXXXXXX', 'Value1', 'Value2', 'Value3', 'Value4', 'Value5'])
         return True
     except:
         return False
