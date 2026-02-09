@@ -1,11 +1,6 @@
-2026/02/09-11:39:54.438 1920 Reusing MANIFEST C:\Users\Islam Glab\Desktop\WhatsApp_Sender_App\chrome_profile\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
-2026/02/09-11:39:54.438 1920 Recovering log #64
-2026/02/09-11:39:54.439 1920 Reusing old log C:\Users\Islam Glab\Desktop\WhatsApp_Sender_App\chrome_profile\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000064.log 
-2026/02/09-11:39:59.474 1920 Compacting 1@1 + 2@2 files
-2026/02/09-11:39:59.546 1920 Generated table #67@1: 54951 keys, 2212815 bytes
-2026/02/09-11:39:59.590 1920 Generated table #68@1: 19647 keys, 1701542 bytes
-2026/02/09-11:39:59.590 1920 Compacted 1@1 + 2@2 files => 3914357 bytes
-2026/02/09-11:39:59.594 1920 compacted to: files[ 0 0 2 0 0 0 0 ]
-2026/02/09-11:39:59.594 1920 Delete type=2 #62
-2026/02/09-11:39:59.594 1920 Delete type=2 #63
-2026/02/09-11:39:59.594 1920 Delete type=2 #65
+2026/02/09-12:01:45.731 7b8 Reusing MANIFEST C:\Users\Islam Glab\Desktop\WhatsApp_Sender_App\chrome_profile\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/02/09-12:01:45.732 7b8 Recovering log #70
+2026/02/09-12:01:45.765 7b8 Reusing old log C:\Users\Islam Glab\Desktop\WhatsApp_Sender_App\chrome_profile\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000070.log 
+2026/02/09-12:04:45.106 7b8 Level-0 table #76: started
+2026/02/09-12:04:45.138 7b8 Level-0 table #76: 1222060 bytes OK
+2026/02/09-12:04:45.142 7b8 Delete type=0 #70

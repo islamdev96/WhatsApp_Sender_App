@@ -1,0 +1,13 @@
+chrome_profile/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.db
+.sqlite
+.log
+*.csv
+!test_my_number.csv
+!contacts.csv
+!test_contacts.csv
+!template_contacts.csv

@@ -1,3 +1,6 @@
-2026/02/09-11:39:53.672 25d4 Reusing MANIFEST C:\Users\Islam Glab\Desktop\WhatsApp_Sender_App\chrome_profile\Default\Local Storage\leveldb/MANIFEST-000001
-2026/02/09-11:39:53.679 25d4 Recovering log #3
-2026/02/09-11:39:53.681 25d4 Reusing old log C:\Users\Islam Glab\Desktop\WhatsApp_Sender_App\chrome_profile\Default\Local Storage\leveldb/000003.log 
+2026/02/09-12:01:44.971 1b2c Reusing MANIFEST C:\Users\Islam Glab\Desktop\WhatsApp_Sender_App\chrome_profile\Default\Local Storage\leveldb/MANIFEST-000001
+2026/02/09-12:01:44.976 1b2c Recovering log #3
+2026/02/09-12:01:44.978 1b2c Reusing old log C:\Users\Islam Glab\Desktop\WhatsApp_Sender_App\chrome_profile\Default\Local Storage\leveldb/000003.log 
+2026/02/09-12:02:44.988 a4 Level-0 table #5: started
+2026/02/09-12:02:44.995 a4 Level-0 table #5: 18782 bytes OK
+2026/02/09-12:02:45.002 a4 Delete type=0 #3
