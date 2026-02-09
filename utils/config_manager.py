@@ -18,6 +18,12 @@ DEFAULT_CONFIG = {
     "batch_size": 30,
     "batch_pause_min": 180,
     "batch_pause_max": 240,
+    "max_retries": 2,
+    "retry_delay_min": 3,
+    "retry_delay_max": 6,
+    "max_consecutive_failures": 5,
+    "profile_name": "Default",
+    "profiles_dir": os.path.join("data", "profiles"),
     "window_width": 1000,
     "window_height": 700,
 }

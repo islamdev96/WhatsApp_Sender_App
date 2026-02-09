@@ -1,6 +1,7 @@
 import time
 import random
 import urllib.parse
+import json
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -77,6 +78,51 @@ class WhatsAppBot:
             (By.XPATH, '//*[contains(text(),"ليس لديه واتساب")]'),
             (By.XPATH, '//*[contains(text(),"ليس لديه WhatsApp")]'),
         ]
+
+        self._load_selectors_from_file()
+
+    def _load_selectors_from_file(self):
+        selectors_path = os.path.join(os.path.dirname(__file__), "selectors.json")
+        if not os.path.exists(selectors_path):
+            return
+        try:
+            with open(selectors_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            mode = str(data.get("mode", "merge")).lower()
+            mapping = {
+                "xpath": By.XPATH,
+                "css": By.CSS_SELECTOR,
+                "css_selector": By.CSS_SELECTOR,
+                "id": By.ID,
+                "name": By.NAME,
+                "class": By.CLASS_NAME,
+                "class_name": By.CLASS_NAME,
+            }
+
+            def _parse_list(items):
+                parsed = []
+                for item in items or []:
+                    by = mapping.get(str(item.get("by", "")).lower())
+                    value = item.get("value")
+                    if by and value:
+                        parsed.append((by, value))
+                return parsed
+
+            for key, value in data.items():
+                if not key.endswith("_LOCATORS"):
+                    continue
+                parsed = _parse_list(value)
+                if not parsed:
+                    continue
+                if hasattr(self, key):
+                    if mode == "replace":
+                        setattr(self, key, parsed)
+                    else:
+                        current = getattr(self, key)
+                        setattr(self, key, current + parsed)
+        except Exception:
+            # If selectors file is malformed, ignore and use defaults.
+            return
 
     def _find_any(self, locators):
         if not self.driver:
@@ -190,7 +236,7 @@ class WhatsAppBot:
             except:
                 pass
 
-    def send_message(self, phone, name, message_template, attachments=None, stop_event=None):
+    def send_message(self, phone, name, message_template, attachments=None, stop_event=None, send_text_with_image=True):
         """Sends a message and optionally multiple attachments (image, video, document)."""
         if stop_event and stop_event.is_set():
             return "STOPPED"
@@ -239,8 +285,13 @@ class WhatsAppBot:
                     path = att.get("path")
                     type_ = att.get("type", "image")
                     
-                    # Determine caption: only for first attachment if message exists
-                    caption = message if (i == 0 and message) else None
+                    # Determine caption: prefer per-attachment caption, else first attachment uses message
+                    raw_caption = att.get("caption")
+                    caption = None
+                    if raw_caption:
+                        caption = str(raw_caption).replace("{name}", name).strip()
+                    elif i == 0 and message and send_text_with_image:
+                        caption = message
                     
                     # Perform Attachment
                     res = self._send_attachment(path, type_, caption)
@@ -248,6 +299,10 @@ class WhatsAppBot:
                         return res # Fail fast or continue? Fail fast is safer for now.
                     
                     time.sleep(2)
+                if message and not send_text_with_image:
+                    text_res = self._send_text(message)
+                    if text_res != "SUCCESS":
+                        return text_res
                 return "SUCCESS"
             else:
                 # Text Only
@@ -256,11 +311,29 @@ class WhatsAppBot:
         except Exception as e:
             return f"ERR_GENERAL: {str(e)[:100]}"
 
+    def check_number(self, phone, stop_event=None):
+        """Checks if a phone number has WhatsApp without sending a message."""
+        if stop_event and stop_event.is_set():
+            return "STOPPED"
+        if not self.driver:
+            return "ERR_NOT_READY"
+        url = f"https://web.whatsapp.com/send?phone={phone}"
+        try:
+            self.driver.get(url)
+            ready_state = self._wait_for_chat_or_invalid(timeout=45)
+            if ready_state == "INVALID":
+                return "INVALID"
+            if ready_state == "READY":
+                return "VALID"
+            return "ERR_TIMEOUT"
+        except Exception as e:
+            return f"ERR_GENERAL: {str(e)[:100]}"
+
     def _send_attachment(self, path, media_type, caption=None):
         """Internal method to upload a single file."""
         try:
             # 1. Click Attach Button
-            attach_btn = self._find_any(self.ATTACH_BUTTON_LOCATORS)
+            attach_btn = self._find_best_clickable(self.ATTACH_BUTTON_LOCATORS) or self._find_any(self.ATTACH_BUTTON_LOCATORS)
             if not attach_btn:
                 return "ERR_ATTACH_BTN_NOT_FOUND"
             self.driver.execute_script("arguments[0].click();", attach_btn)
@@ -318,7 +391,7 @@ class WhatsAppBot:
             
             if media_type == 'document':
                  # Document preview is just a small box with send button
-                 send_btn = self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=15)
+                 send_btn = self._find_best_clickable(self.SEND_BUTTON_LOCATORS) or self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=15)
                  if not send_btn:
                      return "ERR_DOC_SEND_BTN_NOT_FOUND"
             else:
@@ -331,7 +404,7 @@ class WhatsAppBot:
                         caption_box.send_keys(caption)
                         time.sleep(1.0)
                 
-                send_btn = self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=15)
+                send_btn = self._find_best_clickable(self.SEND_BUTTON_LOCATORS) or self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=15)
             
             if not send_btn:
                 return "ERR_SEND_BTN_NOT_FOUND"
@@ -351,27 +424,56 @@ class WhatsAppBot:
         except Exception as e:
             return f"ERR_ATTACH_{media_type.upper()}: {str(e)[:50]}"
 
+    def _human_type(self, element, text):
+        """Types text like a human with random delays."""
+        for char in text:
+            element.send_keys(char)
+            time.sleep(random.uniform(0.05, 0.2))
+
+    def _random_scroll(self):
+        """Simulates random scrolling in the chat list to mimic human activity."""
+        try:
+            # Find chat/side pane
+            pane = self._find_any([
+                (By.ID, "pane-side"),
+                (By.XPATH, '//div[@id="pane-side"]'),
+            ])
+            if pane:
+                self.driver.execute_script("arguments[0].scrollTop += arguments[1]", pane, random.randint(100, 300))
+                time.sleep(random.uniform(0.5, 1.5))
+                self.driver.execute_script("arguments[0].scrollTop -= arguments[1]", pane, random.randint(50, 150))
+        except:
+            pass
+
     def _send_text(self, message):
         try:
             chat_input = self._wait_for_any(self.CHAT_INPUT_LOCATORS, timeout=30)
             if not chat_input:
                 return "ERR_CHAT_INPUT_NOT_FOUND"
+            
             chat_input.click()
-            chat_input.send_keys(message)
+            time.sleep(0.5)
+            
+            # Use human typing for shorter messages to avoid detection
+            if len(message) < 200:
+                self._human_type(chat_input, message)
+            else:
+                chat_input.send_keys(message) # Paste long messages
+                
             time.sleep(0.5)
 
-            send_btn = self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=10)
+            send_btn = self._find_best_clickable(self.SEND_BUTTON_LOCATORS) or self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=10)
             if send_btn:
                 try:
+                    send_btn.click()
+                except:
                     self.driver.execute_script("arguments[0].click();", send_btn)
-                except Exception:
-                    pass
-            # Fallback Enter
-            try:
+            else:
+                # Fallback Enter
                 chat_input.send_keys(Keys.ENTER)
-            except:
-                pass
+                
             time.sleep(1)
+            self._random_scroll() # Scroll a bit after sending
             return "SUCCESS"
         except Exception as e:
             return f"ERR_TEXT_SEND: {str(e)[:50]}"
