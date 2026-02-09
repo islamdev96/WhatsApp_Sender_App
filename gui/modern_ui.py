@@ -23,6 +23,7 @@ from utils.templates_manager import TemplatesManager
 from utils.contacts_manager import ContactsManager
 from utils.scheduler import Scheduler
 from utils.campaign_manager import CampaignManager
+from utils.workflow_manager import WorkflowManager
 
 # ─── Color Palette (Premium) ────────────────────────────────────────────────
 PALETTE_DARK = {
@@ -486,6 +487,11 @@ class ModernWhatsAppApp(ctk.CTk):
                                        hover_color=COLORS["accent_hover"],
                                        command=self._check_numbers_action)
         self.btn_check.pack(fill="x", pady=(0, 10))
+
+        self.use_valid_after_check_var = ctk.BooleanVar(value=self.config.get("use_valid_after_check", False))
+        ctk.CTkCheckBox(ctrl_frame, text="استخدم الصالح فقط بعد الفحص",
+                        variable=self.use_valid_after_check_var,
+                        font=ctk.CTkFont(size=11)).pack(anchor="e", pady=(0, 10))
 
         # -- Scheduling --
         sched_label = ctk.CTkLabel(right, text="🕒 جدولة الإرسال", font=ctk.CTkFont(size=13, weight="bold"))
@@ -1751,6 +1757,8 @@ class ModernWhatsAppApp(ctk.CTk):
         self.send_text_var.set(self.config.get("send_text_with_image", True))
         self.bg_mode_var.set(self.config.get("background_mode", False))
         self.spin_text_var.set(self.config.get("enable_spintax", True))
+        if hasattr(self, "use_valid_after_check_var"):
+            self.use_valid_after_check_var.set(self.config.get("use_valid_after_check", False))
 
     def _save_current_state(self):
         self.config.set("last_contacts_file", self.contacts_entry.get())
@@ -1758,6 +1766,8 @@ class ModernWhatsAppApp(ctk.CTk):
         self.config.set("send_text_with_image", self.send_text_var.get())
         self.config.set("background_mode", self.bg_mode_var.get())
         self.config.set("enable_spintax", self.spin_text_var.get())
+        if hasattr(self, "use_valid_after_check_var"):
+            self.config.set("use_valid_after_check", self.use_valid_after_check_var.get())
         # Save window size
         self.config.set("window_width", self.winfo_width())
         self.config.set("window_height", self.winfo_height())
@@ -2151,7 +2161,7 @@ class ModernWhatsAppApp(ctk.CTk):
         if hasattr(self, "pause_btn"):
             self.pause_btn.configure(text="Pause")
 
-        self._open_progress_window_pro(len(contacts))
+        self._open_progress_window_blind(len(contacts))
 
         threading.Thread(
             target=self._run_automation,
@@ -2328,7 +2338,7 @@ class ModernWhatsAppApp(ctk.CTk):
             eta = None
             if processed > 0 and total > processed:
                 eta = (elapsed / processed) * (total - processed)
-            self._update_progress_header_pro(processed, total, phone)
+            self._update_progress_header_blind(processed, total, phone)
 
             if not phone:
                 self.invalid += 1
@@ -2376,24 +2386,24 @@ class ModernWhatsAppApp(ctk.CTk):
                 self.sent += 1
                 self.log(f"✅ تم الإرسال لـ {name}")
                 self.results_log.append({"phone": phone, "name": name, "status": "نجاح", "error_code": "-", "timestamp": timestamp})
-                self._add_progress_row_pro([phone, "Contact", timestamp, "Sent", "Success"], tag="success")
+                self._add_progress_row_blind([phone, "Contact", timestamp, "Sent", "Success"], tag="success")
                 consecutive_failures = 0
             elif res == "INVALID":
                 self.invalid += 1
                 self.log(f"🚫 [ERR-20] الرقم {phone} غير صحيح.")
                 self.results_log.append({"phone": phone, "name": name, "status": "بدون واتساب", "error_code": "ERR-20", "timestamp": timestamp})
-                self._add_progress_row_pro([phone, "Contact", timestamp, "Invalid", "No WhatsApp"], tag="invalid")
+                self._add_progress_row_blind([phone, "Contact", timestamp, "Invalid", "No WhatsApp"], tag="invalid")
                 consecutive_failures = 0
             elif res == "STOPPED":
                 self.results_log.append({"phone": phone, "name": name, "status": "توقف", "error_code": "-", "timestamp": timestamp})
-                self._add_progress_row_pro([phone, "Contact", timestamp, "Stopped", "User stopped"], tag="stopped")
+                self._add_progress_row_blind([phone, "Contact", timestamp, "Stopped", "User stopped"], tag="stopped")
                 break
             else:
                 self.failed += 1
                 err_code = res if res.startswith("ERR") else "ERR-UNKNOWN"
                 self.log(f"❌ فشل: {phone} | {res}")
                 self.results_log.append({"phone": phone, "name": name, "status": "فشل", "error_code": err_code, "timestamp": timestamp})
-                self._add_progress_row_pro([phone, "Contact", timestamp, "Failed", str(res)], tag="failed")
+                self._add_progress_row_blind([phone, "Contact", timestamp, "Failed", str(res)], tag="failed")
                 consecutive_failures += 1
                 if consecutive_failures >= max_consecutive_failures:
                     self.log(f"⛔ تم الإيقاف تلقائياً بعد {consecutive_failures} فشل متتالي لتقليل المخاطر.")
@@ -2503,13 +2513,22 @@ class ModernWhatsAppApp(ctk.CTk):
             self._run_on_ui(self._update_stats)
             time.sleep(random.uniform(1.5, 3.0))
 
-        csv_path = self._save_number_check_report()
+        report_path, valid_path, invalid_path = self._save_number_check_report()
         if self.stop_event.is_set():
             self.log("🛑 تم إيقاف الفحص.")
         else:
             self.log("🏁 انتهى فحص الأرقام.")
-            if csv_path:
-                self.log(f"📄 تقرير الفحص: {csv_path}")
+            if report_path:
+                self.log(f"📄 تقرير الفحص: {report_path}")
+            if valid_path:
+                self.log(f"✅ ملف الأرقام الصالحة: {valid_path}")
+            if invalid_path:
+                self.log(f"🚫 ملف الأرقام غير الصالحة: {invalid_path}")
+            if valid_path and hasattr(self, "use_valid_after_check_var") and self.use_valid_after_check_var.get():
+                self.contacts_entry.delete(0, "end")
+                self.contacts_entry.insert(0, valid_path)
+                self._update_total_counts(total=self.sent, contacts_count=self.sent, groups_count=0)
+                self.log("✨ تم تعيين ملف الأرقام الصالحة كملف الإرسال الحالي.")
 
         self.is_checking = False
         self.stop_event.clear()
@@ -2520,7 +2539,7 @@ class ModernWhatsAppApp(ctk.CTk):
 
     def _save_number_check_report(self):
         if not self.results_log:
-            return None
+            return None, None, None
         try:
             reports_dir = os.path.join(os.getcwd(), "reports", "number_checks")
             os.makedirs(reports_dir, exist_ok=True)
@@ -2531,9 +2550,32 @@ class ModernWhatsAppApp(ctk.CTk):
                 writer = csv.DictWriter(f, fieldnames=["phone", "name", "status", "error_code", "timestamp"])
                 writer.writeheader()
                 writer.writerows(self.results_log)
-            return filepath
+            valid_rows = [r for r in self.results_log if str(r.get("status", "")).strip() in ("صالح", "VALID")]
+            invalid_rows = [r for r in self.results_log if str(r.get("status", "")).strip() in ("غير صالح", "INVALID")]
+
+            valid_path = None
+            invalid_path = None
+            if valid_rows:
+                valid_name = f"valid_numbers_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                valid_path = os.path.join(reports_dir, valid_name)
+                with open(valid_path, 'w', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.DictWriter(f, fieldnames=["phone", "name"])
+                    writer.writeheader()
+                    for r in valid_rows:
+                        writer.writerow({"phone": r.get("phone"), "name": r.get("name")})
+
+            if invalid_rows:
+                invalid_name = f"invalid_numbers_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                invalid_path = os.path.join(reports_dir, invalid_name)
+                with open(invalid_path, 'w', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.DictWriter(f, fieldnames=["phone", "name", "error_code"])
+                    writer.writeheader()
+                    for r in invalid_rows:
+                        writer.writerow({"phone": r.get("phone"), "name": r.get("name"), "error_code": r.get("error_code")})
+
+            return filepath, valid_path, invalid_path
         except Exception:
-            return None
+            return None, None, None
 
     # ═══════════════════════════════════════════════════════════════════════
     #  REPORT
@@ -2660,7 +2702,7 @@ class ModernWhatsAppApp(ctk.CTk):
             self.progress_tree.heading("status", text="Status")
             self.progress_tree.heading("message", text="Result / Message")
             
-            self.progress_tree.column("id", width=160, anchor="w")
+            self.progress_tree.column("id", width=180, anchor="w")
             self.progress_tree.column("type", width=80, anchor="center")
             self.progress_tree.column("date", width=140, anchor="center")
             self.progress_tree.column("status", width=100, anchor="center")
@@ -2739,4 +2781,163 @@ class ModernWhatsAppApp(ctk.CTk):
                 self.progress_bar_small.set(processed / total if total else 0)
             if self.progress_status_label and current_phone:
                 self.progress_status_label.configure(text=f"Processing: {current_phone}")
+        self._run_on_ui(_do)
+
+    # ═══════════════════════════════════════════════════════════════════════
+    #  BLIND MODE PROGRESS WINDOW (BENCHMARK MATCH)
+    # ═══════════════════════════════════════════════════════════════════════
+    def _open_progress_window_blind(self, total):
+        def _do():
+            if self.progress_win and self.progress_win.winfo_exists():
+                try:
+                    self.progress_win.destroy()
+                except Exception:
+                    pass
+            self.progress_win = ctk.CTkToplevel(self)
+            self.progress_win.title("Auto Whatsapp Business Sender Turbo Pro - Blind Mode")
+            self.progress_win.geometry("950x650")
+            self.progress_win.minsize(900, 550)
+            self.progress_win.grab_set()
+            
+            # Focus
+            self.progress_win.after(100, self.progress_win.lift)
+
+            # Main Container
+            main_cont = ctk.CTkFrame(self.progress_win, corner_radius=0, fg_color=COLORS["bg_dark"])
+            main_cont.pack(fill="both", expand=True)
+
+            # 1. Top Header (Counters)
+            header = ctk.CTkFrame(main_cont, corner_radius=10, fg_color=COLORS["card_bg"])
+            header.pack(fill="x", padx=15, pady=(15, 10))
+            
+            # Title & Counter
+            top_row = ctk.CTkFrame(header, fg_color="transparent")
+            top_row.pack(fill="x", padx=15, pady=(10, 5))
+            
+            self.progress_count_label = ctk.CTkLabel(
+                top_row, text=f"Sending Process (0/{total})", 
+                font=("Segoe UI", 16, "bold"), text_color=COLORS["text_main"]
+            )
+            self.progress_count_label.pack(side="left")
+            
+            status_chip = ctk.CTkLabel(
+                top_row, text="Running 🚀", 
+                font=("Segoe UI", 12, "bold"), text_color=COLORS["bg_dark"],
+                fg_color=COLORS["primary"], corner_radius=6, padx=10, pady=2
+            )
+            status_chip.pack(side="right")
+            self.progress_state_label = status_chip
+
+            # Progress Bar (Thick & Green)
+            self.progress_bar_small = ctk.CTkProgressBar(header, height=20, corner_radius=0,
+                                                         progress_color="#00E676", # Bright Neon Green
+                                                         border_color=COLORS["border"], border_width=1)
+            self.progress_bar_small.pack(fill="x", expand=True, padx=15, pady=(5, 15))
+            self.progress_bar_small.set(0)
+
+            # 2. Data Grid (Treeview)
+            table_frame = ctk.CTkFrame(main_cont, corner_radius=10, fg_color=COLORS["card_bg"])
+            table_frame.pack(fill="both", expand=True, padx=15, pady=(0, 10))
+
+            columns = ("id", "type", "date", "status", "message")
+            self.progress_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15)
+            
+            # Exact Match Columns
+            self.progress_tree.heading("id", text="ID")
+            self.progress_tree.heading("type", text="Type")
+            self.progress_tree.heading("date", text="Sending Date")
+            self.progress_tree.heading("status", text="Status")
+            self.progress_tree.heading("message", text="Message")
+            
+            self.progress_tree.column("id", width=180, anchor="w")
+            self.progress_tree.column("type", width=80, anchor="center")
+            self.progress_tree.column("date", width=150, anchor="center")
+            self.progress_tree.column("status", width=90, anchor="center")
+            self.progress_tree.column("message", width=300, anchor="w")
+
+            # Styling the Treeview
+            style = ttk.Style(self.progress_win)
+            try:
+                style.theme_use("clam")
+            except:
+                pass
+            
+            bg_color = COLORS["bg_dark"]
+            fg_color = COLORS["text_main"]
+            row_height = 30
+            
+            style.configure(
+                "Treeview",
+                background=bg_color,
+                foreground=fg_color,
+                fieldbackground=bg_color,
+                rowheight=row_height,
+                font=("Segoe UI", 11),
+                borderwidth=0
+            )
+            style.configure("Treeview.Heading", font=("Segoe UI", 11, "bold"), background=COLORS["card_bg"], foreground=COLORS["text_main"])
+            style.map("Treeview", background=[("selected", COLORS["primary"])], foreground=[("selected", "black")])
+
+            # Tags for coloring rows (Text color)
+            self.progress_tree.tag_configure("success", foreground="#00E676") # Green
+            self.progress_tree.tag_configure("failed", foreground="#FF3D00")  # Red
+            self.progress_tree.tag_configure("waiting", foreground=COLORS["text_muted"])
+            self.progress_tree.tag_configure("invalid", foreground="#FFA500") # Orange
+            self.progress_tree.tag_configure("stopped", foreground=COLORS["info"])
+
+            tree_scroll = ctk.CTkScrollbar(table_frame, command=self.progress_tree.yview)
+            self.progress_tree.configure(yscrollcommand=tree_scroll.set)
+            self.progress_tree.pack(side="left", fill="both", expand=True, padx=2, pady=2)
+            tree_scroll.pack(side="right", fill="y", padx=2, pady=2)
+
+            # 3. Footer Controls
+            footer = ctk.CTkFrame(main_cont, corner_radius=10, fg_color=COLORS["card_bg"], height=60)
+            footer.pack(fill="x", padx=15, pady=(0, 15))
+            
+            self.progress_status_label = ctk.CTkLabel(
+                footer, text="Starting...", font=("Segoe UI", 12), text_color=COLORS["text_muted"]
+            )
+            self.progress_status_label.pack(side="left", padx=20, pady=15)
+
+            # Buttons (Black background as per screenshot)
+            btn_style = {"width": 100, "height": 32, "font": ("Segoe UI", 12, "bold")}
+            
+            ctk.CTkButton(footer, text="Close", fg_color="black", hover_color="#333333", border_color=COLORS["border"], border_width=1,
+                          command=self._close_progress_window, **btn_style).pack(side="right", padx=10)
+                          
+            self.pause_btn = ctk.CTkButton(footer, text="Pause", fg_color="black", hover_color="#333333", border_color=COLORS["border"], border_width=1,
+                                           text_color="white", command=self._toggle_pause, **btn_style)
+            self.pause_btn.pack(side="right", padx=5)
+            
+            ctk.CTkButton(footer, text="Export", fg_color="black", hover_color="#333333", border_color=COLORS["border"], border_width=1,
+                          command=self._export_last_report, **btn_style).pack(side="right", padx=5)
+
+        self._run_on_ui(_do)
+
+    def _add_progress_row_blind(self, row_values, tag="waiting"):
+        # row_values = [phone, type, time, status, message]
+        # Prepend icon to phone (ID)
+        icon = ""
+        if tag == "success": icon = "✅ "
+        elif tag == "failed": icon = "❌ "
+        elif tag == "invalid": icon = "🚫 "
+        elif tag == "stopped": icon = "🛑 "
+        elif tag == "waiting": icon = "⏳ "
+        
+        new_values = list(row_values)
+        new_values[0] = f"{icon}{new_values[0]}"
+        
+        def _do():
+            if self.progress_tree:
+                self.progress_tree.insert("", "0", values=new_values, tags=(tag,))
+        self._run_on_ui(_do)
+
+    def _update_progress_header_blind(self, processed, total, current_phone=None):
+        def _do():
+            if self.progress_count_label:
+                self.progress_count_label.configure(text=f"Sending Process ({processed}/{total})")
+            if self.progress_bar_small:
+                self.progress_bar_small.set(processed / total if total else 0)
+            if self.progress_status_label and current_phone:
+                self.progress_status_label.configure(text=f"Sending message to: {current_phone}")
         self._run_on_ui(_do)

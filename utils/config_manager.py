@@ -24,6 +24,7 @@ DEFAULT_CONFIG = {
     "max_consecutive_failures": 5,
     "enable_spintax": True,
     "auto_open_login": True,
+    "use_valid_after_check": False,
     "profile_name": "Default",
     "profiles_dir": os.path.join("data", "profiles"),
     "window_width": 1000,

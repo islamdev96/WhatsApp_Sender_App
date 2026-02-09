@@ -1,7 +1,7 @@
 {
   "appearance_mode": "light",
   "language": "ar",
-  "last_contacts_file": "C:/Users/Islam Glab/Desktop/test_my_number.csv",
+  "last_contacts_file": "C:\\Users\\Islam Glab\\Desktop\\WhatsApp_Sender_App\\data\\imports\\import_20260209_201808.csv",
   "last_image_file": "C:/Users/Islam Glab/Desktop/1.jpg",
   "last_message": "Rgrgr",
   "send_text_with_image": true,
@@ -17,10 +17,11 @@
   "max_consecutive_failures": 5,
   "enable_spintax": true,
   "auto_open_login": true,
+  "use_valid_after_check": false,
   "profile_name": "Default",
   "profiles_dir": "data\\profiles",
-  "window_width": 1920,
-  "window_height": 1001,
+  "window_width": 1924,
+  "window_height": 1055,
   "last_video_file": "",
   "last_doc_file": ""
 }
