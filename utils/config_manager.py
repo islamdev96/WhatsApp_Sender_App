@@ -25,6 +25,8 @@ DEFAULT_CONFIG = {
     "enable_spintax": True,
     "auto_open_login": True,
     "use_valid_after_check": False,
+    "use_workflow": False,
+    "last_workflow": "",
     "profile_name": "Default",
     "profiles_dir": os.path.join("data", "profiles"),
     "window_width": 1000,

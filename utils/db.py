@@ -67,6 +67,22 @@ class SQLiteStore:
             timestamp TEXT,
             FOREIGN KEY(campaign_id) REFERENCES wa_campaigns(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS wa_workflows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE,
+            created TEXT,
+            updated TEXT
+        );
+        CREATE TABLE IF NOT EXISTS wa_workflow_steps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            workflow_id INTEGER,
+            step_order INTEGER,
+            body TEXT,
+            attachments_json TEXT,
+            delay_min INTEGER,
+            delay_max INTEGER,
+            FOREIGN KEY(workflow_id) REFERENCES wa_workflows(id) ON DELETE CASCADE
+        );
         """
         with _DB_LOCK:
             self.conn.executescript(schema)

@@ -47,6 +47,9 @@ PALETTE_DARK = {
     "accent":        "#22D3EE",
     "accent_hover":  "#06B6D4",
     "border":        "#263145",
+    "secondary":     "#1F2937",
+    "secondary_hover":"#2A3A52",
+    "secondary_text":"#E5E7EB",
 }
 
 PALETTE_LIGHT = {
@@ -70,6 +73,9 @@ PALETTE_LIGHT = {
     "accent":        "#0EA5E9",
     "accent_hover":  "#0284C7",
     "border":        "#E2E8F0",
+    "secondary":     "#E2E8F0",
+    "secondary_hover":"#CBD5E1",
+    "secondary_text":"#0F172A",
 }
 
 # Active palette (filled at runtime based on appearance mode)
@@ -112,6 +118,7 @@ class ModernWhatsAppApp(ctk.CTk):
         self.contacts_mgr = ContactsManager()
         self.scheduler = Scheduler()
         self.campaign_manager = CampaignManager()
+        self.workflow_manager = WorkflowManager()
 
         # ── Appearance ──
         mode = self.config.get("appearance_mode", "dark")
@@ -193,6 +200,10 @@ class ModernWhatsAppApp(ctk.CTk):
             self.attachment_manager.apply_theme(COLORS)
         if hasattr(self, "message_editor"):
             self.message_editor.apply_theme(COLORS)
+        if hasattr(self, "workflow_step_editor"):
+            self.workflow_step_editor.apply_theme(COLORS)
+        if hasattr(self, "workflow_step_attachments"):
+            self.workflow_step_attachments.apply_theme(COLORS)
         if hasattr(self, "progress_bar"):
             self.progress_bar.configure(progress_color=COLORS["primary"])
         if hasattr(self, "total_counts_label"):
@@ -200,15 +211,42 @@ class ModernWhatsAppApp(ctk.CTk):
         if hasattr(self, "btn_start"):
             self.btn_start.configure(fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"], text_color="#000000")
         if hasattr(self, "btn_login"):
-            self.btn_login.configure(fg_color=COLORS["card_bg"], hover_color=COLORS["border"], border_color=COLORS["primary"])
+            self.btn_login.configure(fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"], text_color=COLORS["secondary_text"])
         if hasattr(self, "btn_stop"):
-            self.btn_stop.configure(fg_color=COLORS["card_bg"], hover_color=COLORS["danger"], border_color=COLORS["danger"])
+            self.btn_stop.configure(fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"], text_color="#FFFFFF")
         if hasattr(self, "btn_check"):
             self.btn_check.configure(fg_color=COLORS["info"], hover_color=COLORS["accent_hover"])
         if hasattr(self, "btn_schedule"):
             self.btn_schedule.configure(fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"])
         if hasattr(self, "btn_cancel_sched"):
             self.btn_cancel_sched.configure(fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"])
+        if hasattr(self, "workflow_menu"):
+            self.workflow_menu.configure(
+                fg_color=COLORS["card_bg"],
+                button_color=COLORS["primary"],
+                button_hover_color=COLORS["primary_hover"],
+                text_color=COLORS["text_main"],
+                dropdown_fg_color=COLORS["card_bg"],
+                dropdown_text_color=COLORS["text_main"],
+            )
+        if hasattr(self, "workflow_name_entry"):
+            self.workflow_name_entry.configure(
+                fg_color=COLORS["bg_dark"],
+                text_color=COLORS["text_main"],
+                border_color=COLORS["border"],
+            )
+        if hasattr(self, "step_delay_min_entry"):
+            self.step_delay_min_entry.configure(
+                fg_color=COLORS["bg_dark"],
+                text_color=COLORS["text_main"],
+                border_color=COLORS["border"],
+            )
+        if hasattr(self, "step_delay_max_entry"):
+            self.step_delay_max_entry.configure(
+                fg_color=COLORS["bg_dark"],
+                text_color=COLORS["text_main"],
+                border_color=COLORS["border"],
+            )
 
     # ═══════════════════════════════════════════════════════════════════════
     #  LAYOUT
@@ -230,6 +268,7 @@ class ModernWhatsAppApp(ctk.CTk):
         self.tab_frames = {}
         self._build_tab_main()
         self._build_tab_groups()
+        self._build_tab_workflows()
         self._build_tab_templates()
         self._build_tab_settings()
         self._build_tab_analytics()
@@ -273,8 +312,8 @@ class ModernWhatsAppApp(ctk.CTk):
         
         # New Profile Button
         ctk.CTkButton(self.sidebar, text="+ حساب جديد", width=180, height=24,
-                      fg_color="transparent", border_width=1, border_color=COLORS["border"],
-                      hover_color=COLORS["card_bg"], text_color=COLORS["text_muted"],
+                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+                      text_color=COLORS["secondary_text"],
                       font=("Segoe UI", 11),
                       command=self._create_new_profile).grid(row=3, column=0, padx=20, pady=(0, 30))
 
@@ -282,6 +321,7 @@ class ModernWhatsAppApp(ctk.CTk):
         nav_items = [
             ("🏠  الرئيسية", "main"),
             ("👥  المجموعات", "groups"),
+            ("🧭  سير العمل", "workflows"),
             ("📝  القوالب", "templates"),
             ("📊  التحليلات", "analytics"),
             ("⚙️  الإعدادات", "settings"),
@@ -382,11 +422,13 @@ class ModernWhatsAppApp(ctk.CTk):
         # 1. Contacts
         self._create_file_row(left, "👥 ملف الأرقام", "contacts_entry", self._browse_contacts)
         ctk.CTkButton(left, text="📥 استيراد متقدم", height=30,
-                      fg_color=COLORS["card_bg"], hover_color=COLORS["border"],
+                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+                      text_color=COLORS["secondary_text"],
                       font=ctk.CTkFont(size=12, weight="bold"),
                       command=self._open_import_dialog).pack(fill="x", padx=20, pady=(2, 8))
         ctk.CTkButton(left, text="🧮 مولد أرقام", height=30,
-                      fg_color=COLORS["card_bg"], hover_color=COLORS["border"],
+                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+                      text_color=COLORS["secondary_text"],
                       font=ctk.CTkFont(size=12, weight="bold"),
                       command=self._open_number_generator).pack(fill="x", padx=20, pady=(0, 8))
 
@@ -451,9 +493,9 @@ class ModernWhatsAppApp(ctk.CTk):
         self.btn_login = ctk.CTkButton(ctrl_frame, text="🔑 فتح واتساب (Login)",
                                        font=("Segoe UI", 13, "bold"),
                                        height=40,
-                                       fg_color=COLORS["card_bg"],
-                                       hover_color=COLORS["border"],
-                                       border_width=1, border_color=COLORS["primary"],
+                                       fg_color=COLORS["secondary"],
+                                       hover_color=COLORS["secondary_hover"],
+                                       text_color=COLORS["secondary_text"],
                                        image=None, compound="right",
                                        command=self._login_action)
         self.btn_login.pack(fill="x", pady=(0, 10))
@@ -472,9 +514,9 @@ class ModernWhatsAppApp(ctk.CTk):
         self.btn_stop = ctk.CTkButton(ctrl_frame, text="🛑 إيقاف مؤقت",
                                       font=("Segoe UI", 13, "bold"),
                                       height=40,
-                                      fg_color=COLORS["card_bg"],
-                                      hover_color=COLORS["danger"],
-                                      border_width=1, border_color=COLORS["danger"],
+                                      fg_color=COLORS["danger"],
+                                      hover_color=COLORS["danger_hover"],
+                                      text_color="#FFFFFF",
                                       state="disabled",
                                       command=self._stop_action)
         self.btn_stop.pack(fill="x", pady=(0, 10))
@@ -492,6 +534,39 @@ class ModernWhatsAppApp(ctk.CTk):
         ctk.CTkCheckBox(ctrl_frame, text="استخدم الصالح فقط بعد الفحص",
                         variable=self.use_valid_after_check_var,
                         font=ctk.CTkFont(size=11)).pack(anchor="e", pady=(0, 10))
+
+        # -- Workflow --
+        wf_label = ctk.CTkLabel(right, text="🧭 سير العمل", font=ctk.CTkFont(size=13, weight="bold"))
+        wf_label.pack(anchor="e", padx=15, pady=(4, 4))
+
+        wf_row = ctk.CTkFrame(right, fg_color="transparent")
+        wf_row.pack(fill="x", padx=15, pady=(0, 4))
+
+        self.use_workflow_var = ctk.BooleanVar(value=self.config.get("use_workflow", False))
+        ctk.CTkCheckBox(wf_row, text="تفعيل", variable=self.use_workflow_var,
+                        font=ctk.CTkFont(size=11)).pack(side="right", padx=4)
+
+        self.workflow_var = ctk.StringVar(value=self.config.get("last_workflow", ""))
+        self.workflow_menu = ctk.CTkOptionMenu(
+            wf_row,
+            values=self._get_workflow_names(),
+            variable=self.workflow_var,
+            width=160,
+            height=28,
+            fg_color=COLORS["card_bg"],
+            button_color=COLORS["primary"],
+            button_hover_color=COLORS["primary_hover"],
+            text_color=COLORS["text_main"],
+            dropdown_fg_color=COLORS["card_bg"],
+            dropdown_text_color=COLORS["text_main"],
+        )
+        self.workflow_menu.pack(side="left", padx=4)
+
+        ctk.CTkButton(right, text="⚙️ إدارة سير العمل", height=28,
+                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+                      text_color=COLORS["secondary_text"],
+                      font=ctk.CTkFont(size=11, weight="bold"),
+                      command=lambda: self._switch_tab("workflows")).pack(fill="x", padx=15, pady=(0, 10))
 
         # -- Scheduling --
         sched_label = ctk.CTkLabel(right, text="🕒 جدولة الإرسال", font=ctk.CTkFont(size=13, weight="bold"))
@@ -928,7 +1003,8 @@ class ModernWhatsAppApp(ctk.CTk):
         setattr(self, entry_attr, entry)
         
         ctk.CTkButton(row, text="📂", width=40, height=35,
-                      fg_color=COLORS["card_bg"], hover_color=COLORS["primary"],
+                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+                      text_color=COLORS["secondary_text"],
                       font=("Segoe UI", 14),
                       command=browse_cmd).pack(side="right")
 
@@ -986,7 +1062,8 @@ class ModernWhatsAppApp(ctk.CTk):
         delim_entry.pack(side="right", padx=6)
         ctk.CTkCheckBox(settings_row, text="إزالة التكرارات", variable=dedup_var).pack(side="right", padx=6)
         ctk.CTkButton(settings_row, text="تحديث المعاينة", height=28,
-                      fg_color=COLORS["card_bg"], hover_color=COLORS["border"],
+                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+                      text_color=COLORS["secondary_text"],
                       command=lambda: _load_preview()).pack(side="left", padx=6)
 
         # Field Mapping
@@ -1250,7 +1327,8 @@ class ModernWhatsAppApp(ctk.CTk):
         btn_row = ctk.CTkFrame(win, fg_color="transparent")
         btn_row.pack(fill="x", padx=15, pady=(0, 15))
         ctk.CTkButton(btn_row, text="إلغاء", width=90, height=32,
-                      fg_color=COLORS["card_bg"], hover_color=COLORS["border"],
+                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+                      text_color=COLORS["secondary_text"],
                       command=win.destroy).pack(side="left", padx=6)
         ctk.CTkButton(btn_row, text="استيراد", width=100, height=32,
                       fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
@@ -1347,7 +1425,8 @@ class ModernWhatsAppApp(ctk.CTk):
         btns = ctk.CTkFrame(win, fg_color="transparent")
         btns.pack(fill="x", padx=12, pady=(0, 12))
         ctk.CTkButton(btns, text="معاينة", width=90, height=30,
-                      fg_color=COLORS["card_bg"], hover_color=COLORS["border"],
+                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+                      text_color=COLORS["secondary_text"],
                       command=_refresh_preview).pack(side="left", padx=6)
         ctk.CTkButton(btns, text="حفظ واستخدام", width=110, height=30,
                       fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
@@ -1391,8 +1470,8 @@ class ModernWhatsAppApp(ctk.CTk):
                           command=lambda n=t["name"]: self._select_template(n)).pack(side="left", padx=2)
             
             ctk.CTkButton(actions, text="حذف", width=50, height=24, 
-                          fg_color=COLORS["card_bg"], hover_color=COLORS["danger"], 
-                          border_width=1, border_color=COLORS["danger"],
+                          fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+                          text_color="#FFFFFF",
                           font=("Segoe UI", 11),
                           command=lambda n=t["name"]: self._delete_template_by_name(n)).pack(side="left", padx=2)
 
@@ -1457,9 +1536,9 @@ class ModernWhatsAppApp(ctk.CTk):
             
             btn = ctk.CTkButton(self.groups_listbox, text=text,
                                 font=("Segoe UI", 13),
-                                fg_color=COLORS["card_bg"],
-                                hover_color=COLORS["border"],
-                                text_color=COLORS["text_main"],
+                                fg_color=COLORS["secondary"],
+                                hover_color=COLORS["secondary_hover"],
+                                text_color=COLORS["secondary_text"],
                                 anchor="e", height=42, corner_radius=8,
                                 command=lambda name=g["name"]: self._select_group(name))
             btn.pack(fill="x", pady=3)
@@ -1547,6 +1626,311 @@ class ModernWhatsAppApp(ctk.CTk):
         self.contacts_entry.delete(0, "end")
         self.contacts_entry.insert(0, f"[GROUP:{name}]")
         messagebox.showinfo("تم", f"تم تحديد مجموعة '{name}' ({len(g['contacts'])} جهة). اضغط 'بدء الإرسال'.")
+
+    # ════════════════════════════════════════════════════════════
+    #  WORKFLOWS
+    # ════════════════════════════════════════════════════════════
+    def _build_tab_workflows(self):
+        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.tab_frames["workflows"] = frame
+
+        header = ctk.CTkLabel(frame, text="🧭 سير العمل (Workflows)",
+                              font=ctk.CTkFont(size=20, weight="bold"))
+        header.pack(anchor="e", padx=25, pady=(20, 10))
+
+        body = ctk.CTkFrame(frame, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=20, pady=10)
+        body.grid_columnconfigure(0, weight=1)
+        body.grid_columnconfigure(1, weight=2)
+        body.grid_rowconfigure(0, weight=1)
+
+        # Left: Workflows list
+        left = ctk.CTkFrame(body, corner_radius=12, fg_color=COLORS["card_bg"])
+        left.grid(row=0, column=0, sticky="nsew", padx=(0, 8), pady=5)
+        ctk.CTkLabel(left, text="القائمة", font=ctk.CTkFont(size=13, weight="bold"),
+                     text_color=COLORS["text_main"]).pack(anchor="e", padx=12, pady=(10, 8))
+
+        self.workflows_list_frame = ctk.CTkScrollableFrame(left, fg_color="transparent")
+        self.workflows_list_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+        # Right: Editor
+        right = ctk.CTkFrame(body, corner_radius=12, fg_color=COLORS["card_bg"])
+        right.grid(row=0, column=1, sticky="nsew", padx=(8, 0), pady=5)
+        right.grid_columnconfigure(0, weight=1)
+
+        name_row = ctk.CTkFrame(right, fg_color="transparent")
+        name_row.pack(fill="x", padx=12, pady=(10, 6))
+        ctk.CTkLabel(name_row, text="اسم سير العمل:", font=ctk.CTkFont(size=12)).pack(side="right", padx=4)
+        self.workflow_name_entry = ctk.CTkEntry(name_row, height=30, corner_radius=6,
+                                                fg_color=COLORS["bg_dark"], text_color=COLORS["text_main"],
+                                                border_color=COLORS["border"])
+        self.workflow_name_entry.pack(side="right", fill="x", expand=True, padx=4)
+
+        # Steps list
+        ctk.CTkLabel(right, text="الخطوات", font=ctk.CTkFont(size=12, weight="bold"),
+                     text_color=COLORS["text_main"]).pack(anchor="e", padx=12, pady=(4, 4))
+        self.workflow_steps_frame = ctk.CTkScrollableFrame(right, height=140, fg_color="transparent")
+        self.workflow_steps_frame.pack(fill="x", padx=12, pady=(0, 6))
+
+        # Step editor
+        ctk.CTkLabel(right, text="محرر الخطوة", font=ctk.CTkFont(size=12, weight="bold"),
+                     text_color=COLORS["text_main"]).pack(anchor="e", padx=12, pady=(6, 4))
+        self.workflow_step_editor = RichTextFrame(right, colors=COLORS, fg_color=COLORS["bg_dark"], corner_radius=10)
+        self.workflow_step_editor.pack(fill="x", padx=12, pady=(0, 6))
+
+        self.workflow_step_attachments = AttachmentManager(right, colors=COLORS, fg_color=COLORS["bg_dark"], corner_radius=10)
+        self.workflow_step_attachments.pack(fill="x", padx=12, pady=(0, 6))
+
+        delay_row = ctk.CTkFrame(right, fg_color="transparent")
+        delay_row.pack(fill="x", padx=12, pady=(0, 6))
+        ctk.CTkLabel(delay_row, text="تأخير الخطوة (ثواني):", font=ctk.CTkFont(size=11)).pack(side="right", padx=4)
+        self.step_delay_min_entry = ctk.CTkEntry(delay_row, width=60, height=28, corner_radius=6,
+                                                 fg_color=COLORS["bg_dark"], text_color=COLORS["text_main"],
+                                                 border_color=COLORS["border"], placeholder_text="min")
+        self.step_delay_min_entry.pack(side="right", padx=4)
+        self.step_delay_max_entry = ctk.CTkEntry(delay_row, width=60, height=28, corner_radius=6,
+                                                 fg_color=COLORS["bg_dark"], text_color=COLORS["text_main"],
+                                                 border_color=COLORS["border"], placeholder_text="max")
+        self.step_delay_max_entry.pack(side="right", padx=4)
+
+        step_btn_row = ctk.CTkFrame(right, fg_color="transparent")
+        step_btn_row.pack(fill="x", padx=12, pady=(0, 6))
+        ctk.CTkButton(step_btn_row, text="➕ إضافة/تحديث خطوة", height=30,
+                      fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
+                      font=ctk.CTkFont(size=12, weight="bold"),
+                      command=self._add_or_update_step).pack(side="right", padx=4)
+        ctk.CTkButton(step_btn_row, text="مسح الخطوة", height=30,
+                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+                      text_color=COLORS["secondary_text"],
+                      font=ctk.CTkFont(size=12),
+                      command=self._clear_step_editor).pack(side="right", padx=4)
+
+        wf_btn_row = ctk.CTkFrame(right, fg_color="transparent")
+        wf_btn_row.pack(fill="x", padx=12, pady=(0, 10))
+        ctk.CTkButton(wf_btn_row, text="💾 حفظ سير العمل", height=34,
+                      fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
+                      font=ctk.CTkFont(size=12, weight="bold"),
+                      command=self._save_workflow).pack(side="right", padx=4)
+        ctk.CTkButton(wf_btn_row, text="🆕 جديد", height=34,
+                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+                      text_color=COLORS["secondary_text"],
+                      font=ctk.CTkFont(size=12, weight="bold"),
+                      command=self._new_workflow).pack(side="right", padx=4)
+        ctk.CTkButton(wf_btn_row, text="✅ استخدام في الإرسال", height=34,
+                      fg_color=COLORS["success"], hover_color=COLORS["primary_hover"],
+                      font=ctk.CTkFont(size=12, weight="bold"),
+                      command=self._use_workflow_in_main).pack(side="left", padx=4)
+
+        self.workflow_steps = []
+        self.workflow_edit_id = None
+        self.workflow_step_edit_index = None
+        self._refresh_workflow_list()
+        self._render_workflow_steps()
+
+    def _get_workflow_names(self):
+        workflows = self.workflow_manager.get_all()
+        self.workflow_cache = {w["name"]: w["id"] for w in workflows}
+        names = list(self.workflow_cache.keys())
+        return names if names else ["—"]
+
+    def _refresh_workflow_menu(self):
+        if not hasattr(self, "workflow_menu"):
+            return
+        names = self._get_workflow_names()
+        self.workflow_menu.configure(values=names)
+        cur = self.workflow_var.get().strip()
+        if cur not in names:
+            self.workflow_var.set(names[0])
+
+    def _refresh_workflow_list(self):
+        if not hasattr(self, "workflows_list_frame"):
+            return
+        for w in self.workflows_list_frame.winfo_children():
+            w.destroy()
+        workflows = self.workflow_manager.get_all()
+        if not workflows:
+            ctk.CTkLabel(self.workflows_list_frame, text="لا يوجد سير عمل محفوظ.",
+                         font=("Segoe UI", 12), text_color=COLORS["text_muted"]).pack(pady=20)
+            self._refresh_workflow_menu()
+            return
+        for wf in workflows:
+            card = ctk.CTkFrame(self.workflows_list_frame, fg_color=COLORS["bg_dark"], corner_radius=10)
+            card.pack(fill="x", pady=5, padx=5)
+
+            head = ctk.CTkFrame(card, fg_color="transparent")
+            head.pack(fill="x", padx=8, pady=(6, 0))
+            ctk.CTkLabel(head, text=wf["name"], font=("Segoe UI", 12, "bold"),
+                         text_color=COLORS["primary"]).pack(side="right")
+            ctk.CTkLabel(head, text=f"خطوات: {wf['steps_count']}", font=("Segoe UI", 10),
+                         text_color=COLORS["text_muted"]).pack(side="left")
+
+            actions = ctk.CTkFrame(card, fg_color="transparent")
+            actions.pack(fill="x", padx=8, pady=(4, 8))
+            ctk.CTkButton(actions, text="فتح", width=50, height=24,
+                          fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+                          text_color=COLORS["secondary_text"],
+                          command=lambda i=wf["id"]: self._load_workflow_into_editor(i)).pack(side="left", padx=2)
+            ctk.CTkButton(actions, text="حذف", width=50, height=24,
+                          fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+                          text_color="#FFFFFF",
+                          command=lambda i=wf["id"]: self._delete_workflow(i)).pack(side="left", padx=2)
+        self._refresh_workflow_menu()
+
+    def _render_workflow_steps(self):
+        if not hasattr(self, "workflow_steps_frame"):
+            return
+        for w in self.workflow_steps_frame.winfo_children():
+            w.destroy()
+        if not self.workflow_steps:
+            ctk.CTkLabel(self.workflow_steps_frame, text="لا توجد خطوات بعد.",
+                         font=("Segoe UI", 11), text_color=COLORS["text_muted"]).pack(pady=10)
+            return
+        for idx, step in enumerate(self.workflow_steps):
+            row = ctk.CTkFrame(self.workflow_steps_frame, fg_color="transparent")
+            row.pack(fill="x", pady=2)
+            preview = (step.get("body") or "").strip().replace("\n", " ")
+            if len(preview) > 45:
+                preview = preview[:42] + "..."
+            att_count = len(step.get("attachments") or [])
+            delay_txt = f"{step.get('delay_min', 0)}-{step.get('delay_max', 0)}s"
+            ctk.CTkLabel(row, text=f"خطوة {idx+1}: {preview}",
+                         font=("Segoe UI", 11), anchor="e").pack(side="right", padx=4)
+            ctk.CTkLabel(row, text=f"مرفقات:{att_count} | تأخير:{delay_txt}",
+                         font=("Segoe UI", 10), text_color=COLORS["text_muted"]).pack(side="left", padx=4)
+            ctk.CTkButton(row, text="تعديل", width=50, height=24,
+                          fg_color=COLORS["secondary"], hover_color=COLORS["border"],
+                      text_color=COLORS["secondary_text"],
+                          command=lambda i=idx: self._edit_step(i)).pack(side="left", padx=2)
+            ctk.CTkButton(row, text="حذف", width=50, height=24,
+                          fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+                          command=lambda i=idx: self._delete_step(i)).pack(side="left", padx=2)
+
+    def _load_workflow_into_editor(self, workflow_id):
+        wf = self.workflow_manager.get(workflow_id)
+        if not wf:
+            return
+        self.workflow_edit_id = wf["id"]
+        self.workflow_name_entry.delete(0, "end")
+        self.workflow_name_entry.insert(0, wf["name"])
+        self.workflow_steps = wf.get("steps") or []
+        self.workflow_step_edit_index = None
+        self._clear_step_editor()
+        self._render_workflow_steps()
+
+    def _new_workflow(self):
+        self.workflow_edit_id = None
+        self.workflow_name_entry.delete(0, "end")
+        self.workflow_steps = []
+        self.workflow_step_edit_index = None
+        self._clear_step_editor()
+        self._render_workflow_steps()
+
+    def _save_workflow(self):
+        name = self.workflow_name_entry.get().strip()
+        steps = self.workflow_steps or []
+        if not name:
+            messagebox.showwarning("تنبيه", "يرجى إدخال اسم سير العمل.")
+            return
+        if not steps:
+            messagebox.showwarning("تنبيه", "يرجى إضافة خطوة واحدة على الأقل.")
+            return
+        ok, wf_id_or_msg = self.workflow_manager.save(name, steps, self.workflow_edit_id)
+        if not ok:
+            messagebox.showerror("خطأ", str(wf_id_or_msg))
+            return
+        self.workflow_edit_id = wf_id_or_msg
+        self._refresh_workflow_list()
+        self._refresh_workflow_menu()
+        messagebox.showinfo("تم", "تم حفظ سير العمل.")
+
+    def _delete_workflow(self, workflow_id):
+        if messagebox.askyesno("تأكيد", "هل تريد حذف سير العمل؟"):
+            self.workflow_manager.delete(workflow_id)
+            if self.workflow_edit_id == workflow_id:
+                self._new_workflow()
+            self._refresh_workflow_list()
+            self._refresh_workflow_menu()
+
+    def _add_or_update_step(self):
+        body = self.workflow_step_editor.get_text()
+        attachments = self.workflow_step_attachments.get_attachments()
+        delay_min = self.step_delay_min_entry.get().strip()
+        delay_max = self.step_delay_max_entry.get().strip()
+        try:
+            delay_min = int(delay_min) if delay_min else 0
+            delay_max = int(delay_max) if delay_max else 0
+        except ValueError:
+            messagebox.showerror("خطأ", "يرجى إدخال تأخير صحيح بالأرقام.")
+            return
+        if not body and not attachments:
+            messagebox.showwarning("تنبيه", "الخطوة فارغة. أضف رسالة أو مرفقات.")
+            return
+        step_data = {
+            "body": body,
+            "attachments": attachments,
+            "delay_min": delay_min,
+            "delay_max": delay_max,
+        }
+        if self.workflow_step_edit_index is None:
+            self.workflow_steps.append(step_data)
+        else:
+            self.workflow_steps[self.workflow_step_edit_index] = step_data
+        self.workflow_step_edit_index = None
+        self._clear_step_editor()
+        self._render_workflow_steps()
+
+    def _edit_step(self, index):
+        if index < 0 or index >= len(self.workflow_steps):
+            return
+        step = self.workflow_steps[index]
+        self.workflow_step_edit_index = index
+        self.workflow_step_editor.set_text(step.get("body", ""))
+        self.workflow_step_attachments.clear()
+        for att in step.get("attachments") or []:
+            path = att.get("path")
+            type_ = att.get("type", "document")
+            caption = att.get("caption", "")
+            if path:
+                self.workflow_step_attachments._add_item(path, type_)
+                # set caption if exists
+                try:
+                    self.workflow_step_attachments.attachments[-1].caption_entry.delete(0, "end")
+                    self.workflow_step_attachments.attachments[-1].caption_entry.insert(0, caption)
+                except Exception:
+                    pass
+        self.step_delay_min_entry.delete(0, "end")
+        self.step_delay_min_entry.insert(0, str(step.get("delay_min", 0)))
+        self.step_delay_max_entry.delete(0, "end")
+        self.step_delay_max_entry.insert(0, str(step.get("delay_max", 0)))
+
+    def _delete_step(self, index):
+        if index < 0 or index >= len(self.workflow_steps):
+            return
+        self.workflow_steps.pop(index)
+        self._render_workflow_steps()
+
+    def _clear_step_editor(self):
+        self.workflow_step_editor.set_text("")
+        self.workflow_step_attachments.clear()
+        self.step_delay_min_entry.delete(0, "end")
+        self.step_delay_max_entry.delete(0, "end")
+
+    def _use_workflow_in_main(self):
+        name = self.workflow_name_entry.get().strip()
+        if not name:
+            messagebox.showwarning("تنبيه", "اختر سير عمل أولاً.")
+            return
+        self.use_workflow_var.set(True)
+        self.workflow_var.set(name)
+        self._switch_tab("main")
+
+    def _get_selected_workflow(self):
+        if not hasattr(self, "workflow_var"):
+            return None
+        name = self.workflow_var.get().strip()
+        if not name or name == "—":
+            return None
+        return self.workflow_manager.get_by_name(name)
 
     # ═══════════════════════════════════════════════════════════════════════
     #  SCHEDULING
@@ -1759,6 +2143,12 @@ class ModernWhatsAppApp(ctk.CTk):
         self.spin_text_var.set(self.config.get("enable_spintax", True))
         if hasattr(self, "use_valid_after_check_var"):
             self.use_valid_after_check_var.set(self.config.get("use_valid_after_check", False))
+        if hasattr(self, "use_workflow_var"):
+            self.use_workflow_var.set(self.config.get("use_workflow", False))
+        if hasattr(self, "workflow_var"):
+            last_wf = self.config.get("last_workflow", "")
+            if last_wf:
+                self.workflow_var.set(last_wf)
 
     def _save_current_state(self):
         self.config.set("last_contacts_file", self.contacts_entry.get())
@@ -1768,6 +2158,10 @@ class ModernWhatsAppApp(ctk.CTk):
         self.config.set("enable_spintax", self.spin_text_var.get())
         if hasattr(self, "use_valid_after_check_var"):
             self.config.set("use_valid_after_check", self.use_valid_after_check_var.get())
+        if hasattr(self, "use_workflow_var"):
+            self.config.set("use_workflow", self.use_workflow_var.get())
+        if hasattr(self, "workflow_var"):
+            self.config.set("last_workflow", self.workflow_var.get())
         # Save window size
         self.config.set("window_width", self.winfo_width())
         self.config.set("window_height", self.winfo_height())
@@ -1948,10 +2342,8 @@ class ModernWhatsAppApp(ctk.CTk):
                     self._set_session_status("الحالة: متصل", COLORS["success"])
                     self._show_dialog("info", "تم", "تم تسجيل الدخول. يمكنك الآن الضغط على 'بدء الإرسال'.")
                     if self.pending_start_payload:
-                        pending = self.pending_start_payload
-                        self.pending_start_payload = None
                         self.log("🚀 بدء الإرسال تلقائياً بعد تسجيل الدخول.")
-                        self._run_on_ui(lambda: self._begin_send(*pending))
+                        self._run_on_ui(self._run_pending_start)
                     if self.pending_check_contacts:
                         pending_contacts = self.pending_check_contacts
                         self.pending_check_contacts = None
@@ -1969,6 +2361,21 @@ class ModernWhatsAppApp(ctk.CTk):
                 self.pending_check_contacts = None
 
         threading.Thread(target=run_login, daemon=True).start()
+
+    def _run_pending_start(self):
+        pending = self.pending_start_payload
+        self.pending_start_payload = None
+        if not pending:
+            return
+        if isinstance(pending, dict) and pending.get("mode") == "workflow":
+            wf = self.workflow_manager.get(pending.get("workflow_id"))
+            if not wf:
+                self.report_error("ERR-05", "سير العمل غير موجود.", dialog=True)
+                return
+            self._begin_send_workflow(pending.get("contacts", []), wf)
+            return
+        if isinstance(pending, tuple):
+            self._begin_send(*pending)
 
     def _get_profiles(self):
         try:
@@ -2080,6 +2487,10 @@ class ModernWhatsAppApp(ctk.CTk):
             types = "بدون مرفقات"
         self.log(f"🧪 فحص قبل الإرسال: جهات={len(contacts)} | رسالة={msg_len} حرف | مرفقات={types}")
 
+    def _log_preflight_workflow(self, contacts, workflow):
+        steps_count = len(workflow.get("steps") or [])
+        self.log(f"🧭 سير العمل: {workflow.get('name','')} | خطوات={steps_count} | جهات={len(contacts)}")
+
     def _apply_template(self, text, contact):
         if not text:
             return ""
@@ -2169,7 +2580,76 @@ class ModernWhatsAppApp(ctk.CTk):
             daemon=True
         ).start()
 
+    def _begin_send_workflow(self, contacts, workflow):
+        if self.is_running:
+            return
+
+        if self.bg_mode_var.get():
+            self.bot.background_mode = True
+            self.bot.minimize()
+            self.log("🖥️ وضع الخلفية مفعل — المتصفح مُصغّر.")
+        else:
+            self.bot.background_mode = False
+            self.bot.bring_to_front()
+
+        self.is_running = True
+        self.stop_event.clear()
+        self.pause_event.clear()
+        self.is_paused = False
+
+        self._log_preflight_workflow(contacts, workflow)
+
+        self.btn_start.configure(state="disabled")
+        self.btn_stop.configure(state="normal")
+        if hasattr(self, "btn_check"):
+            self.btn_check.configure(state="disabled")
+        self.progress_bar.set(0)
+        self.status_label.configure(text="جاري العمل...")
+        if hasattr(self, "pause_btn"):
+            self.pause_btn.configure(text="Pause")
+
+        self._open_progress_window(len(contacts))
+
+        threading.Thread(
+            target=self._run_workflow_automation,
+            args=(contacts, workflow),
+            daemon=True
+        ).start()
+
     def _start_action(self):
+        # Workflow mode
+        if hasattr(self, "use_workflow_var") and self.use_workflow_var.get():
+            workflow = self._get_selected_workflow()
+            if not workflow or not workflow.get("steps"):
+                self.report_error("ERR-05", "يرجى اختيار سير عمل يحتوي على خطوات.", dialog=True)
+                return
+            contacts = self._get_contacts_from_input()
+            if not contacts:
+                return
+            self._save_current_state()
+
+            if not self.bot or not self.bot.driver:
+                auto_open = self.config.get("auto_open_login", True)
+                if auto_open or messagebox.askyesno("تنبيه", "المتصفح غير مفتوح. هل تريد فتحه الآن؟"):
+                    self.pending_start_payload = {
+                        "mode": "workflow",
+                        "contacts": contacts,
+                        "workflow_id": workflow["id"],
+                    }
+                    self._set_session_status("الحالة: جاري فتح المتصفح...", COLORS["info"])
+                    self._login_action()
+                return
+
+            if not self.bot.is_logged_in():
+                self.bot.bring_to_front()
+                self.report_error("ERR-21", dialog=True, level="warning")
+                return
+
+            self._set_session_status("الحالة: متصل", COLORS["success"])
+            self._begin_send_workflow(contacts, workflow)
+            return
+
+        # Normal mode
         msg_template, attachments = self._prepare_content()
         if msg_template is None and attachments is None:
             return  # Error reported
@@ -2277,6 +2757,215 @@ class ModernWhatsAppApp(ctk.CTk):
     # ═══════════════════════════════════════════════════════════════════════
     #  MAIN AUTOMATION LOOP
     # ═══════════════════════════════════════════════════════════════════════
+    def _run_workflow_automation(self, contacts, workflow):
+        if not self.bot:
+            return
+
+        self.sent = 0
+        self.failed = 0
+        self.invalid = 0
+        self.results_log = []
+
+        total = len(contacts)
+        start_time = datetime.datetime.now()
+
+        try:
+            batch_size = int(self.batch_size_entry.get())
+            pause_min = int(self.batch_min_entry.get())
+            pause_max = int(self.batch_max_entry.get())
+            delay_min = int(self.delay_min_entry.get())
+            delay_max = int(self.delay_max_entry.get())
+            max_retries = int(self.config.get("max_retries", 2))
+            retry_delay_min = int(self.config.get("retry_delay_min", 3))
+            retry_delay_max = int(self.config.get("retry_delay_max", 6))
+            max_consecutive_failures = int(self.config.get("max_consecutive_failures", 5))
+        except ValueError:
+            batch_size, pause_min, pause_max, delay_min, delay_max = 50, 300, 600, 10, 20
+            max_retries, retry_delay_min, retry_delay_max, max_consecutive_failures = 2, 3, 6, 5
+
+        self.log(f"🧭 بدء سير العمل: {workflow.get('name','')} | جهات: {total}")
+        steps = workflow.get("steps") or []
+        consecutive_failures = 0
+
+        retryable_errors = {
+            "ERR_TIMEOUT",
+            "ERR_CHAT_INPUT_NOT_FOUND",
+            "ERR_ATTACH_BTN_NOT_FOUND",
+            "ERR_FILE_INPUT_NOT_FOUND",
+            "ERR_SEND_BTN_NOT_FOUND",
+            "ERR_SEND_BTN_TIMEOUT",
+            "ERR_TEXT_SEND",
+        }
+
+        for i, c in enumerate(contacts):
+            if self.stop_event.is_set():
+                break
+            while self.pause_event.is_set() and not self.stop_event.is_set():
+                time.sleep(0.3)
+
+            if i > 0 and i % batch_size == 0:
+                pause_time = random.uniform(pause_min, pause_max)
+                self.log(f"⏸ استراحة لمدة {int(pause_time)} ثانية...")
+                time.sleep(pause_time)
+
+            phone = c.get("phone")
+            name = c.get("name", "عميل")
+
+            processed = i + 1
+            self._run_on_ui(lambda: self.status_label.configure(text=f"جاري الإرسال {processed}/{total} إلى {name}..."))
+            self._run_on_ui(lambda: self.progress_bar.set(processed / total))
+            elapsed = (datetime.datetime.now() - start_time).total_seconds()
+            eta = None
+            if processed > 0 and total > processed:
+                eta = (elapsed / processed) * (total - processed)
+            self._update_progress_header(processed, total, phone, eta)
+
+            if not phone:
+                self.invalid += 1
+                self.results_log.append({"phone": "N/A", "name": name, "status": "بدون واتساب", "error_code": "ERR-00", "timestamp": datetime.datetime.now()})
+                self._run_on_ui(self._update_stats)
+                continue
+
+            if not self.bot.is_logged_in():
+                self.report_error("ERR-21", dialog=True, level="warning")
+                break
+
+            contact_status = "SUCCESS"
+            contact_error = "-"
+
+            for s_idx, step in enumerate(steps):
+                if self.stop_event.is_set():
+                    contact_status = "STOPPED"
+                    break
+
+                body = step.get("body", "")
+                step_attachments = step.get("attachments") or []
+                if not body and not step_attachments:
+                    continue
+
+                msg_for_contact = self._apply_template(body, c)
+                atts_for_contact = self._format_attachments_for_contact(step_attachments, c)
+                segments = self._split_messages(msg_for_contact)
+                primary_msg = segments[0] if segments else msg_for_contact
+                extra_msgs = segments[1:] if segments else []
+
+                res = None
+                for attempt in range(max_retries + 1):
+                    res = self.bot.send_message(
+                        phone=phone,
+                        name=name,
+                        message_template=primary_msg,
+                        extra_messages=extra_msgs,
+                        attachments=atts_for_contact,
+                        stop_event=self.stop_event,
+                        send_text_with_image=self.send_text_var.get()
+                    )
+                    if res in ("SUCCESS", "INVALID", "STOPPED"):
+                        break
+                    is_retryable = res in retryable_errors or str(res).startswith("ERR_ATTACH_") or str(res).startswith("ERR_GENERAL")
+                    if attempt < max_retries and is_retryable:
+                        wait_s = random.uniform(retry_delay_min, retry_delay_max)
+                        self.log(f"🔁 إعادة محاولة خطوة ({attempt + 1}/{max_retries}) بعد {int(wait_s)}ث | {phone} | {res}")
+                        time.sleep(wait_s)
+                        continue
+                    break
+
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                step_label = f"Step {s_idx + 1}"
+
+                if res == "SUCCESS":
+                    self._add_progress_row([phone, step_label, timestamp, "Sent", ""])
+                elif res == "INVALID":
+                    self._add_progress_row([phone, step_label, timestamp, "Invalid", ""])
+                    contact_status = "INVALID"
+                    contact_error = "ERR-20"
+                    break
+                elif res == "STOPPED":
+                    self._add_progress_row([phone, step_label, timestamp, "Stopped", "User stopped"])
+                    contact_status = "STOPPED"
+                    break
+                else:
+                    self._add_progress_row([phone, step_label, timestamp, "Failed", str(res)])
+                    contact_status = "FAILED"
+                    contact_error = res
+                    break
+
+                try:
+                    s_min = int(step.get("delay_min", 0) or 0)
+                    s_max = int(step.get("delay_max", 0) or 0)
+                except ValueError:
+                    s_min, s_max = 0, 0
+                if s_max > 0:
+                    time.sleep(random.uniform(s_min, max(s_min, s_max)))
+
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            if contact_status == "SUCCESS":
+                self.sent += 1
+                self.results_log.append({"phone": phone, "name": name, "status": "نجاح", "error_code": "-", "timestamp": timestamp})
+                consecutive_failures = 0
+            elif contact_status == "INVALID":
+                self.invalid += 1
+                self.results_log.append({"phone": phone, "name": name, "status": "بدون واتساب", "error_code": "ERR-20", "timestamp": timestamp})
+                consecutive_failures = 0
+            elif contact_status == "STOPPED":
+                self.results_log.append({"phone": phone, "name": name, "status": "توقف", "error_code": "-", "timestamp": timestamp})
+                break
+            else:
+                self.failed += 1
+                err_code = contact_error if str(contact_error).startswith("ERR") else "ERR-UNKNOWN"
+                self.results_log.append({"phone": phone, "name": name, "status": "فشل", "error_code": err_code, "timestamp": timestamp})
+                consecutive_failures += 1
+                if consecutive_failures >= max_consecutive_failures:
+                    self.log(f"⛔ تم الإيقاف تلقائيًا بعد {consecutive_failures} فشل متتالي لتقليل المخاطر.")
+                    self.stop_event.set()
+                    break
+
+            self._run_on_ui(self._update_stats)
+            time.sleep(random.uniform(delay_min, delay_max))
+
+        end_time = datetime.datetime.now()
+        duration = end_time - start_time
+        csv_path = self._generate_final_report(duration)
+        self.last_report_path = csv_path
+
+        self.campaign_manager.add_campaign(
+            name=f"Workflow {workflow.get('name','')} | {start_time.strftime('%Y-%m-%d %H:%M')}",
+            total=total,
+            sent=self.sent,
+            failed=self.failed,
+            invalid=self.invalid,
+            duration_seconds=int(duration.total_seconds()),
+            results_log=self.results_log,
+            csv_path=csv_path
+        )
+        self._run_on_ui(self._refresh_analytics)
+
+        try:
+            if self.bg_mode_var.get():
+                self.bot.minimize()
+            else:
+                self.bot.bring_to_front()
+
+            if self.stop_event.is_set():
+                self.log("🛑 تم إيقاف العملية.")
+            else:
+                self.log("🏁 انتهت العملية.")
+                self._run_on_ui(lambda: self.progress_bar.set(1.0))
+
+        except Exception as e:
+            self.report_error("ERR-99", "حدث خطأ عام أثناء الإرسال.", detail=str(e), dialog=True)
+        finally:
+            self.is_running = False
+            self.pause_event.clear()
+            self.is_paused = False
+            self._run_on_ui(lambda: self.btn_start.configure(state="normal"))
+            self._run_on_ui(lambda: self.btn_stop.configure(state="disabled"))
+            if hasattr(self, "btn_check"):
+                self._run_on_ui(lambda: self.btn_check.configure(state="normal"))
+            if hasattr(self, "pause_btn"):
+                self._run_on_ui(lambda: self.pause_btn.configure(text="Pause"))
+            self._run_on_ui(lambda: self.status_label.configure(text="جاهز..."))
+
     def _run_automation(self, contacts, msg_template, attachments):
         if not self.bot:
             return
@@ -2941,3 +3630,4 @@ class ModernWhatsAppApp(ctk.CTk):
             if self.progress_status_label and current_phone:
                 self.progress_status_label.configure(text=f"Sending message to: {current_phone}")
         self._run_on_ui(_do)
+

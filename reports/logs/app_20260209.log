@@ -12,3 +12,34 @@
 [20:18:19] 
 📊 التقرير النهائي: ✅1 | ❌0 | 🚫0 | ⏱3 دقيقة 18 ثانية
 [20:18:19] 🏁 انتهت العملية.
+[21:16:31] تم تحميل 1 جهة اتصال من الملف.
+[21:16:31] جاري فتح المتصفح...
+[21:16:32] تم تحميل 1 جهة اتصال من الملف.
+[21:16:32] جاري فتح المتصفح...
+[21:16:40] [ERR-01] تعذر تشغيل المتصفح. اغلق كل نوافذ Chrome ثم أعد المحاولة. | Message: session not created: Chrome instance exited. Examine ChromeDriver verbose log to determine the cause.; For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#sessionnotcreatedexception
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x845093
+	0x8450d4
+	0x63b490
+	0x67091b
+	0x66bb00
+	0x6b47bf
+	0x6b3fd7
+	0x6a7f56
+	0x6796c9
+	0x67a484
+	0xa97e34
+	0xa930c9
+	0xab0add
+	0x85db38
+	0x8658ad
+	0x84d848
+	0x84da12
+	0x8375fa
+	0x75f2fcc9
+	0x773682ae
+	0x7736827e
+
+[21:16:40] يرجى فتح واتساب على الهاتف ومسح QR لتسجيل الدخول...
+[21:18:40] [ERR-02] المتصفح لا يستجيب للأتمتة أو انتهت مهلة تسجيل الدخول.
