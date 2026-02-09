@@ -1,36 +1,109 @@
 import csv
 import os
 
+
+def _normalize_phone(phone):
+    """Normalize a phone number string (Egypt-specific formatting)."""
+    if not phone:
+        return None
+    phone = str(phone).strip().replace(' ', '').replace('-', '')
+    # Remove .0 from float conversion
+    if phone.endswith('.0'):
+        phone = phone[:-2]
+    # Egypt specific formatting
+    if phone.startswith('01') and len(phone) == 11:
+        phone = '2' + phone
+    elif phone.startswith('1') and len(phone) == 10:
+        phone = '20' + phone
+    return phone
+
+
 def read_contacts(file_path):
     """Reads contacts from a CSV file and returns a list of dictionaries."""
     contacts = []
     try:
         if not os.path.exists(file_path):
             return []
-            
+
         with open(file_path, 'r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
             for row in reader:
                 normalized_row = {k.strip().lower(): v for k, v in row.items()}
-                
-                # Try multiple possible column names for phone and name
+
                 phone = normalized_row.get('phone') or normalized_row.get('mobile') or \
                         normalized_row.get('number') or normalized_row.get('phone 1 - value')
                 name = normalized_row.get('name') or normalized_row.get('given name') or 'Customer'
-                
+
+                phone = _normalize_phone(phone)
                 if phone:
-                    phone = phone.strip().replace(' ', '').replace('-', '')
-                    # Egypt specific formatting
-                    if phone.startswith('01'):
-                        phone = '2' + phone
-                    elif phone.startswith('1') and len(phone) == 10:
-                        phone = '20' + phone
-                        
-                    contacts.append({'phone': phone, 'name': name})
+                    contacts.append({'phone': phone, 'name': name.strip()})
     except Exception as e:
         print(f"Error reading CSV: {e}")
-        
+
     return contacts
+
+
+def read_contacts_excel(file_path):
+    """Reads contacts from an Excel (.xlsx) file."""
+    contacts = []
+    try:
+        import openpyxl
+        if not os.path.exists(file_path):
+            return []
+
+        wb = openpyxl.load_workbook(file_path, read_only=True)
+        ws = wb.active
+
+        # Read header row
+        headers = []
+        for cell in next(ws.iter_rows(min_row=1, max_row=1)):
+            headers.append(str(cell.value or '').strip().lower())
+
+        # Find phone and name columns
+        phone_col = None
+        name_col = None
+        for i, h in enumerate(headers):
+            if h in ('phone', 'mobile', 'number', 'phone 1 - value', 'رقم', 'هاتف'):
+                phone_col = i
+            if h in ('name', 'given name', 'اسم', 'الاسم'):
+                name_col = i
+
+        if phone_col is None:
+            # Try first two columns: assume col 0=name, col 1=phone
+            if len(headers) >= 2:
+                name_col = 0
+                phone_col = 1
+            elif len(headers) == 1:
+                phone_col = 0
+
+        if phone_col is None:
+            return []
+
+        for row in ws.iter_rows(min_row=2):
+            phone_val = row[phone_col].value if phone_col < len(row) else None
+            name_val = row[name_col].value if name_col is not None and name_col < len(row) else 'Customer'
+
+            phone = _normalize_phone(phone_val)
+            if phone:
+                contacts.append({'phone': phone, 'name': str(name_val or 'Customer').strip()})
+
+        wb.close()
+    except Exception as e:
+        print(f"Error reading Excel: {e}")
+
+    return contacts
+
+
+def read_contacts_auto(file_path):
+    """Auto-detect file type and read contacts accordingly."""
+    if not file_path or not os.path.exists(file_path):
+        return []
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext in ('.xlsx', '.xls'):
+        return read_contacts_excel(file_path)
+    else:
+        return read_contacts(file_path)
+
 
 def create_contacts_template(file_path):
     """Creates a sample CSV template for the user."""
@@ -42,3 +115,4 @@ def create_contacts_template(file_path):
         return True
     except:
         return False
+

@@ -1,10 +1,16 @@
-import tkinter as tk
-from gui.app_ui import WhatsAppSenderApp
+import sys
+import os
+
+# Ensure project root is in path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from gui.modern_ui import ModernWhatsAppApp
+
 
 def main():
-    root = tk.Tk()
-    app = WhatsAppSenderApp(root)
-    root.mainloop()
+    app = ModernWhatsAppApp()
+    app.mainloop()
+
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,16 @@
+{
+  "appearance_mode": "light",
+  "language": "ar",
+  "last_contacts_file": "C:/Users/Islam Glab/Desktop/test_my_number.csv",
+  "last_image_file": "C:/Users/Islam Glab/Desktop/1.jpg",
+  "last_message": "xfbfb",
+  "send_text_with_image": true,
+  "background_mode": false,
+  "delay_min": 30,
+  "delay_max": 120,
+  "batch_size": 30,
+  "batch_pause_min": 180,
+  "batch_pause_max": 240,
+  "window_width": 1250,
+  "window_height": 875
+}
