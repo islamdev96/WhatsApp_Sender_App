@@ -21,23 +21,37 @@ from utils.contacts_manager import ContactsManager
 from utils.scheduler import Scheduler
 from utils.campaign_manager import CampaignManager
 
-# ─── Color Palette ───────────────────────────────────────────────────────────
+# ─── Color Palette (Premium) ────────────────────────────────────────────────
 COLORS = {
-    "primary":       "#25D366",
-    "primary_hover": "#128C7E",
-    "primary_dark":  "#075E54",
-    "danger":        "#E74C3C",
-    "danger_hover":  "#C0392B",
-    "warning":       "#F39C12",
-    "success":       "#2ECC71",
-    "info":          "#3498DB",
-    "card_dark":     "#1E1E2E",
-    "card_light":    "#FFFFFF",
-    "bg_dark":       "#11111B",
-    "bg_light":      "#F0F2F5",
-    "text_muted":    "#6C757D",
-    "accent":        "#6C5CE7",
-    "gold":          "#FFC107",
+    # Main branding
+    "primary":       "#00E676",      # Bright Neon Green
+    "primary_hover": "#00C853",      # Deep Emerald
+    "primary_dark":  "#050505",      # Very Dark Background (Sidebar)
+    
+    # Status colors
+    "danger":        "#FF3D00",      # Vibrant Red
+    "danger_hover":  "#DD2C00",
+    "warning":       "#FF9100",      # Deep Orange
+    "success":       "#00E676",
+    "info":          "#2979FF",      # Bright Blue
+    
+    # UI Elements (Dark Mode focused)
+    "card_bg":       "#1A1A1A",      # Dark Card Background
+    "bg_dark":       "#121212",      # Main Background
+    "text_main":     "#FFFFFF",
+    "text_muted":    "#B0BEC5",
+    "accent":        "#651FFF",      # Deep Purple Accent
+    "border":        "#333333",
+}
+
+# ─── Typography & Styling ─────────────────────────────────────────────────────
+FONTS = {
+    "header": ("Segoe UI", 24, "bold"),
+    "sub_header": ("Segoe UI", 16, "bold"),
+    "body": ("Segoe UI", 13),
+    "body_bold": ("Segoe UI", 13, "bold"),
+    "small": ("Segoe UI", 11),
+    "mono": ("Consolas", 12),
 }
 
 ERROR_CATALOG = {
@@ -130,21 +144,21 @@ class ModernWhatsAppApp(ctk.CTk):
 
     # ─── Sidebar ──────────────────────────────────────────────────────────
     def _build_sidebar(self):
-        self.sidebar = ctk.CTkFrame(self, width=220, corner_radius=0,
+        self.sidebar = ctk.CTkFrame(self, width=240, corner_radius=0,
                                     fg_color=COLORS["primary_dark"])
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         self.sidebar.grid_rowconfigure(9, weight=1)
 
         # Logo / Title
-        logo_label = ctk.CTkLabel(self.sidebar, text="📱 WA Sender",
-                                  font=ctk.CTkFont(size=22, weight="bold"),
-                                  text_color="white")
-        logo_label.grid(row=0, column=0, padx=20, pady=(25, 5))
+        logo_label = ctk.CTkLabel(self.sidebar, text="⚡ WA Sender",
+                                  font=("Segoe UI", 26, "bold"),
+                                  text_color=COLORS["primary"])
+        logo_label.grid(row=0, column=0, padx=20, pady=(35, 5))
 
-        subtitle = ctk.CTkLabel(self.sidebar, text="Professional Edition",
-                                font=ctk.CTkFont(size=11),
-                                text_color="#A8DADC")
-        subtitle.grid(row=1, column=0, padx=20, pady=(0, 25))
+        subtitle = ctk.CTkLabel(self.sidebar, text="PRO EDITION",
+                                font=("Segoe UI", 10, "bold"),
+                                text_color=COLORS["text_muted"])
+        subtitle.grid(row=1, column=0, padx=20, pady=(0, 35))
 
         # Navigation Buttons
         nav_items = [
@@ -159,15 +173,15 @@ class ModernWhatsAppApp(ctk.CTk):
         self.nav_buttons = {}
         for i, (text, tab_id) in enumerate(nav_items):
             btn = ctk.CTkButton(self.sidebar, text=text,
-                                font=ctk.CTkFont(size=14),
+                                font=("Segoe UI", 14),
                                 fg_color="transparent",
-                                text_color="white",
-                                hover_color=COLORS["primary_hover"],
-                                anchor="e",
-                                height=42,
-                                corner_radius=8,
+                                text_color=COLORS["text_muted"],
+                                hover_color=COLORS["bg_dark"],
+                                anchor="w",
+                                height=50,
+                                corner_radius=10,
                                 command=lambda t=tab_id: self._switch_tab(t))
-            btn.grid(row=i + 2, column=0, padx=12, pady=3, sticky="ew")
+            btn.grid(row=i + 2, column=0, padx=15, pady=4, sticky="ew")
             self.nav_buttons[tab_id] = btn
 
         # Spacer
@@ -197,9 +211,9 @@ class ModernWhatsAppApp(ctk.CTk):
         # Highlight active nav
         for nid, btn in self.nav_buttons.items():
             if nid == tab_id:
-                btn.configure(fg_color=COLORS["primary"])
+                btn.configure(fg_color=COLORS["primary"], text_color="#000000", font=("Segoe UI", 14, "bold"))
             else:
-                btn.configure(fg_color="transparent")
+                btn.configure(fg_color="transparent", text_color=COLORS["text_muted"], font=("Segoe UI", 14))
 
     # ─── Main Tab ─────────────────────────────────────────────────────────
     def _build_tab_main(self):
@@ -219,13 +233,14 @@ class ModernWhatsAppApp(ctk.CTk):
             ("invalid", "🚫 بدون واتساب", "0", COLORS["warning"]),
         ]
         for i, (key, title, val, color) in enumerate(stats):
-            card = ctk.CTkFrame(dash, corner_radius=12, height=85)
-            card.grid(row=0, column=i, padx=6, pady=5, sticky="ew")
+            card = ctk.CTkFrame(dash, corner_radius=16, height=100, fg_color=COLORS["card_bg"])
+            card.grid(row=0, column=i, padx=8, pady=5, sticky="ew")
             card.grid_propagate(False)
-            ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=12),
-                         text_color=COLORS["text_muted"]).pack(pady=(12, 2))
+            
+            ctk.CTkLabel(card, text=title, font=("Segoe UI", 12),
+                         text_color=COLORS["text_muted"]).pack(pady=(20, 5))
             val_label = ctk.CTkLabel(card, text=val,
-                                     font=ctk.CTkFont(size=26, weight="bold"),
+                                     font=("Segoe UI", 32, "bold"),
                                      text_color=color)
             val_label.pack()
             self.stat_cards[key] = val_label
@@ -242,35 +257,30 @@ class ModernWhatsAppApp(ctk.CTk):
         left.grid(row=0, column=0, padx=(0, 8), pady=5, sticky="nsew")
 
         # -- Files Section --
-        files_label = ctk.CTkLabel(left, text="📁 الملفات", font=ctk.CTkFont(size=14, weight="bold"))
-        files_label.pack(anchor="e", padx=15, pady=(12, 5))
+        files_label = ctk.CTkLabel(left, text="📁 الملفات والمرفقات", font=("Segoe UI", 14, "bold"), text_color=COLORS["text_main"])
+        files_label.pack(anchor="e", padx=20, pady=(12, 10))
 
-        file_row1 = ctk.CTkFrame(left, fg_color="transparent")
-        file_row1.pack(fill="x", padx=15, pady=3)
-        self.contacts_entry = ctk.CTkEntry(file_row1, placeholder_text="ملف الأرقام (CSV / Excel)...",
-                                           height=36, corner_radius=8)
-        self.contacts_entry.pack(side="right", fill="x", expand=True, padx=(8, 0))
-        ctk.CTkButton(file_row1, text="اختر", width=70, height=36,
-                      fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
-                      command=self._browse_contacts).pack(side="right")
+        # 1. Contacts
+        self._create_file_row(left, "👥 ملف الأرقام", "contacts_entry", self._browse_contacts)
 
-        file_row2 = ctk.CTkFrame(left, fg_color="transparent")
-        file_row2.pack(fill="x", padx=15, pady=3)
-        self.image_entry = ctk.CTkEntry(file_row2, placeholder_text="الصورة (اختياري)...",
-                                        height=36, corner_radius=8)
-        self.image_entry.pack(side="right", fill="x", expand=True, padx=(8, 0))
-        ctk.CTkButton(file_row2, text="اختر", width=70, height=36,
-                      fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
-                      command=self._browse_image).pack(side="right")
+        # 2. Image
+        self._create_file_row(left, "📷 صورة", "image_entry", self._browse_image)
+
+        # 3. Video
+        self._create_file_row(left, "🎥 فيديو", "video_entry", self._browse_video)
+
+        # 4. Document
+        self._create_file_row(left, "📄 مستند (PDF/Doc)", "doc_entry", self._browse_document)
 
         # -- Message Section --
-        msg_label = ctk.CTkLabel(left, text="✉️ نص الرسالة  (استخدم {name} لاسم العميل)",
-                                 font=ctk.CTkFont(size=13, weight="bold"))
-        msg_label.pack(anchor="e", padx=15, pady=(12, 5))
-
-        self.message_textbox = ctk.CTkTextbox(left, height=120, corner_radius=8,
-                                              font=ctk.CTkFont(size=13))
-        self.message_textbox.pack(fill="both", expand=True, padx=15, pady=(0, 5))
+        # -- Message Input --
+        ctk.CTkLabel(left, text="نص الرسالة:", font=("Segoe UI", 13, "bold"),
+                     text_color=COLORS["text_main"]).pack(anchor="e", padx=25)
+        
+        self.msg_text = ctk.CTkTextbox(left, height=180, corner_radius=12,
+                                       font=("Segoe UI", 13), border_color=COLORS["border"],
+                                       fg_color=COLORS["bg_dark"])
+        self.msg_text.pack(fill="both", expand=True, padx=20, pady=(5, 10))
 
         # -- Checkboxes --
         chk_frame = ctk.CTkFrame(left, fg_color="transparent")
@@ -291,32 +301,42 @@ class ModernWhatsAppApp(ctk.CTk):
         right.grid(row=0, column=1, padx=(8, 0), pady=5, sticky="nsew")
 
         ctrl_label = ctk.CTkLabel(right, text="🎛️ التحكم", font=ctk.CTkFont(size=14, weight="bold"))
-        ctrl_label.pack(anchor="e", padx=15, pady=(12, 8))
+        ctrl_label.pack(anchor="e", padx=15, pady=4)
 
-        self.btn_login = ctk.CTkButton(right, text="1. فتح واتساب ومسح QR",
-                                       font=ctk.CTkFont(size=13, weight="bold"),
-                                       fg_color=COLORS["primary"],
-                                       hover_color=COLORS["primary_hover"],
-                                       height=44, corner_radius=10,
+        ctrl_frame = ctk.CTkFrame(right, fg_color="transparent")
+        ctrl_frame.pack(fill="x", padx=15, pady=(0, 10))
+
+        # 1. Login
+        self.btn_login = ctk.CTkButton(ctrl_frame, text="🔑 فتح واتساب (Login)",
+                                       font=("Segoe UI", 13, "bold"),
+                                       height=40,
+                                       fg_color=COLORS["card_bg"],
+                                       hover_color=COLORS["border"],
+                                       border_width=1, border_color=COLORS["primary"],
+                                       image=None, compound="right",
                                        command=self._login_action)
-        self.btn_login.pack(fill="x", padx=15, pady=4)
+        self.btn_login.pack(fill="x", pady=(0, 10))
 
-        self.btn_start = ctk.CTkButton(right, text="2. بدء الإرسال ▶",
-                                       font=ctk.CTkFont(size=14, weight="bold"),
+        # 2. Start
+        self.btn_start = ctk.CTkButton(ctrl_frame, text="🚀 بدء الإرسال",
+                                       font=("Segoe UI", 14, "bold"),
+                                       height=45,
                                        fg_color=COLORS["primary"],
+                                       text_color="#000000",
                                        hover_color=COLORS["primary_hover"],
-                                       height=48, corner_radius=10,
-                                       command=self._start_thread)
-        self.btn_start.pack(fill="x", padx=15, pady=4)
+                                       command=self._start_action)
+        self.btn_start.pack(fill="x", pady=(0, 10))
 
-        self.btn_stop = ctk.CTkButton(right, text="إيقاف ⏹",
-                                      font=ctk.CTkFont(size=13, weight="bold"),
-                                      fg_color=COLORS["danger"],
-                                      hover_color=COLORS["danger_hover"],
-                                      height=40, corner_radius=10,
+        # 3. Stop
+        self.btn_stop = ctk.CTkButton(ctrl_frame, text="🛑 إيقاف مؤقت",
+                                      font=("Segoe UI", 13, "bold"),
+                                      height=40,
+                                      fg_color=COLORS["card_bg"],
+                                      hover_color=COLORS["danger"],
+                                      border_width=1, border_color=COLORS["danger"],
                                       state="disabled",
                                       command=self._stop_action)
-        self.btn_stop.pack(fill="x", padx=15, pady=4)
+        self.btn_stop.pack(fill="x", pady=(0, 10))
 
         # -- Scheduling --
         sched_label = ctk.CTkLabel(right, text="🕒 جدولة الإرسال", font=ctk.CTkFont(size=13, weight="bold"))
@@ -679,12 +699,26 @@ class ModernWhatsAppApp(ctk.CTk):
     # ═══════════════════════════════════════════════════════════════════════
     #  FILE BROWSE
     # ═══════════════════════════════════════════════════════════════════════
+    def _create_file_row(self, parent, label_text, entry_attr, browse_cmd):
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", padx=15, pady=4)
+        
+        ctk.CTkLabel(row, text=label_text, width=100, anchor="e", font=("Segoe UI", 12, "bold"),
+                     text_color=COLORS["text_muted"]).pack(side="right", padx=(5, 0))
+        
+        entry = ctk.CTkEntry(row, placeholder_text="اختر الملف...", height=35, 
+                             corner_radius=8, font=("Segoe UI", 12), border_color=COLORS["border"],
+                             fg_color=COLORS["bg_dark"], text_color=COLORS["text_main"])
+        entry.pack(side="right", fill="x", expand=True, padx=5)
+        setattr(self, entry_attr, entry)
+        
+        ctk.CTkButton(row, text="📂", width=40, height=35,
+                      fg_color=COLORS["card_bg"], hover_color=COLORS["primary"],
+                      font=("Segoe UI", 14),
+                      command=browse_cmd).pack(side="right")
+
     def _browse_contacts(self):
-        path = filedialog.askopenfilename(filetypes=[
-            ("جهات الاتصال", "*.csv;*.xlsx;*.xls"),
-            ("CSV", "*.csv"),
-            ("Excel", "*.xlsx;*.xls"),
-        ])
+        path = filedialog.askopenfilename(filetypes=[("Contacts", "*.csv;*.xlsx;*.xls")])
         if path:
             self.contacts_entry.delete(0, "end")
             self.contacts_entry.insert(0, path)
@@ -695,21 +729,75 @@ class ModernWhatsAppApp(ctk.CTk):
             self.image_entry.delete(0, "end")
             self.image_entry.insert(0, path)
 
+    def _browse_video(self):
+        path = filedialog.askopenfilename(filetypes=[("Video", "*.mp4;*.mkv;*.avi;*.3gp")])
+        if path:
+            self.video_entry.delete(0, "end")
+            self.video_entry.insert(0, path)
+
+    def _browse_document(self):
+        path = filedialog.askopenfilename(filetypes=[("Documents", "*.pdf;*.docx;*.pptx;*.xlsx;*.txt;*.zip;*.rar")])
+        if path:
+            self.doc_entry.delete(0, "end")
+            self.doc_entry.insert(0, path)
+
+    def _browse_video(self):
+        path = filedialog.askopenfilename(filetypes=[("Video", "*.mp4;*.mkv;*.avi;*.3gp")])
+        if path:
+            self.video_entry.delete(0, "end")
+            self.video_entry.insert(0, path)
+
+    def _browse_document(self):
+        path = filedialog.askopenfilename(filetypes=[("Documents", "*.pdf;*.docx;*.pptx;*.xlsx;*.txt;*.zip;*.rar")])
+        if path:
+            self.doc_entry.delete(0, "end")
+            self.doc_entry.insert(0, path)
+
     # ═══════════════════════════════════════════════════════════════════════
     #  TEMPLATES MANAGEMENT
     # ═══════════════════════════════════════════════════════════════════════
     def _refresh_templates_list(self):
-        for widget in self.templates_listbox.winfo_children():
-            widget.destroy()
-        for t in self.templates.get_all():
-            btn = ctk.CTkButton(self.templates_listbox, text=t["name"],
-                                font=ctk.CTkFont(size=13),
-                                fg_color="transparent",
-                                hover_color=COLORS["primary_hover"],
-                                text_color=("gray10", "gray90"),
-                                anchor="e", height=36, corner_radius=6,
-                                command=lambda name=t["name"]: self._select_template(name))
-            btn.pack(fill="x", pady=2)
+        for w in self.templates_listbox.winfo_children():
+            w.destroy()
+            
+        templates = self.templates.get_all()
+        if not templates:
+            ctk.CTkLabel(self.templates_listbox, text="لا توجد قوالب محفوظة.", 
+                         font=("Segoe UI", 12), text_color=COLORS["text_muted"]).pack(pady=20)
+            return
+
+        for t in templates:
+            card = ctk.CTkFrame(self.templates_listbox, fg_color=COLORS["card_bg"], corner_radius=10)
+            card.pack(fill="x", pady=5, padx=5)
+            
+            # Header
+            head = ctk.CTkFrame(card, fg_color="transparent", height=30)
+            head.pack(fill="x", padx=10, pady=(8, 0))
+            
+            ctk.CTkLabel(head, text=t["name"], font=("Segoe UI", 13, "bold"), 
+                         text_color=COLORS["primary"]).pack(side="right")
+            
+            ctk.CTkLabel(head, text=t["updated"], font=("Segoe UI", 10), 
+                         text_color=COLORS["text_muted"]).pack(side="left")
+            
+            # Body Preview
+            body_prev = t["body"][:60] + "..." if len(t["body"]) > 60 else t["body"]
+            ctk.CTkLabel(card, text=body_prev, font=("Segoe UI", 11), 
+                         text_color=COLORS["text_muted"], anchor="e", justify="right").pack(fill="x", padx=10, pady=(5, 10))
+            
+            # Actions
+            actions = ctk.CTkFrame(card, fg_color="transparent", height=30)
+            actions.pack(fill="x", padx=10, pady=(0, 10))
+            
+            ctk.CTkButton(actions, text="اختيار", width=60, height=24, 
+                          fg_color=COLORS["primary"], font=("Segoe UI", 11, "bold"), text_color="black",
+                          command=lambda n=t["name"]: self._select_template(n)).pack(side="left", padx=2)
+            
+            ctk.CTkButton(actions, text="حذف", width=50, height=24, 
+                          fg_color=COLORS["card_bg"], hover_color=COLORS["danger"], 
+                          border_width=1, border_color=COLORS["danger"],
+                          font=("Segoe UI", 11),
+                          command=lambda n=t["name"]: self._delete_template_by_name(n)).pack(side="left", padx=2)
 
     def _select_template(self, name):
         t = self.templates.get_by_name(name)
@@ -759,17 +847,25 @@ class ModernWhatsAppApp(ctk.CTk):
     def _refresh_groups_list(self):
         for w in self.groups_listbox.winfo_children():
             w.destroy()
-        for g in self.contacts_mgr.get_all():
+        
+        groups = self.contacts_mgr.get_all()
+        if not groups:
+            ctk.CTkLabel(self.groups_listbox, text="لا توجد مجموعات بعد", 
+                         font=("Segoe UI", 12), text_color=COLORS["text_muted"]).pack(pady=20)
+            return
+
+        for g in groups:
             count = len(g.get("contacts", []))
-            text = f"{g['name']}  ({count})"
+            text = f"📁 {g['name']}  ({count})"
+            
             btn = ctk.CTkButton(self.groups_listbox, text=text,
-                                font=ctk.CTkFont(size=13),
-                                fg_color="transparent",
-                                hover_color=COLORS["primary_hover"],
-                                text_color=("gray10", "gray90"),
-                                anchor="e", height=36, corner_radius=6,
+                                font=("Segoe UI", 13),
+                                fg_color=COLORS["card_bg"],
+                                hover_color=COLORS["border"],
+                                text_color=COLORS["text_main"],
+                                anchor="e", height=42, corner_radius=8,
                                 command=lambda name=g["name"]: self._select_group(name))
-            btn.pack(fill="x", pady=2)
+            btn.pack(fill="x", pady=3)
 
     def _select_group(self, name):
         self.group_name_entry.delete(0, "end")
@@ -919,8 +1015,8 @@ class ModernWhatsAppApp(ctk.CTk):
         header.pack(anchor="e", padx=25, pady=(20, 10))
 
         # Overall Stats
-        stats_frame = ctk.CTkFrame(frame, corner_radius=10)
-        stats_frame.pack(fill="x", padx=20, pady=(0, 15))
+        stats_frame = ctk.CTkFrame(frame, corner_radius=16, fg_color=COLORS["card_bg"])
+        stats_frame.pack(fill="x", padx=20, pady=(0, 20))
         
         self.analytics_labels = {}
         
@@ -932,18 +1028,18 @@ class ModernWhatsAppApp(ctk.CTk):
         
         for i, (key, title) in enumerate(items):
             f = ctk.CTkFrame(stats_frame, fg_color="transparent")
-            f.grid(row=0, column=i, pady=10)
-            ctk.CTkLabel(f, text=title, font=ctk.CTkFont(size=12), text_color=COLORS["text_muted"]).pack()
-            l = ctk.CTkLabel(f, text="0", font=ctk.CTkFont(size=18, weight="bold"), text_color=COLORS["primary"])
+            f.grid(row=0, column=i, pady=20)
+            ctk.CTkLabel(f, text=title, font=("Segoe UI", 13), text_color=COLORS["text_muted"]).pack()
+            l = ctk.CTkLabel(f, text="0", font=("Segoe UI", 24, "bold"), text_color=COLORS["primary"])
             l.pack()
             self.analytics_labels[key] = l
 
         # Campaign History List
         ctk.CTkLabel(frame, text="سجل الحملات السابقة:", 
-                     font=ctk.CTkFont(size=13, weight="bold")).pack(anchor="e", padx=25, pady=(5, 5))
+                     font=("Segoe UI", 14, "bold"), text_color=COLORS["text_muted"]).pack(anchor="e", padx=30, pady=(5, 5))
         
-        self.campaigns_list = ctk.CTkScrollableFrame(frame, corner_radius=10)
-        self.campaigns_list.pack(fill="both", expand=True, padx=20, pady=(0, 15))
+        self.campaigns_list = ctk.CTkScrollableFrame(frame, corner_radius=16, fg_color=COLORS["bg_dark"])
+        self.campaigns_list.pack(fill="both", expand=True, padx=20, pady=(0, 20))
         
         # Refresh Button
         ctk.CTkButton(frame, text="🔄 تحديث البيانات", height=32,
@@ -1046,6 +1142,9 @@ class ModernWhatsAppApp(ctk.CTk):
             if os.path.exists(def_img):
                 self.image_entry.insert(0, def_img)
 
+        self.video_entry.insert(0, self.config.get("last_video_file", ""))
+        self.doc_entry.insert(0, self.config.get("last_doc_file", ""))
+
         # Load last message
         last_msg = self.config.get("last_message", "")
         if last_msg:
@@ -1058,6 +1157,8 @@ class ModernWhatsAppApp(ctk.CTk):
     def _save_current_state(self):
         self.config.set("last_contacts_file", self.contacts_entry.get())
         self.config.set("last_image_file", self.image_entry.get())
+        self.config.set("last_video_file", self.video_entry.get())
+        self.config.set("last_doc_file", self.doc_entry.get())
         self.config.set("last_message", self.message_textbox.get("1.0", "end").strip())
         self.config.set("send_text_with_image", self.send_text_var.get())
         self.config.set("background_mode", self.bg_mode_var.get())
@@ -1101,54 +1202,85 @@ class ModernWhatsAppApp(ctk.CTk):
 
         threading.Thread(target=run_login, daemon=True).start()
 
-    def _prepare_message_and_image(self):
+    def _prepare_content(self):
         msg_template = self.message_textbox.get("1.0", "end").strip()
-        img_path_raw = self.image_entry.get().strip()
-        img_path = img_path_raw if img_path_raw and os.path.exists(img_path_raw) else None
+        attachments = []
 
-        if img_path_raw and not img_path:
-            self.report_error("ERR-09", dialog=True)
+        # 1. Image
+        img = self.image_entry.get().strip()
+        if img and os.path.exists(img):
+            attachments.append({"type": "image", "path": img})
+        elif img:
+            self.report_error("ERR-09", f"الصورة غير موجودة: {img}", dialog=True)
             return None, None
 
-        if img_path and not self.send_text_var.get():
-            msg_template = ""
-
-        if not msg_template and not img_path:
-            self.report_error("ERR-04", "يرجى كتابة نص الرسالة أو اختيار صورة.", dialog=True, level="warning")
+        # 2. Video
+        vid = self.video_entry.get().strip()
+        if vid and os.path.exists(vid):
+            attachments.append({"type": "video", "path": vid})
+        elif vid:
+            self.report_error("ERR-09", f"الفيديو غير موجود: {vid}", dialog=True)
             return None, None
 
-        return msg_template, img_path
+        # 3. Document
+        doc = self.doc_entry.get().strip()
+        if doc and os.path.exists(doc):
+            attachments.append({"type": "document", "path": doc})
+        elif doc:
+            self.report_error("ERR-09", f"المستند غير موجود: {doc}", dialog=True)
+            return None, None
 
-    def _start_thread(self):
-        msg_template, img_path = self._prepare_message_and_image()
-        if msg_template is None and img_path is None:
-            return
+        # Check if empty
+        if not msg_template and not attachments:
+            self.report_error("ERR-04", "يرجى كتابة نص الرسالة أو اختيار مرفق.", dialog=True, level="warning")
+            return None, None
 
-        contacts_path = self.contacts_entry.get().strip()
-        # Check if sending to a group
-        self._sending_group_contacts = None
-        if contacts_path.startswith("[GROUP:") and contacts_path.endswith("]"):
-            group_name = contacts_path[7:-1]
+        return msg_template, attachments
+
+    def _start_action(self):
+        msg_template, attachments = self._prepare_content()
+        if msg_template is None and attachments is None:
+            return  # Error reported
+
+        contacts_input = self.contacts_entry.get().strip()
+        contacts = []
+
+        # 1. Check Group
+        if contacts_input.startswith("[GROUP:") and contacts_input.endswith("]"):
+            group_name = contacts_input[7:-1]
             g = self.contacts_mgr.get_by_name(group_name)
-            if not g or not g["contacts"]:
+            if not g or not g.get("contacts"):
                 self.report_error("ERR-03", f"المجموعة '{group_name}' فارغة أو غير موجودة.", dialog=True)
                 return
-            self._sending_group_contacts = g["contacts"]
-        elif not contacts_path or not os.path.exists(contacts_path):
-            self.report_error("ERR-03", "يرجى اختيار ملف أرقام صحيح.", dialog=True)
-            return
+            contacts = g["contacts"]
+            self.log(f"تم اختيار المجموعة: {group_name} ({len(contacts)} جهة اتصال)")
+            
+        # 2. Check File
+        elif contacts_input and os.path.exists(contacts_input):
+            contacts = read_contacts_auto(contacts_input)
+            if not contacts:
+                self.report_error("ERR-06", "الملف فارغ أو لا يحتوي على أرقام صحيحة.", dialog=True)
+                return
+            self.log(f"تم تحميل {len(contacts)} جهة اتصال من الملف.")
+            
+        else:
+             self.report_error("ERR-05", "يرجى اختيار ملف أرقام صحيح أو مجموعة.", dialog=True)
+             return
 
+        self._save_current_state()
+        
+        # 3. Check Bot & Login
         if not self.bot or not self.bot.driver:
             if messagebox.askyesno("تنبيه", "المتصفح غير مفتوح. هل تريد فتحه الآن؟"):
                 self._login_action()
             return
+            
         if not self.bot.is_logged_in():
-            self.bot.background_mode = False
             self.bot.bring_to_front()
             self.report_error("ERR-21", dialog=True, level="warning")
             return
 
-        # Apply background mode
+        # 4. Apply background mode
         if self.bg_mode_var.get():
             self.bot.background_mode = True
             self.bot.minimize()
@@ -1157,21 +1289,17 @@ class ModernWhatsAppApp(ctk.CTk):
             self.bot.background_mode = False
             self.bot.bring_to_front()
 
+        # 5. Start Thread
         self.is_running = True
         self.stop_event.clear()
-        self.results_log = []
-        self.sent = 0
-        self.failed = 0
-        self.invalid = 0
-        self._run_on_ui(self._update_stats)
-
+        
         self.btn_start.configure(state="disabled")
         self.btn_stop.configure(state="normal")
+        self.progress_bar.set(0)
+        self.status_label.configure(text="جاري العمل...")
 
-        # Save current state
-        self._save_current_state()
-
-        threading.Thread(target=self._run_automation, args=(msg_template, img_path, contacts_path),
+        threading.Thread(target=self._run_automation, 
+                         args=(contacts, msg_template, attachments),
                          daemon=True).start()
 
     def _stop_action(self):
@@ -1185,6 +1313,11 @@ class ModernWhatsAppApp(ctk.CTk):
         if res.startswith("ERR_IMAGE_FLOW:"):
             detail = res.split(":", 1)[1].strip()
             return "ERR-08", "فشل إرسال الصورة.", detail
+        if res.startswith("ERR_ATTACH_"):
+            parts = res.split(":", 1)
+            atype = parts[0].replace("ERR_ATTACH_", "")
+            detail = parts[1].strip() if len(parts) > 1 else ""
+            return "ERR-08", f"فشل إرفاق ملف ({atype}).", detail
         if res.startswith("ERR_GENERAL:"):
             detail = res.split(":", 1)[1].strip()
             if "timeout" in detail.lower():
@@ -1206,112 +1339,118 @@ class ModernWhatsAppApp(ctk.CTk):
     # ═══════════════════════════════════════════════════════════════════════
     #  MAIN AUTOMATION LOOP
     # ═══════════════════════════════════════════════════════════════════════
-    def _run_automation(self, msg_template, img_path, contacts_path):
+    # ═══════════════════════════════════════════════════════════════════════
+    #  MAIN AUTOMATION LOOP
+    # ═══════════════════════════════════════════════════════════════════════
+    def _run_automation(self, contacts, msg_template, attachments):
+        if not self.bot:
+            return
+
+        self.sent = 0
+        self.failed = 0
+        self.invalid = 0
+        self.results_log = []
+        
+        total = len(contacts)
         start_time = datetime.datetime.now()
+
+        # Batch settings
         try:
-            if self._sending_group_contacts:
-                contacts = self._sending_group_contacts
-            else:
-                contacts = read_contacts_auto(contacts_path)
-            if not contacts:
-                self.report_error("ERR-03", "لا يوجد أرقام صالحة في الملف.", dialog=True)
-                return
-
-            total = len(contacts)
-            self.log(f"🚀 بدء إرسال {total} رسالة...")
-
-            # Get settings
-            delay_min = int(self.delay_min_entry.get())
-            delay_max = int(self.delay_max_entry.get())
-            if delay_min > delay_max:
-                delay_min, delay_max = delay_max, delay_min
-
             batch_size = int(self.batch_size_entry.get())
             pause_min = int(self.batch_min_entry.get())
             pause_max = int(self.batch_max_entry.get())
-            if pause_min > pause_max:
-                pause_min, pause_max = pause_max, pause_min
+            delay_min = int(self.delay_min_entry.get())
+            delay_max = int(self.delay_max_entry.get())
+        except ValueError:
+            batch_size, pause_min, pause_max, delay_min, delay_max = 50, 300, 600, 10, 20
 
-            for i, c in enumerate(contacts):
-                if self.stop_event.is_set():
-                    break
+        self.log(f"🚀 بدء إرسال {total} رسالة...")
 
-                processed = i + 1
-                progress = processed / total
-                self._run_on_ui(lambda p=progress: self.progress_bar.set(p))
-                self._run_on_ui(lambda c=c, p=processed, t=total: self.status_label.configure(
-                    text=f"إرسال إلى: {c['name']} ({p}/{t})"))
+        for i, c in enumerate(contacts):
+            if self.stop_event.is_set():
+                break
 
-                res = self.bot.send_message(c['phone'], c['name'], msg_template, img_path, self.stop_event)
+            # Batch pause
+            if i > 0 and i % batch_size == 0:
+                pause_time = random.uniform(pause_min, pause_max)
+                self.log(f"⏸ استراحة لمدة {int(pause_time)} ثانية...")
+                time.sleep(pause_time)
 
-                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            phone = c.get("phone")
+            name = c.get("name", "عميل")
+            
+            processed = i + 1
+            self._run_on_ui(lambda: self.status_label.configure(text=f"جاري إرسال {processed}/{total} إلى {name}..."))
+            self._run_on_ui(lambda: self.progress_bar.set(processed / total))
 
-                if res == "SUCCESS":
-                    self.sent += 1
-                    self.log(f"✅ تم الإرسال لـ {c['name']}")
-                    self.results_log.append({"phone": c['phone'], "name": c['name'],
-                                             "status": "نجاح", "error_code": "", "timestamp": timestamp})
-                elif res == "INVALID":
-                    self.invalid += 1
-                    self.log(f"🚫 [ERR-20] الرقم {c['phone']} ليس عليه واتساب أو غير صحيح.")
-                    self.results_log.append({"phone": c['phone'], "name": c['name'],
-                                             "status": "بدون واتساب", "error_code": "ERR-20", "timestamp": timestamp})
-                elif res == "STOPPED":
-                    self.results_log.append({"phone": c['phone'], "name": c['name'],
-                                             "status": "توقف", "error_code": "", "timestamp": timestamp})
-                    break
-                else:
-                    self.failed += 1
-                    code, message, detail = self._map_bot_error(res)
-                    self.log(f"❌ [{code}] {message} - {c['name']} ({c['phone']})")
-                    if detail:
-                        self.log(f"   تفاصيل: {detail}")
-                    self.results_log.append({"phone": c['phone'], "name": c['name'],
-                                             "status": "فشل", "error_code": code, "timestamp": timestamp})
-
+            if not phone:
+                self.invalid += 1
+                self.results_log.append({"phone": "N/A", "name": name, "status": "INVALID", "error_code": "ERR-00", "timestamp": datetime.datetime.now()})
                 self._run_on_ui(self._update_stats)
-                remaining = total - processed
-                self._run_on_ui(lambda r=remaining, p=processed, t=total: self.status_label.configure(
-                    text=f"تمت معالجة {p}/{t} | المتبقي {r}"))
+                continue
 
-                # Delay
-                if processed < total:
-                    wait = random.randint(delay_min, delay_max)
-                    self.log(f"⏳ انتظار {wait} ثانية...")
-                    for _ in range(wait):
-                        if self.stop_event.is_set():
-                            break
-                        time.sleep(1)
-
-                    if batch_size > 0 and processed % batch_size == 0:
-                        batch_wait = random.randint(pause_min, pause_max)
-                        self.log(f"🕒 استراحة دورية {batch_wait} ثانية بعد {processed} رسالة...")
-                        for _ in range(batch_wait):
-                            if self.stop_event.is_set():
-                                break
-                            time.sleep(1)
-
-            # Final report
-            duration = datetime.datetime.now() - start_time
-            csv_path = self._generate_final_report(duration)
-            
-            # Save Campaign
-            c_name = f"Campaign {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
-            if self._sending_group_contacts:
-                # Can try to find group name if needed, or just generic
-                pass
-            
-            self.campaign_manager.add_campaign(
-                name=c_name,
-                total=total,
-                sent=self.sent,
-                failed=self.failed,
-                invalid=self.invalid,
-                duration_seconds=duration.total_seconds(),
-                results_log=self.results_log,
-                csv_path=csv_path
+            # Send Message + Attachments
+            # We assume bot.send_message is updated to valid signature
+            res = self.bot.send_message(
+                phone=phone,
+                name=name,
+                message_template=msg_template,
+                attachments=attachments,
+                stop_event=self.stop_event
             )
-            self._run_on_ui(self._refresh_analytics)
+            
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            if res == "SUCCESS":
+                self.sent += 1
+                self.log(f"✅ تم الإرسال لـ {name}")
+                self.results_log.append({"phone": phone, "name": name, "status": "نجاح", "error_code": "-", "timestamp": timestamp})
+            elif res == "INVALID":
+                self.invalid += 1
+                self.log(f"🚫 [ERR-20] الرقم {phone} غير صحيح.")
+                self.results_log.append({"phone": phone, "name": name, "status": "بدون واتساب", "error_code": "ERR-20", "timestamp": timestamp})
+            elif res == "STOPPED":
+                self.results_log.append({"phone": phone, "name": name, "status": "توقف", "error_code": "-", "timestamp": timestamp})
+                break
+            else:
+                self.failed += 1
+                err_code = res if res.startswith("ERR") else "ERR-UNKNOWN"
+                self.log(f"❌ فشل: {phone} | {res}")
+                self.results_log.append({"phone": phone, "name": name, "status": "فشل", "error_code": err_code, "timestamp": timestamp})
+
+            self._run_on_ui(self._update_stats)
+            
+            # Delay
+            time.sleep(random.uniform(delay_min, delay_max))
+
+        end_time = datetime.datetime.now()
+        duration = end_time - start_time
+        
+        # Save Campaign
+        csv_path = self._generate_final_report(duration)
+        
+        # Determine status
+        c_status = "Completed" if not self.stop_event.is_set() else "Stopped"
+        
+        # Save to history
+        self.campaign_manager.add_campaign(
+            name=f"Campaign {start_time.strftime('%Y-%m-%d %H:%M')}",
+            total=total,
+            sent=self.sent,
+            failed=self.failed,
+            invalid=self.invalid,
+            duration=str(duration).split('.')[0],
+            status=c_status,
+            csv_path=csv_path,
+            errors={r["error_code"]: 1 for r in self.results_log if r["status"] == "فشل"}
+        )
+        self._run_on_ui(self._refresh_analytics)
+
+        try:
+            if self.bg_mode_var.get():
+                self.bot.minimize()
+            else:
+                self.bot.bring_to_front()
 
             if self.stop_event.is_set():
                 self.log("🛑 تم إيقاف العملية.")

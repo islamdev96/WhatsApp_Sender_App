@@ -190,8 +190,8 @@ class WhatsAppBot:
             except:
                 pass
 
-    def send_message(self, phone, name, message_template, image_path=None, stop_event=None):
-        """Sends a message (and optionally an image) to a single phone number."""
+    def send_message(self, phone, name, message_template, attachments=None, stop_event=None):
+        """Sends a message and optionally multiple attachments (image, video, document)."""
         if stop_event and stop_event.is_set():
             return "STOPPED"
         if not self.driver:
@@ -201,122 +201,180 @@ class WhatsAppBot:
         message_template = message_template or ""
         message = message_template.replace("{name}", name).strip()
         
-        if not image_path and not message:
+        # Attachments can be None or list
+        if not attachments:
+            attachments = []
+        
+        if not attachments and not message:
             return "ERR_EMPTY_MESSAGE"
 
-        # 1. Open the chat (always without prefilled text for reliability)
+        # 1. Open the chat
         url = f"https://web.whatsapp.com/send?phone={phone}"
-            
+        
         try:
             self.driver.get(url)
             
-            # 2. Wait for loading (Chat input or invalid number)
+            # 2. Wait for loading
             ready_state = self._wait_for_chat_or_invalid(timeout=90)
-            
-            # Check for invalid phone number
             if ready_state == "INVALID":
                 return "INVALID"
             if ready_state == "TIMEOUT":
                 return "ERR_TIMEOUT"
 
-            time.sleep(random.uniform(5, 7))
+            time.sleep(random.uniform(3, 5))
 
-            if image_path:
-                # 3. Attach Image
-                try:
-                    attach_btn = self._find_any(self.ATTACH_BUTTON_LOCATORS)
-                    if not attach_btn:
-                        return "ERR_ATTACH_BTN_NOT_FOUND"
-
-                    # Click the plus button to reveal menu
-                    self.driver.execute_script("arguments[0].click();", attach_btn)
-                    time.sleep(2)
-                    
-                    # Find the hidden input for images
-                    image_input = self._wait_for_any(self.FILE_INPUT_LOCATORS, timeout=20)
-                    if not image_input:
-                        return "ERR_FILE_INPUT_NOT_FOUND"
-                    image_input.send_keys(image_path)
-                    
-                    # 4. Wait for Preview & Caption Box
-                    self._wait_for_any(self.MEDIA_PREVIEW_LOCATORS, timeout=40)
-                    caption_box = None
-                    if message:
-                        caption_box = self._wait_for_any(self.CAPTION_BOX_LOCATORS, timeout=40)
-                        if not caption_box:
-                            return "ERR_CAPTION_BOX_NOT_FOUND"
-                        time.sleep(1.5)
-                        caption_box.send_keys(message)
-                        time.sleep(2.5)
-                    
-                    # 5. Final Send Click
-                    send_btn = self._find_best_clickable(self.SEND_BUTTON_LOCATORS)
-                    if not send_btn:
-                        send_btn = self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=10)
-                    if not send_btn:
-                        return "ERR_FINAL_SEND_BTN_NOT_FOUND"
+            # 3. Send Content
+            # Strategy:
+            # - If attachments exist:
+            #   - Send 1st attachment WITH the message as caption.
+            #   - Send subsequent attachments (no caption).
+            # - If no attachments:
+            #   - Send text message.
+            
+            if attachments:
+                for i, att in enumerate(attachments):
+                    if stop_event and stop_event.is_set():
+                        return "STOPPED"
                         
-                    self.driver.execute_script("arguments[0].click();", send_btn)
-                    # If preview still open, try Enter fallback
-                    if not self._wait_for_preview_close(timeout=5):
-                        # JS fallback: click last visible send button
-                        try:
-                            self.driver.execute_script("""
-                                const nodes = Array.from(document.querySelectorAll('[data-icon*="send"],button[aria-label*="Send"],div[role="button"][aria-label*="Send"]'));
-                                for (let i = nodes.length - 1; i >= 0; i--) {
-                                    const el = nodes[i];
-                                    const style = window.getComputedStyle(el);
-                                    if (el.offsetParent !== null && style.visibility !== 'hidden' && el.getAttribute('aria-disabled') !== 'true') {
-                                        el.click();
-                                        break;
-                                    }
-                                }
-                            """)
-                        except Exception:
-                            pass
-                        try:
-                            if caption_box:
-                                caption_box.send_keys(Keys.ENTER)
-                            else:
-                                self.driver.switch_to.active_element.send_keys(Keys.ENTER)
-                        except Exception:
-                            pass
+                    path = att.get("path")
+                    type_ = att.get("type", "image")
                     
-                    # Wait for upload to complete
-                    time.sleep(6)
-                    return "SUCCESS"
-                except Exception as e:
-                    return f"ERR_IMAGE_FLOW: {str(e)[:100]}"
+                    # Determine caption: only for first attachment if message exists
+                    caption = message if (i == 0 and message) else None
+                    
+                    # Perform Attachment
+                    res = self._send_attachment(path, type_, caption)
+                    if res != "SUCCESS":
+                        return res # Fail fast or continue? Fail fast is safer for now.
+                    
+                    time.sleep(2)
+                return "SUCCESS"
             else:
-                # 6. Text-only Send
-                try:
-                    chat_input = self._wait_for_any(self.CHAT_INPUT_LOCATORS, timeout=30)
-                    if not chat_input:
-                        return "ERR_CHAT_INPUT_NOT_FOUND"
-                    chat_input.click()
-                    chat_input.send_keys(message)
-                    time.sleep(0.5)
+                # Text Only
+                return self._send_text(message)
 
-                    send_btn = self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=10)
-                    if send_btn:
-                        try:
-                            self.driver.execute_script("arguments[0].click();", send_btn)
-                        except Exception:
-                            pass
-                    # Fallback: press Enter to send
-                    try:
-                        chat_input.send_keys(Keys.ENTER)
-                    except Exception:
-                        pass
-                    time.sleep(3)
-                    return "SUCCESS"
-                except Exception:
-                    return "ERR_SEND_BTN_TIMEOUT"
-                
-        except TimeoutException:
-            return "ERR_TIMEOUT"
         except Exception as e:
             return f"ERR_GENERAL: {str(e)[:100]}"
+
+    def _send_attachment(self, path, media_type, caption=None):
+        """Internal method to upload a single file."""
+        try:
+            # 1. Click Attach Button
+            attach_btn = self._find_any(self.ATTACH_BUTTON_LOCATORS)
+            if not attach_btn:
+                return "ERR_ATTACH_BTN_NOT_FOUND"
+            self.driver.execute_script("arguments[0].click();", attach_btn)
+            time.sleep(1.0)
+            
+            # 2. Choose Input based on type
+            # Photos/Videos usually input[accept*='image']
+            # Documents usually input[accept='*'] or specific click
+            
+            input_el = None
+            
+            if media_type == 'document':
+                # Try to find the Document button in the menu and click it to trigger input
+                # Common selectors for "Document" button in the attach menu
+                doc_btn_locators = [
+                    (By.XPATH, '//span[@data-icon="attach-document"]'),
+                    (By.XPATH, '//li//*[contains(text(),"Document")]'),
+                    (By.XPATH, '//li//*[contains(text(),"مستند")]'),
+                    (By.CSS_SELECTOR, 'span[data-icon="attach-document"]'),
+                ]
+                doc_btn = self._find_any(doc_btn_locators)
+                if doc_btn:
+                     self.driver.execute_script("arguments[0].click();", doc_btn)
+                
+                # Check for file input
+                input_el = self._wait_for_any(self.FILE_INPUT_LOCATORS, timeout=5)
+            else:
+                # Image/Video - usually top button "Photos & Videos"
+                # But typically the file input is present and works for images if we just send keys
+                # We can try clicking the "Photos & Videos" button first for robustness
+                media_btn_locators = [
+                    (By.XPATH, '//span[@data-icon="attach-image"]'),
+                    (By.XPATH, '//li//*[contains(text(),"Photos")]'),
+                    (By.XPATH, '//li//*[contains(text(),"صور")]'),
+                ]
+                media_btn = self._find_any(media_btn_locators)
+                if media_btn:
+                    self.driver.execute_script("arguments[0].click();", media_btn)
+                    
+                input_el = self._wait_for_any(self.FILE_INPUT_LOCATORS, timeout=5)
+
+            if not input_el:
+                # Fallback: try finding any file input on page
+                input_el = self.driver.find_element(By.XPATH, '//input[@type="file"]')
+            
+            if not input_el:
+                return "ERR_FILE_INPUT_NOT_FOUND"
+
+            # 3. Send Keys
+            input_el.send_keys(path)
+            
+            # 4. Wait for Preview (Media) or File Dialog (Doc)
+            # Docs often have a different preview or simple "Send" icon
+            # Media has the full editor.
+            
+            if media_type == 'document':
+                 # Document preview is just a small box with send button
+                 send_btn = self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=15)
+                 if not send_btn:
+                     return "ERR_DOC_SEND_BTN_NOT_FOUND"
+            else:
+                # Media Preview
+                self._wait_for_any(self.MEDIA_PREVIEW_LOCATORS, timeout=40)
+                if caption:
+                    caption_box = self._wait_for_any(self.CAPTION_BOX_LOCATORS, timeout=10)
+                    if caption_box:
+                        time.sleep(0.5)
+                        caption_box.send_keys(caption)
+                        time.sleep(1.0)
+                
+                send_btn = self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=15)
+            
+            if not send_btn:
+                return "ERR_SEND_BTN_NOT_FOUND"
+                
+            self.driver.execute_script("arguments[0].click();", send_btn)
+            
+            # Wait for upload/processing
+            # If large video, this might take time.
+            time.sleep(3) 
+            
+            # Close preview if stuck (rare for docs, common for media)
+            if media_type != 'document':
+                 self._wait_for_preview_close(timeout=5)
+                 
+            return "SUCCESS"
+            
+        except Exception as e:
+            return f"ERR_ATTACH_{media_type.upper()}: {str(e)[:50]}"
+
+    def _send_text(self, message):
+        try:
+            chat_input = self._wait_for_any(self.CHAT_INPUT_LOCATORS, timeout=30)
+            if not chat_input:
+                return "ERR_CHAT_INPUT_NOT_FOUND"
+            chat_input.click()
+            chat_input.send_keys(message)
+            time.sleep(0.5)
+
+            send_btn = self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=10)
+            if send_btn:
+                try:
+                    self.driver.execute_script("arguments[0].click();", send_btn)
+                except Exception:
+                    pass
+            # Fallback Enter
+            try:
+                chat_input.send_keys(Keys.ENTER)
+            except:
+                pass
+            time.sleep(1)
+            return "SUCCESS"
+        except Exception as e:
+            return f"ERR_TEXT_SEND: {str(e)[:50]}"
 
     def close(self):
         if self.driver:

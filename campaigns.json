@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1,
+    "name": "Campaign 2026-02-09 13:55",
+    "date": "2026-02-09 13:55:29",
+    "total": 1,
+    "sent": 1,
+    "failed": 0,
+    "invalid": 0,
+    "duration_seconds": 27,
+    "success_rate": 100.0,
+    "csv_path": "C:\\Users\\Islam Glab\\Desktop\\WhatsApp_Sender_App\\reports\\report_20260209_135529.csv",
+    "results": [
+      {
+        "phone": "201030406057",
+        "name": "My Number",
+        "status": "نجاح",
+        "error_code": "",
+        "timestamp": "2026-02-09 13:55:29"
+      }
+    ]
+  }
+]
