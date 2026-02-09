@@ -3,7 +3,7 @@
   "language": "ar",
   "last_contacts_file": "C:/Users/Islam Glab/Desktop/test_my_number.csv",
   "last_image_file": "C:/Users/Islam Glab/Desktop/1.jpg",
-  "last_message": "",
+  "last_message": "Rgrgr",
   "send_text_with_image": true,
   "background_mode": false,
   "delay_min": 30,
@@ -16,10 +16,11 @@
   "retry_delay_max": 6,
   "max_consecutive_failures": 5,
   "enable_spintax": true,
+  "auto_open_login": true,
   "profile_name": "Default",
   "profiles_dir": "data\\profiles",
-  "window_width": 1758,
-  "window_height": 1055,
+  "window_width": 1920,
+  "window_height": 1001,
   "last_video_file": "",
   "last_doc_file": ""
 }

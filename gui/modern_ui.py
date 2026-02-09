@@ -29,7 +29,7 @@ PALETTE_DARK = {
     # Main branding
     "primary":       "#00E676",  # Neon Green
     "primary_hover": "#00C853",
-    "primary_dark":  "#0B1220",  # Sidebar / base (Slate Dark)
+    "primary_dark":  "#0A0F16",  # Sidebar / base (Deeper Slate)
 
     # Status colors
     "danger":        "#FF3D00",
@@ -39,13 +39,13 @@ PALETTE_DARK = {
     "info":          "#38BDF8",
 
     # UI Elements
-    "card_bg":       "#152238",
-    "bg_dark":       "#0E1726",
-    "text_main":     "#F1F5F9",
-    "text_muted":    "#9AA4B2",
+    "card_bg":       "#151E2E",
+    "bg_dark":       "#0F172A",
+    "text_main":     "#F8FAFC",
+    "text_muted":    "#94A3B8",
     "accent":        "#22D3EE",
     "accent_hover":  "#06B6D4",
-    "border":        "#263142",
+    "border":        "#263145",
 }
 
 PALETTE_LIGHT = {
@@ -62,7 +62,7 @@ PALETTE_LIGHT = {
     "info":          "#0284C7",
 
     # UI Elements
-    "card_bg":       "#F8FAFC",
+    "card_bg":       "#F1F5F9",
     "bg_dark":       "#FFFFFF",
     "text_main":     "#0F172A",
     "text_muted":    "#64748B",
@@ -176,6 +176,39 @@ class ModernWhatsAppApp(ctk.CTk):
         COLORS.clear()
         COLORS.update(palette)
 
+    def _refresh_theme(self):
+        # Update key widgets after palette change
+        if hasattr(self, "sidebar"):
+            self.sidebar.configure(fg_color=COLORS["primary_dark"])
+        if hasattr(self, "appearance_switch"):
+            self.appearance_switch.configure(text_color=COLORS["text_main"])
+        if hasattr(self, "nav_buttons") and hasattr(self, "current_tab"):
+            for nid, btn in self.nav_buttons.items():
+                if nid == self.current_tab:
+                    btn.configure(fg_color=COLORS["primary"], text_color="#000000", font=("Segoe UI", 14, "bold"))
+                else:
+                    btn.configure(fg_color="transparent", text_color=COLORS["text_muted"], font=("Segoe UI", 14))
+        if hasattr(self, "attachment_manager"):
+            self.attachment_manager.apply_theme(COLORS)
+        if hasattr(self, "message_editor"):
+            self.message_editor.apply_theme(COLORS)
+        if hasattr(self, "progress_bar"):
+            self.progress_bar.configure(progress_color=COLORS["primary"])
+        if hasattr(self, "total_counts_label"):
+            self.total_counts_label.configure(text_color=COLORS["text_muted"])
+        if hasattr(self, "btn_start"):
+            self.btn_start.configure(fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"], text_color="#000000")
+        if hasattr(self, "btn_login"):
+            self.btn_login.configure(fg_color=COLORS["card_bg"], hover_color=COLORS["border"], border_color=COLORS["primary"])
+        if hasattr(self, "btn_stop"):
+            self.btn_stop.configure(fg_color=COLORS["card_bg"], hover_color=COLORS["danger"], border_color=COLORS["danger"])
+        if hasattr(self, "btn_check"):
+            self.btn_check.configure(fg_color=COLORS["info"], hover_color=COLORS["accent_hover"])
+        if hasattr(self, "btn_schedule"):
+            self.btn_schedule.configure(fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"])
+        if hasattr(self, "btn_cancel_sched"):
+            self.btn_cancel_sched.configure(fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"])
+
     # ═══════════════════════════════════════════════════════════════════════
     #  LAYOUT
     # ═══════════════════════════════════════════════════════════════════════
@@ -203,6 +236,7 @@ class ModernWhatsAppApp(ctk.CTk):
 
         # Show main tab by default
         self._switch_tab("main")
+        self._refresh_theme()
 
     # ─── Sidebar ──────────────────────────────────────────────────────────
     def _build_sidebar(self):
@@ -273,7 +307,7 @@ class ModernWhatsAppApp(ctk.CTk):
         # Appearance Toggle
         self.appearance_switch = ctk.CTkSwitch(self.sidebar, text="الوضع الداكن",
                                                font=ctk.CTkFont(size=12),
-                                               text_color="white",
+                                               text_color=COLORS["text_main"],
                                                command=self._toggle_appearance,
                                                onvalue="dark", offvalue="light")
         self.appearance_switch.grid(row=10, column=0, padx=20, pady=(10, 5))
@@ -287,6 +321,7 @@ class ModernWhatsAppApp(ctk.CTk):
         ver_label.grid(row=11, column=0, padx=20, pady=(5, 15))
 
     def _switch_tab(self, tab_id):
+        self.current_tab = tab_id
         for fid, frame in self.tab_frames.items():
             frame.grid_forget()
         self.tab_frames[tab_id].grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
@@ -355,11 +390,11 @@ class ModernWhatsAppApp(ctk.CTk):
                       command=self._open_number_generator).pack(fill="x", padx=20, pady=(0, 8))
 
         # Attachments Panel (New)
-        self.attachment_manager = AttachmentManager(left, fg_color=COLORS["card_bg"], corner_radius=12)
+        self.attachment_manager = AttachmentManager(left, colors=COLORS, fg_color=COLORS["card_bg"], corner_radius=12)
         self.attachment_manager.pack(fill="x", padx=15, pady=(6, 10))
 
         # Message Section (New)
-        self.message_editor = RichTextFrame(left, fg_color=COLORS["bg_dark"], corner_radius=12)
+        self.message_editor = RichTextFrame(left, colors=COLORS, fg_color=COLORS["bg_dark"], corner_radius=12)
         self.message_editor.pack(fill="both", expand=True, padx=20, pady=(5, 10))
         self.message_textbox = self.message_editor.text_box # Alias for backward compatibility
         self.msg_text = self.message_editor.text_box # Alias
@@ -509,6 +544,10 @@ class ModernWhatsAppApp(ctk.CTk):
         self.counter_label = ctk.CTkLabel(counter_frame, text="✅ 0 | ❌ 0 | 🚫 0",
                                           font=ctk.CTkFont(size=14, weight="bold"))
         self.counter_label.pack()
+        self.total_counts_label = ctk.CTkLabel(counter_frame, text="الإجمالي: 0 | جهات: 0 | مجموعات: 0",
+                                               font=ctk.CTkFont(size=11),
+                                               text_color=COLORS["text_muted"])
+        self.total_counts_label.pack()
 
         # -- Error Codes Button --
         ctk.CTkButton(right, text="📖 أكواد الأخطاء",
@@ -855,6 +894,12 @@ class ModernWhatsAppApp(ctk.CTk):
         self.stat_cards["failed"].configure(text=str(self.failed))
         self.stat_cards["invalid"].configure(text=str(self.invalid))
         self.counter_label.configure(text=f"✅ {self.sent} | ❌ {self.failed} | 🚫 {self.invalid}")
+
+    def _update_total_counts(self, total=0, contacts_count=0, groups_count=0):
+        if hasattr(self, "total_counts_label"):
+            self.total_counts_label.configure(
+                text=f"الإجمالي: {total} | جهات: {contacts_count} | مجموعات: {groups_count}"
+            )
 
     def _show_error_codes(self):
         lines = [f"{code} — {desc}" for code, desc in ERROR_CATALOG.items()]
@@ -1680,7 +1725,8 @@ class ModernWhatsAppApp(ctk.CTk):
         ctk.set_appearance_mode(mode)
         self.config.set_and_save("appearance_mode", mode)
         self._apply_palette(mode)
-        messagebox.showinfo("تم", "تم تغيير المظهر. يُفضّل إعادة تشغيل التطبيق لتطبيق الألوان بالكامل.")
+        self._refresh_theme()
+        messagebox.showinfo("تم", "تم تغيير المظهر.")
 
     def _load_saved_state(self):
         # Load last used files
@@ -2000,6 +2046,7 @@ class ModernWhatsAppApp(ctk.CTk):
                 return None
             contacts = g["contacts"]
             self.log(f"تم اختيار المجموعة: {group_name} ({len(contacts)} جهة اتصال)")
+            self._update_total_counts(total=len(contacts), contacts_count=len(contacts), groups_count=1)
             return contacts
 
         # 2. Check File
@@ -2009,6 +2056,7 @@ class ModernWhatsAppApp(ctk.CTk):
                 self.report_error("ERR-06", "الملف فارغ أو لا يحتوي على أرقام صحيحة.", dialog=True)
                 return None
             self.log(f"تم تحميل {len(contacts)} جهة اتصال من الملف.")
+            self._update_total_counts(total=len(contacts), contacts_count=len(contacts), groups_count=0)
             return contacts
 
         self.report_error("ERR-05", "يرجى اختيار ملف أرقام صحيح أو مجموعة.", dialog=True)
@@ -2124,7 +2172,8 @@ class ModernWhatsAppApp(ctk.CTk):
         
         # 3. Check Bot & Login
         if not self.bot or not self.bot.driver:
-            if messagebox.askyesno("تنبيه", "المتصفح غير مفتوح. هل تريد فتحه الآن؟"):
+            auto_open = self.config.get("auto_open_login", True)
+            if auto_open or messagebox.askyesno("تنبيه", "المتصفح غير مفتوح. هل تريد فتحه الآن؟"):
                 self.pending_start_payload = (contacts, msg_template, attachments)
                 self._set_session_status("الحالة: جاري فتح المتصفح...", COLORS["info"])
                 self._login_action()
@@ -2146,7 +2195,8 @@ class ModernWhatsAppApp(ctk.CTk):
             return
 
         if not self.bot or not self.bot.driver:
-            if messagebox.askyesno("تنبيه", "المتصفح غير مفتوح. هل تريد فتحه الآن؟"):
+            auto_open = self.config.get("auto_open_login", True)
+            if auto_open or messagebox.askyesno("تنبيه", "المتصفح غير مفتوح. هل تريد فتحه الآن؟"):
                 self.pending_check_contacts = contacts
                 self._set_session_status("الحالة: جاري فتح المتصفح...", COLORS["info"])
                 self._login_action()

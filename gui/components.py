@@ -5,7 +5,10 @@ from tkinter import filedialog
 import os
 
 class AttachmentItem(ctk.CTkFrame):
-    def __init__(self, master, path, type_="image", caption="", remove_callback=None, **kwargs):
+    def __init__(self, master, path, type_="image", caption="", remove_callback=None, colors=None, **kwargs):
+        self.colors = colors or {}
+        if "fg_color" not in kwargs:
+            kwargs["fg_color"] = self._c("bg_dark", "transparent")
         super().__init__(master, **kwargs)
         self.path = path
         self.type_ = type_
@@ -16,7 +19,8 @@ class AttachmentItem(ctk.CTkFrame):
 
         # Icon/Type
         icon_text = "📷" if type_ == "image" else "🎥" if type_ == "video" else "📄"
-        self.icon_label = ctk.CTkLabel(self, text=icon_text, width=30)
+        self.icon_label = ctk.CTkLabel(self, text=icon_text, width=30,
+                                       text_color=self._c("accent", None))
         self.icon_label.grid(row=0, column=0, padx=5, pady=5)
 
         # Path (Truncated) & Caption Frame
@@ -27,18 +31,50 @@ class AttachmentItem(ctk.CTkFrame):
         if len(filename) > 25:
             filename = filename[:22] + "..."
             
-        self.path_label = ctk.CTkLabel(content_frame, text=filename, anchor="w", font=("Segoe UI", 12, "bold"))
+        self.path_label = ctk.CTkLabel(content_frame, text=filename, anchor="w",
+                                       font=("Segoe UI", 12, "bold"),
+                                       text_color=self._c("text_main", None))
         self.path_label.pack(fill="x")
 
-        self.caption_entry = ctk.CTkEntry(content_frame, placeholder_text="أضف كابشن (اختياري)...", height=24, font=("Segoe UI", 11))
+        self.caption_entry = ctk.CTkEntry(
+            content_frame,
+            placeholder_text="أضف كابشن (اختياري)...",
+            height=24,
+            font=("Segoe UI", 11),
+            fg_color=self._c("card_bg", None),
+            text_color=self._c("text_main", None),
+            border_color=self._c("border", None),
+            placeholder_text_color=self._c("text_muted", None),
+        )
         self.caption_entry.pack(fill="x", pady=(2, 0))
         if caption:
             self.caption_entry.insert(0, caption)
 
         # Remove Button
-        self.remove_btn = ctk.CTkButton(self, text="❌", width=30, height=24, fg_color="#FF5555", hover_color="#CC0000",
+        self.remove_btn = ctk.CTkButton(self, text="❌", width=30, height=24,
+                                        fg_color=self._c("danger", "#FF5555"),
+                                        hover_color=self._c("danger_hover", "#CC0000"),
                                         command=self._on_remove)
         self.remove_btn.grid(row=0, column=2, padx=5, pady=5)
+
+    def _c(self, key, fallback=None):
+        return self.colors.get(key, fallback)
+
+    def apply_theme(self, colors):
+        self.colors = colors or {}
+        self.configure(fg_color=self._c("bg_dark", "transparent"))
+        self.icon_label.configure(text_color=self._c("accent", None))
+        self.path_label.configure(text_color=self._c("text_main", None))
+        self.caption_entry.configure(
+            fg_color=self._c("card_bg", None),
+            text_color=self._c("text_main", None),
+            border_color=self._c("border", None),
+            placeholder_text_color=self._c("text_muted", None),
+        )
+        self.remove_btn.configure(
+            fg_color=self._c("danger", "#FF5555"),
+            hover_color=self._c("danger_hover", "#CC0000"),
+        )
 
     def _on_remove(self):
         if self.remove_callback:
@@ -52,30 +88,62 @@ class AttachmentItem(ctk.CTkFrame):
         }
 
 class AttachmentManager(ctk.CTkFrame):
-    def __init__(self, master, **kwargs):
+    def __init__(self, master, colors=None, **kwargs):
+        self.colors = colors or {}
         super().__init__(master, **kwargs)
-        
+
         self.attachments = [] # List of AttachmentItem widgets
 
         # Header
         header = ctk.CTkFrame(self, fg_color="transparent", height=30)
         header.pack(fill="x", padx=5, pady=5)
-        
-        ctk.CTkLabel(header, text="المرفقات", font=("Segoe UI", 13, "bold")).pack(side="right", padx=5)
+
+        self.header_label = ctk.CTkLabel(header, text="المرفقات", font=("Segoe UI", 13, "bold"),
+                                         text_color=self._c("text_main", None))
+        self.header_label.pack(side="right", padx=5)
 
         # Add Buttons (Right aligned)
-        self.btn_add_doc = ctk.CTkButton(header, text="+ ملف", width=60, height=24, command=lambda: self.add_attachment("document"))
+        self.btn_add_doc = ctk.CTkButton(
+            header, text="+ ملف", width=60, height=24,
+            fg_color=self._c("primary", None),
+            hover_color=self._c("primary_hover", None),
+            text_color=self._c("text_main", None),
+            command=lambda: self.add_attachment("document"),
+        )
         self.btn_add_doc.pack(side="left", padx=2)
-        
-        self.btn_add_vid = ctk.CTkButton(header, text="+ فيديو", width=60, height=24, command=lambda: self.add_attachment("video"))
+
+        self.btn_add_vid = ctk.CTkButton(
+            header, text="+ فيديو", width=60, height=24,
+            fg_color=self._c("primary", None),
+            hover_color=self._c("primary_hover", None),
+            text_color=self._c("text_main", None),
+            command=lambda: self.add_attachment("video"),
+        )
         self.btn_add_vid.pack(side="left", padx=2)
-        
-        self.btn_add_img = ctk.CTkButton(header, text="+ صورة", width=60, height=24, command=lambda: self.add_attachment("image"))
+
+        self.btn_add_img = ctk.CTkButton(
+            header, text="+ صورة", width=60, height=24,
+            fg_color=self._c("primary", None),
+            hover_color=self._c("primary_hover", None),
+            text_color=self._c("text_main", None),
+            command=lambda: self.add_attachment("image"),
+        )
         self.btn_add_img.pack(side="left", padx=2)
+
+        self.btn_clear = ctk.CTkButton(
+            header, text="مسح", width=50, height=24,
+            fg_color=self._c("danger", None),
+            hover_color=self._c("danger_hover", None),
+            text_color=self._c("text_main", None),
+            command=self.clear,
+        )
+        self.btn_clear.pack(side="left", padx=2)
 
         # List Area
         self.scroll_frame = ctk.CTkScrollableFrame(self, height=150, fg_color="transparent")
         self.scroll_frame.pack(fill="both", expand=True, padx=5, pady=5)
+
+        self.apply_theme(self.colors)
 
     def add_attachment(self, type_):
         filetypes = []
@@ -92,7 +160,7 @@ class AttachmentManager(ctk.CTkFrame):
                 self._add_item(path, type_)
 
     def _add_item(self, path, type_):
-        item = AttachmentItem(self.scroll_frame, path, type_, remove_callback=self._remove_item)
+        item = AttachmentItem(self.scroll_frame, path, type_, remove_callback=self._remove_item, colors=self.colors)
         item.pack(fill="x", pady=2)
         self.attachments.append(item)
 
@@ -104,8 +172,34 @@ class AttachmentManager(ctk.CTkFrame):
     def get_attachments(self):
         return [item.get_data() for item in self.attachments]
 
+    def clear(self):
+        for item in list(self.attachments):
+            item.destroy()
+        self.attachments = []
+
+    def _c(self, key, fallback=None):
+        return self.colors.get(key, fallback)
+
+    def apply_theme(self, colors):
+        self.colors = colors or {}
+        self.header_label.configure(text_color=self._c("text_main", None))
+        for btn in (self.btn_add_doc, self.btn_add_vid, self.btn_add_img):
+            btn.configure(
+                fg_color=self._c("primary", None),
+                hover_color=self._c("primary_hover", None),
+                text_color=self._c("text_main", None),
+            )
+        self.btn_clear.configure(
+            fg_color=self._c("danger", None),
+            hover_color=self._c("danger_hover", None),
+            text_color=self._c("text_main", None),
+        )
+        for item in self.attachments:
+            item.apply_theme(self.colors)
+
 class RichTextFrame(ctk.CTkFrame):
-    def __init__(self, master, **kwargs):
+    def __init__(self, master, colors=None, **kwargs):
+        self.colors = colors or {}
         super().__init__(master, **kwargs)
         
         # Toolbar
@@ -113,11 +207,24 @@ class RichTextFrame(ctk.CTkFrame):
         self.toolbar.pack(fill="x", padx=5, pady=2)
 
         # Tools
-        ctk.CTkLabel(self.toolbar, text="الرسالة", font=("Segoe UI", 13, "bold")).pack(side="right", padx=5)
+        self.label = ctk.CTkLabel(self.toolbar, text="الرسالة", font=("Segoe UI", 13, "bold"),
+                                  text_color=self._c("text_main", None))
+        self.label.pack(side="right", padx=5)
         
         # Insert Variable
-        self.var_option = ctk.CTkOptionMenu(self.toolbar, values=["{name}", "{phone}", "{var1}", "{var2}", "{var3}", "{var4}", "{var5}"], width=90, height=24,
-                                            command=self._insert_var)
+        self.var_option = ctk.CTkOptionMenu(
+            self.toolbar,
+            values=["{name}", "{phone}", "{var1}", "{var2}", "{var3}", "{var4}", "{var5}"],
+            width=90,
+            height=24,
+            command=self._insert_var,
+            fg_color=self._c("card_bg", None),
+            button_color=self._c("primary", None),
+            button_hover_color=self._c("primary_hover", None),
+            text_color=self._c("text_main", None),
+            dropdown_fg_color=self._c("card_bg", None),
+            dropdown_text_color=self._c("text_main", None),
+        )
         self.var_option.set("متغير")
         self.var_option.pack(side="left", padx=2)
         
@@ -125,21 +232,44 @@ class RichTextFrame(ctk.CTkFrame):
         # We'll just insert markdown-like syntax or placeholders if user wants, 
         # but standard WhatsApp supports *bold*, _italic_, ~strike~.
         
-        self.btn_bold = ctk.CTkButton(self.toolbar, text="B", width=30, height=24, font=("Segoe UI", 12, "bold"),
-                                      command=lambda: self._insert_wrap("*"))
+        self.btn_bold = ctk.CTkButton(
+            self.toolbar, text="B", width=30, height=24, font=("Segoe UI", 12, "bold"),
+            fg_color=self._c("card_bg", None),
+            hover_color=self._c("border", None),
+            text_color=self._c("text_main", None),
+            command=lambda: self._insert_wrap("*"),
+        )
         self.btn_bold.pack(side="left", padx=2)
         
-        self.btn_italic = ctk.CTkButton(self.toolbar, text="I", width=30, height=24, font=("Segoe UI", 12, "italic"),
-                                        command=lambda: self._insert_wrap("_"))
+        self.btn_italic = ctk.CTkButton(
+            self.toolbar, text="I", width=30, height=24, font=("Segoe UI", 12, "italic"),
+            fg_color=self._c("card_bg", None),
+            hover_color=self._c("border", None),
+            text_color=self._c("text_main", None),
+            command=lambda: self._insert_wrap("_"),
+        )
         self.btn_italic.pack(side="left", padx=2)
         
-        self.btn_strike = ctk.CTkButton(self.toolbar, text="S", width=30, height=24, font=("Segoe UI", 12, "overstrike"),
-                                        command=lambda: self._insert_wrap("~"))
+        self.btn_strike = ctk.CTkButton(
+            self.toolbar, text="S", width=30, height=24, font=("Segoe UI", 12, "overstrike"),
+            fg_color=self._c("card_bg", None),
+            hover_color=self._c("border", None),
+            text_color=self._c("text_main", None),
+            command=lambda: self._insert_wrap("~"),
+        )
         self.btn_strike.pack(side="left", padx=2)
 
         # Text Area
-        self.text_box = ctk.CTkTextbox(self, font=("Segoe UI", 14), wrap="word")
+        self.text_box = ctk.CTkTextbox(
+            self,
+            font=("Segoe UI", 14),
+            wrap="word",
+            fg_color=self._c("bg_dark", None),
+            text_color=self._c("text_main", None),
+            border_color=self._c("border", None),
+        )
         self.text_box.pack(fill="both", expand=True, padx=5, pady=5)
+        self.apply_theme(self.colors)
 
     def _insert_var(self, value):
         self.text_box.insert("insert", f" {value} ")
@@ -168,3 +298,29 @@ class RichTextFrame(ctk.CTkFrame):
     def set_text(self, text):
         self.text_box.delete("1.0", "end")
         self.text_box.insert("1.0", text)
+
+    def _c(self, key, fallback=None):
+        return self.colors.get(key, fallback)
+
+    def apply_theme(self, colors):
+        self.colors = colors or {}
+        self.label.configure(text_color=self._c("text_main", None))
+        self.var_option.configure(
+            fg_color=self._c("card_bg", None),
+            button_color=self._c("primary", None),
+            button_hover_color=self._c("primary_hover", None),
+            text_color=self._c("text_main", None),
+            dropdown_fg_color=self._c("card_bg", None),
+            dropdown_text_color=self._c("text_main", None),
+        )
+        for btn in (self.btn_bold, self.btn_italic, self.btn_strike):
+            btn.configure(
+                fg_color=self._c("card_bg", None),
+                hover_color=self._c("border", None),
+                text_color=self._c("text_main", None),
+            )
+        self.text_box.configure(
+            fg_color=self._c("bg_dark", None),
+            text_color=self._c("text_main", None),
+            border_color=self._c("border", None),
+        )
