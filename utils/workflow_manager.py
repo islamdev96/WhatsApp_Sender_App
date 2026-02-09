@@ -106,5 +106,6 @@ class WorkflowManager:
         return True, wf_id
 
     def delete(self, workflow_id):
+        self.store.execute("DELETE FROM wa_workflow_steps WHERE workflow_id = ?", (workflow_id,), commit=True)
         self.store.execute("DELETE FROM wa_workflows WHERE id = ?", (workflow_id,), commit=True)
         return True

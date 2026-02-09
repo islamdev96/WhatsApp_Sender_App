@@ -268,7 +268,18 @@ class RichTextFrame(ctk.CTkFrame):
             text_color=self._c("text_main", None),
             border_color=self._c("border", None),
         )
-        self.text_box.pack(fill="both", expand=True, padx=5, pady=5)
+        self.text_box.pack(fill="both", expand=True, padx=5, pady=(5, 2))
+
+        # Character counter
+        self.char_counter = ctk.CTkLabel(
+            self, text="0 حرف",
+            font=("Segoe UI", 10),
+            text_color=self._c("text_muted", "#888888"),
+            anchor="e",
+        )
+        self.char_counter.pack(fill="x", padx=10, pady=(0, 4))
+        self.text_box.bind("<KeyRelease>", self._update_char_count)
+
         self.apply_theme(self.colors)
 
     def _insert_var(self, value):
@@ -298,6 +309,12 @@ class RichTextFrame(ctk.CTkFrame):
     def set_text(self, text):
         self.text_box.delete("1.0", "end")
         self.text_box.insert("1.0", text)
+        self._update_char_count()
+
+    def _update_char_count(self, event=None):
+        text = self.text_box.get("1.0", "end").strip()
+        count = len(text)
+        self.char_counter.configure(text=f"{count} حرف")
 
     def _c(self, key, fallback=None):
         return self.colors.get(key, fallback)
@@ -324,3 +341,4 @@ class RichTextFrame(ctk.CTkFrame):
             text_color=self._c("text_main", None),
             border_color=self._c("border", None),
         )
+        self.char_counter.configure(text_color=self._c("text_muted", "#888888"))

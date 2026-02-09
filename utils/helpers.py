@@ -1,25 +1,46 @@
 import csv
 import os
+import re
 
 
-def _normalize_phone(phone):
-    """Normalize a phone number string (Egypt-specific formatting)."""
+def _normalize_phone(phone, default_country_code="20"):
+    """Normalize a phone number string.
+
+    Handles:
+    - Leading '+' sign (strips it for WhatsApp API)
+    - Numbers already starting with country code
+    - Egypt-specific local formats (01X → 201X) when default is '20'
+    - Generic local numbers with configurable default country code
+    """
     if not phone:
         return None
-    phone = str(phone).strip().replace(' ', '').replace('-', '')
+    phone = str(phone).strip()
+    # Remove common formatting chars
+    phone = re.sub(r'[\s\-\(\)\.]+', '', phone)
     # Remove .0 from float conversion
     if phone.endswith('.0'):
         phone = phone[:-2]
-    # Egypt specific formatting
-    if phone.startswith('01') and len(phone) == 11:
-        phone = '2' + phone
-    elif phone.startswith('1') and len(phone) == 10:
-        phone = '20' + phone
+    # Handle + prefix
+    if phone.startswith('+'):
+        phone = phone[1:]
+    # If already starts with country code, return as-is
+    if default_country_code and phone.startswith(default_country_code):
+        return phone
+    # Egypt-specific: local mobile numbers
+    if default_country_code == "20":
+        if phone.startswith('01') and len(phone) == 11:
+            return '2' + phone
+        if phone.startswith('1') and len(phone) == 10:
+            return '20' + phone
+    # Generic: prepend default country code for short local numbers
+    if default_country_code and len(phone) <= 10 and not phone.startswith('0'):
+        return default_country_code + phone
     return phone
 
-def normalize_phone(phone):
+
+def normalize_phone(phone, default_country_code="20"):
     """Public wrapper for phone normalization."""
-    return _normalize_phone(phone)
+    return _normalize_phone(phone, default_country_code)
 
 
 def read_contacts(file_path):
@@ -146,6 +167,5 @@ def create_contacts_template(file_path):
             writer.writerow(['Name', 'Phone', 'Var1', 'Var2', 'Var3', 'Var4', 'Var5'])
             writer.writerow(['Client Name', '010XXXXXXXX', 'Value1', 'Value2', 'Value3', 'Value4', 'Value5'])
         return True
-    except:
+    except Exception:
         return False
-
