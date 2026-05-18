@@ -159,8 +159,8 @@ class AttachmentManager(ctk.CTkFrame):
             for path in paths:
                 self._add_item(path, type_)
 
-    def _add_item(self, path, type_):
-        item = AttachmentItem(self.scroll_frame, path, type_, remove_callback=self._remove_item, colors=self.colors)
+    def _add_item(self, path, type_, caption=""):
+        item = AttachmentItem(self.scroll_frame, path, type_, caption=caption, remove_callback=self._remove_item, colors=self.colors)
         item.pack(fill="x", pady=2)
         self.attachments.append(item)
 

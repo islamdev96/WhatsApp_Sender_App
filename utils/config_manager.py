@@ -10,6 +10,7 @@ DEFAULT_CONFIG = {
     "language": "ar",
     "last_contacts_file": "",
     "last_image_file": "",
+    "last_attachments": [],
     "last_message": "",
     "send_text_with_image": True,
     "background_mode": False,

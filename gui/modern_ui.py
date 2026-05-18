@@ -154,6 +154,8 @@ class ModernWhatsAppApp(ctk.CTk):
         self.progress_count_label = None
         self.progress_status_label = None
         self.progress_bar_small = None
+        self.progress_state_label = None
+        self.progress_metric_labels = {}
         self.last_report_path = None
 
         # ── Profiles ──
@@ -2154,6 +2156,25 @@ class ModernWhatsAppApp(ctk.CTk):
 
         if hasattr(self, "attachment_manager"):
             self.attachment_manager.clear()
+            saved_attachments = self.config.get("last_attachments", [])
+            if isinstance(saved_attachments, list):
+                for att in saved_attachments:
+                    path = str(att.get("path", "")).strip()
+                    type_ = str(att.get("type", "document") or "document")
+                    caption = str(att.get("caption", "") or "")
+                    if path and os.path.exists(path):
+                        self.attachment_manager._add_item(path, type_, caption)
+
+            legacy_files = [
+                ("last_image_file", "image"),
+                ("last_video_file", "video"),
+                ("last_doc_file", "document"),
+            ]
+            if not self.attachment_manager.get_attachments():
+                for key, type_ in legacy_files:
+                    path = str(self.config.get(key, "") or "").strip()
+                    if path and os.path.exists(path):
+                        self.attachment_manager._add_item(path, type_)
 
 
         # Load last message
@@ -2177,6 +2198,11 @@ class ModernWhatsAppApp(ctk.CTk):
     def _save_current_state(self):
         self.config.set("last_contacts_file", self.contacts_entry.get())
         self.config.set("last_message", self.message_textbox.get("1.0", "end").strip())
+        attachments = self.attachment_manager.get_attachments() if hasattr(self, "attachment_manager") else []
+        self.config.set("last_attachments", attachments)
+        self.config.set("last_image_file", next((a.get("path", "") for a in attachments if a.get("type") == "image"), ""))
+        self.config.set("last_video_file", next((a.get("path", "") for a in attachments if a.get("type") == "video"), ""))
+        self.config.set("last_doc_file", next((a.get("path", "") for a in attachments if a.get("type") == "document"), ""))
         self.config.set("send_text_with_image", self.send_text_var.get())
         self.config.set("background_mode", self.bg_mode_var.get())
         self.config.set("enable_spintax", self.spin_text_var.get())
@@ -2207,6 +2233,8 @@ class ModernWhatsAppApp(ctk.CTk):
         self.progress_count_label = None
         self.progress_status_label = None
         self.progress_bar_small = None
+        self.progress_state_label = None
+        self.progress_metric_labels = {}
 
     def _export_last_report(self):
         if self.last_report_path and os.path.exists(self.last_report_path):
