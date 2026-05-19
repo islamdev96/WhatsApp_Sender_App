@@ -45,4 +45,4 @@ PyInstaller.__main__.run(args)
 for f in [f for f in os.listdir(".") if f.endswith(".spec")]:
     os.remove(f)
 
-print("\n✅ Build complete! Check 'dist/WhatsAppSenderPro.exe'")
+print("\n[SUCCESS] Build complete! Check 'dist/WhatsAppSenderPro.exe'")

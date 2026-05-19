@@ -149,24 +149,53 @@ def read_contacts_excel(file_path):
 
 
 def read_contacts_txt(file_path):
-    """Reads contacts from a plain text file, extracting phone numbers."""
+    """Reads contacts from a plain text file, extracting phone numbers.
+    
+    Supports two formats:
+    1. One number per line (most common)
+    2. Numbers mixed with text (extracted via regex)
+    """
     contacts = []
     try:
         if not os.path.exists(file_path):
             return []
-            
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-            
-        # Extract potential phone numbers
-        matches = re.findall(r'\+?\d(?:[\d\-\s\.]*\d){8,14}', content)
+        
+        # Try UTF-8 first, then fallback to cp1256 (Arabic Windows)
+        content = None
+        for encoding in ('utf-8', 'utf-8-sig', 'cp1256', 'latin-1'):
+            try:
+                with open(file_path, 'r', encoding=encoding) as f:
+                    content = f.read()
+                break
+            except (UnicodeDecodeError, UnicodeError):
+                continue
+        
+        if not content:
+            return []
         
         seen = set()
-        for match in matches:
-            phone = _normalize_phone(match)
-            if phone and phone not in seen:
-                seen.add(phone)
-                contacts.append({'phone': phone, 'name': 'عميل'})
+        
+        # Strategy 1: Try line-by-line (most common for phone lists)
+        for line in content.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            # If the line is purely digits (with optional +, spaces, dashes, dots)
+            cleaned = re.sub(r'[\s\-\.\(\)\+]+', '', line)
+            if cleaned.isdigit() and 8 <= len(cleaned) <= 15:
+                phone = _normalize_phone(line)
+                if phone and phone not in seen:
+                    seen.add(phone)
+                    contacts.append({'phone': phone, 'name': 'عميل'})
+        
+        # Strategy 2: If no numbers found line-by-line, try regex extraction
+        if not contacts:
+            matches = re.findall(r'\+?\d(?:[\d\-\s\.]*\d){8,14}', content)
+            for match in matches:
+                phone = _normalize_phone(match)
+                if phone and phone not in seen:
+                    seen.add(phone)
+                    contacts.append({'phone': phone, 'name': 'عميل'})
                 
     except Exception as e:
         print(f"Error reading TXT: {e}")
