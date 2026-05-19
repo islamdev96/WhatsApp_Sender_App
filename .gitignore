@@ -1,13 +1,45 @@
-chrome_profile/
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.db
-.sqlite
-.log
+*.egg-info/
+
+# Build artifacts
+build/
+dist/
+*.spec
+*.exe
+!run_app.bat
+
+# Data & Profiles (user-specific)
+data/profiles/
+chrome_profile/
+*.db
+*.sqlite
+
+# Logs & Reports
+reports/logs/
+*.log
+
+# CSV files (except templates)
 *.csv
-!test_my_number.csv
-!contacts.csv
 !test_contacts.csv
-!template_contacts.csv
+!contacts.csv
+
+# Config (user-specific)
+config.json
+campaigns.json
+contact_groups.json
+templates.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini

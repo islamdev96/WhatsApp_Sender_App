@@ -1,7 +1,7 @@
 import time
 import random
-import urllib.parse
 import json
+import os
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -9,7 +9,6 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
-import os
 
 class WhatsAppBot:
     def __init__(self, user_data_dir):
@@ -492,13 +491,14 @@ class WhatsAppBot:
                 
             self.driver.execute_script("arguments[0].click();", send_btn)
             
-            # Wait for upload/processing
-            # If large video, this might take time.
-            time.sleep(3) 
+            # Wait for upload/processing - dynamically based on file size
+            file_size = os.path.getsize(path) if os.path.exists(path) else 0
+            wait_time = max(3, min(30, file_size // (1024 * 1024)))  # 1s per MB, min 3s, max 30s
+            time.sleep(wait_time)
             
             # Close preview if stuck (rare for docs, common for media)
             if media_type != 'document':
-                 self._wait_for_preview_close(timeout=5)
+                 self._wait_for_preview_close(timeout=10)
                  
             return "SUCCESS"
             
@@ -560,9 +560,13 @@ class WhatsAppBot:
             return f"ERR_TEXT_SEND: {str(e)[:50]}"
 
     def close(self):
+        """Safely close the browser, ensuring session data is saved."""
         if self.driver:
             try:
+                # Give Chrome a moment to flush any pending writes
+                time.sleep(0.5)
                 self.driver.quit()
-            except:
+            except Exception:
                 pass
-            self.driver = None
+            finally:
+                self.driver = None

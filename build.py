@@ -5,12 +5,15 @@ Automates the PyInstaller build process, including adding data files and setting
 import PyInstaller.__main__
 import os
 import shutil
+import sys
 
 # Clean previous build
-if os.path.exists("dist"):
-    shutil.rmtree("dist")
-if os.path.exists("build"):
-    shutil.rmtree("build")
+for folder in ("dist", "build"):
+    if os.path.exists(folder):
+        shutil.rmtree(folder)
+
+for f in [f for f in os.listdir(".") if f.endswith(".spec")]:
+    os.remove(f)
 
 # Define build arguments
 args = [
@@ -35,7 +38,11 @@ args = [
 ]
 
 # Run PyInstaller
-print("Building WhatsApp Sender Pro...")
+print(f"Building WhatsApp Sender Pro with Python {sys.version}...")
 PyInstaller.__main__.run(args)
 
-print("\nBuild complete! Check 'dist/WhatsAppSenderPro.exe'")
+# Clean up spec file after build
+for f in [f for f in os.listdir(".") if f.endswith(".spec")]:
+    os.remove(f)
+
+print("\n✅ Build complete! Check 'dist/WhatsAppSenderPro.exe'")
