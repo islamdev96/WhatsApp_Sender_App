@@ -230,8 +230,17 @@ class WhatsAppBot:
         options = webdriver.ChromeOptions()
         options.add_argument(f"user-data-dir={self.user_data_dir}")
         options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--remote-allow-origins=*")
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option('useAutomationExtension', False)
+        # Prevent Chrome from clearing session data
+        options.add_experimental_option("prefs", {
+            "profile.exit_type": "Normal",
+            "profile.exited_cleanly": True,
+        })
         if start_minimized:
             options.add_argument("--start-minimized")
         

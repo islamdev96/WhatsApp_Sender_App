@@ -1016,7 +1016,7 @@ class ModernWhatsAppApp(ctk.CTk):
                       command=browse_cmd).pack(side="right")
 
     def _browse_contacts(self):
-        path = filedialog.askopenfilename(filetypes=[("Contacts", "*.csv;*.xlsx;*.xls")])
+        path = filedialog.askopenfilename(filetypes=[("Contacts", "*.csv;*.xlsx;*.xls;*.txt")])
         if path:
             self.contacts_entry.delete(0, "end")
             self.contacts_entry.insert(0, path)
@@ -1586,9 +1586,10 @@ class ModernWhatsAppApp(ctk.CTk):
 
     def _browse_group_file(self):
         path = filedialog.askopenfilename(filetypes=[
-            ("جهات الاتصال", "*.csv;*.xlsx;*.xls"),
+            ("جهات الاتصال", "*.csv;*.xlsx;*.xls;*.txt"),
             ("CSV", "*.csv"),
             ("Excel", "*.xlsx;*.xls"),
+            ("Text", "*.txt"),
         ])
         if path:
             self.group_import_entry.delete(0, "end")
@@ -2388,8 +2389,18 @@ class ModernWhatsAppApp(ctk.CTk):
                 return None, None
             
             # Map to format expected by bot
+            att_type = att.get("type", "document")
+            ext = os.path.splitext(path)[1].lower()
+            
+            # Auto-correct type based on file extension to avoid sending images as documents (thumbnails)
+            if att_type == "document":
+                if ext in [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"]:
+                    att_type = "image"
+                elif ext in [".mp4", ".avi", ".mov", ".mkv", ".3gp"]:
+                    att_type = "video"
+
             item = {
-                "type": att.get("type", "document"),
+                "type": att_type,
                 "path": path,
                 "caption": att.get("caption", "").strip()
             }

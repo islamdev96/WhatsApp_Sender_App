@@ -148,6 +148,32 @@ def read_contacts_excel(file_path):
     return contacts
 
 
+def read_contacts_txt(file_path):
+    """Reads contacts from a plain text file, extracting phone numbers."""
+    contacts = []
+    try:
+        if not os.path.exists(file_path):
+            return []
+            
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        # Extract potential phone numbers
+        matches = re.findall(r'\+?\d(?:[\d\-\s\.]*\d){8,14}', content)
+        
+        seen = set()
+        for match in matches:
+            phone = _normalize_phone(match)
+            if phone and phone not in seen:
+                seen.add(phone)
+                contacts.append({'phone': phone, 'name': 'عميل'})
+                
+    except Exception as e:
+        print(f"Error reading TXT: {e}")
+
+    return contacts
+
+
 def read_contacts_auto(file_path):
     """Auto-detect file type and read contacts accordingly."""
     if not file_path or not os.path.exists(file_path):
@@ -155,6 +181,8 @@ def read_contacts_auto(file_path):
     ext = os.path.splitext(file_path)[1].lower()
     if ext in ('.xlsx', '.xls'):
         return read_contacts_excel(file_path)
+    elif ext == '.txt':
+        return read_contacts_txt(file_path)
     else:
         return read_contacts(file_path)
 
