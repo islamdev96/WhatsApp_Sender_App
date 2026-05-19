@@ -65,6 +65,11 @@ class WhatsAppBot:
             (By.XPATH, '//input[@type="file" and contains(@accept,"image")]'),
             (By.XPATH, '//input[@type="file"]'),
         ]
+        self.PHOTO_VIDEO_INPUT_LOCATORS = [
+            (By.CSS_SELECTOR, 'input[type="file"][accept*="video/mp4"][accept*="image"]'),
+            (By.XPATH, '//input[@type="file" and contains(@accept,"video/mp4") and contains(@accept,"image")]'),
+            (By.XPATH, '//input[@type="file" and contains(@accept,"video/quicktime") and contains(@accept,"image")]'),
+        ]
         self.MEDIA_PREVIEW_LOCATORS = [
             (By.XPATH, '//div[@data-testid="media-viewer"]'),
             (By.XPATH, '//div[@role="dialog"]//img'),
@@ -161,6 +166,38 @@ class WhatsAppBot:
             except Exception:
                 continue
         return None
+
+    def _find_photo_video_input(self):
+        """Find the WhatsApp Photos/Videos file input, avoiding sticker inputs."""
+        if not self.driver:
+            return None
+
+        for by, value in self.PHOTO_VIDEO_INPUT_LOCATORS:
+            try:
+                elements = self.driver.find_elements(by, value)
+            except Exception:
+                continue
+            if elements:
+                return elements[0]
+
+        try:
+            inputs = self.driver.find_elements(By.XPATH, '//input[@type="file"]')
+        except Exception:
+            return None
+
+        fallback = None
+        for el in inputs:
+            try:
+                accept = (el.get_attribute("accept") or "").lower()
+            except Exception:
+                accept = ""
+            if "sticker" in accept or "webp" in accept:
+                continue
+            if "video/" in accept and "image" in accept:
+                return el
+            if "image" in accept and fallback is None:
+                fallback = el
+        return fallback
 
     def _wait_for_preview_close(self, timeout=5, poll=0.3):
         end_time = time.time() + timeout
@@ -390,18 +427,29 @@ class WhatsAppBot:
                 # We can try clicking the "Photos & Videos" button first for robustness
                 media_btn_locators = [
                     (By.XPATH, '//span[@data-icon="attach-image"]'),
+                    (By.XPATH, '//button[@aria-label="Photos & videos"]'),
+                    (By.XPATH, '//div[@aria-label="Photos & videos"]'),
+                    (By.XPATH, '//li//*[contains(text(),"Photos & videos")]'),
                     (By.XPATH, '//li//*[contains(text(),"Photos")]'),
+                    (By.XPATH, '//li//*[contains(text(),"صور")]'),
+                    (By.XPATH, '//li//*[contains(text(),"الصور")]'),
                     (By.XPATH, '//li//*[contains(text(),"صور")]'),
                 ]
                 media_btn = self._find_any(media_btn_locators)
                 if media_btn:
                     self.driver.execute_script("arguments[0].click();", media_btn)
                     
-                input_el = self._wait_for_any(self.FILE_INPUT_LOCATORS, timeout=5)
+                end_time = time.time() + 5
+                while time.time() < end_time and not input_el:
+                    input_el = self._find_photo_video_input()
+                    time.sleep(0.2)
 
             if not input_el:
-                # Fallback: try finding any file input on page
-                input_el = self.driver.find_element(By.XPATH, '//input[@type="file"]')
+                if media_type == 'document':
+                    # Fallback: try finding any file input on page
+                    input_el = self.driver.find_element(By.XPATH, '//input[@type="file"]')
+                else:
+                    input_el = self._find_photo_video_input()
             
             if not input_el:
                 return "ERR_FILE_INPUT_NOT_FOUND"

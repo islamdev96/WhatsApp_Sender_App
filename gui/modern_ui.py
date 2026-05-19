@@ -2524,7 +2524,7 @@ class ModernWhatsAppApp(ctk.CTk):
         if hasattr(self, "pause_btn"):
             self.pause_btn.configure(text="Pause")
 
-        self._open_progress_window_blind(len(contacts))
+        self._open_progress_window_blind(len(contacts), mode="send")
 
         threading.Thread(
             target=self._run_automation,
@@ -2560,7 +2560,7 @@ class ModernWhatsAppApp(ctk.CTk):
         if hasattr(self, "pause_btn"):
             self.pause_btn.configure(text="Pause")
 
-        self._open_progress_window_blind(len(contacts))
+        self._open_progress_window_blind(len(contacts), mode="workflow")
 
         threading.Thread(
             target=self._run_workflow_automation,
@@ -2656,6 +2656,7 @@ class ModernWhatsAppApp(ctk.CTk):
         self.btn_check.configure(state="disabled")
         self.btn_stop.configure(state="normal")
         self.progress_bar.set(0)
+        self._open_progress_window_blind(len(contacts), mode="check")
         self.status_label.configure(text="جاري فحص الأرقام...")
 
         threading.Thread(
@@ -2767,12 +2768,14 @@ class ModernWhatsAppApp(ctk.CTk):
             eta = None
             if processed > 0 and total > processed:
                 eta = (elapsed / processed) * (total - processed)
-            self._update_progress_header_blind(processed, total, phone)
+            self._update_progress_header_blind(processed, total, phone, name, eta)
 
             if not phone:
                 self.invalid += 1
                 self.results_log.append({"phone": "N/A", "name": name, "status": "بدون واتساب", "error_code": "ERR-00", "timestamp": datetime.datetime.now()})
+                self._add_progress_row_blind(["N/A", name, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "بدون رقم", "بيانات الرقم ناقصة"], tag="invalid")
                 self._run_on_ui(self._update_stats)
+                self._update_progress_header_blind(processed, total, phone, name, eta)
                 continue
 
             if not self.bot.is_logged_in():
@@ -2823,18 +2826,18 @@ class ModernWhatsAppApp(ctk.CTk):
                 step_label = f"Step {s_idx + 1}"
 
                 if res == "SUCCESS":
-                    self._add_progress_row_blind([phone, step_label, timestamp, "Sent", ""], tag="success")
+                    self._add_progress_row_blind([phone, f"{name} / {step_label}", timestamp, "تم", "تم إرسال الخطوة"], tag="success")
                 elif res == "INVALID":
-                    self._add_progress_row_blind([phone, step_label, timestamp, "Invalid", ""], tag="invalid")
+                    self._add_progress_row_blind([phone, f"{name} / {step_label}", timestamp, "بدون واتساب", "الرقم غير صالح أو لا يستخدم واتساب"], tag="invalid")
                     contact_status = "INVALID"
                     contact_error = "ERR-20"
                     break
                 elif res == "STOPPED":
-                    self._add_progress_row_blind([phone, step_label, timestamp, "Stopped", "User stopped"], tag="stopped")
+                    self._add_progress_row_blind([phone, f"{name} / {step_label}", timestamp, "توقف", "تم إيقاف العملية"], tag="stopped")
                     contact_status = "STOPPED"
                     break
                 else:
-                    self._add_progress_row_blind([phone, step_label, timestamp, "Failed", str(res)], tag="failed")
+                    self._add_progress_row_blind([phone, f"{name} / {step_label}", timestamp, "فشل", str(res)], tag="failed")
                     contact_status = "FAILED"
                     contact_error = res
                     break
@@ -2870,6 +2873,7 @@ class ModernWhatsAppApp(ctk.CTk):
                     break
 
             self._run_on_ui(self._update_stats)
+            self._update_progress_header_blind(processed, total, phone, name, eta)
             time.sleep(random.uniform(delay_min, delay_max))
 
         end_time = datetime.datetime.now()
@@ -2976,12 +2980,14 @@ class ModernWhatsAppApp(ctk.CTk):
             eta = None
             if processed > 0 and total > processed:
                 eta = (elapsed / processed) * (total - processed)
-            self._update_progress_header_blind(processed, total, phone)
+            self._update_progress_header_blind(processed, total, phone, name, eta)
 
             if not phone:
                 self.invalid += 1
                 self.results_log.append({"phone": "N/A", "name": name, "status": "INVALID", "error_code": "ERR-00", "timestamp": datetime.datetime.now()})
+                self._add_progress_row_blind(["N/A", name, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "بدون رقم", "بيانات الرقم ناقصة"], tag="invalid")
                 self._run_on_ui(self._update_stats)
+                self._update_progress_header_blind(processed, total, phone, name, eta)
                 continue
 
             # Ensure still logged in
@@ -3024,24 +3030,24 @@ class ModernWhatsAppApp(ctk.CTk):
                 self.sent += 1
                 self.log(f"✅ تم الإرسال لـ {name}")
                 self.results_log.append({"phone": phone, "name": name, "status": "نجاح", "error_code": "-", "timestamp": timestamp})
-                self._add_progress_row_blind([phone, "Contact", timestamp, "Sent", "Success"], tag="success")
+                self._add_progress_row_blind([phone, name, timestamp, "تم", "تم الإرسال"], tag="success")
                 consecutive_failures = 0
             elif res == "INVALID":
                 self.invalid += 1
                 self.log(f"🚫 [ERR-20] الرقم {phone} غير صحيح.")
                 self.results_log.append({"phone": phone, "name": name, "status": "بدون واتساب", "error_code": "ERR-20", "timestamp": timestamp})
-                self._add_progress_row_blind([phone, "Contact", timestamp, "Invalid", "No WhatsApp"], tag="invalid")
+                self._add_progress_row_blind([phone, name, timestamp, "بدون واتساب", "الرقم غير صالح أو لا يستخدم واتساب"], tag="invalid")
                 consecutive_failures = 0
             elif res == "STOPPED":
                 self.results_log.append({"phone": phone, "name": name, "status": "توقف", "error_code": "-", "timestamp": timestamp})
-                self._add_progress_row_blind([phone, "Contact", timestamp, "Stopped", "User stopped"], tag="stopped")
+                self._add_progress_row_blind([phone, name, timestamp, "توقف", "تم إيقاف العملية"], tag="stopped")
                 break
             else:
                 self.failed += 1
                 err_code = res if res.startswith("ERR") else "ERR-UNKNOWN"
                 self.log(f"❌ فشل: {phone} | {res}")
                 self.results_log.append({"phone": phone, "name": name, "status": "فشل", "error_code": err_code, "timestamp": timestamp})
-                self._add_progress_row_blind([phone, "Contact", timestamp, "Failed", str(res)], tag="failed")
+                self._add_progress_row_blind([phone, name, timestamp, "فشل", str(res)], tag="failed")
                 consecutive_failures += 1
                 if consecutive_failures >= max_consecutive_failures:
                     self.log(f"⛔ تم الإيقاف تلقائياً بعد {consecutive_failures} فشل متتالي لتقليل المخاطر.")
@@ -3049,6 +3055,7 @@ class ModernWhatsAppApp(ctk.CTk):
                     break
 
             self._run_on_ui(self._update_stats)
+            self._update_progress_header_blind(processed, total, phone, name, eta)
             
             # Delay
             time.sleep(random.uniform(delay_min, delay_max))
@@ -3111,6 +3118,7 @@ class ModernWhatsAppApp(ctk.CTk):
         self.results_log = []
 
         total = len(contacts)
+        start_time = datetime.datetime.now()
         self.log(f"🔍 بدء فحص {total} رقم...")
 
         for i, c in enumerate(contacts):
@@ -3122,11 +3130,18 @@ class ModernWhatsAppApp(ctk.CTk):
             processed = i + 1
             self._run_on_ui(lambda p=processed, t=total, n=name: self.status_label.configure(text=f"فحص {p}/{t} - {n}"))
             self._run_on_ui(lambda p=processed, t=total: self.progress_bar.set(p / t))
+            elapsed = (datetime.datetime.now() - start_time).total_seconds()
+            eta = None
+            if processed > 0 and total > processed:
+                eta = (elapsed / processed) * (total - processed)
+            self._update_progress_header_blind(processed, total, phone, name, eta)
 
             if not phone:
                 self.invalid += 1
                 self.results_log.append({"phone": "N/A", "name": name, "status": "غير صالح", "error_code": "ERR-00", "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+                self._add_progress_row_blind(["N/A", name, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "بدون رقم", "بيانات الرقم ناقصة"], tag="invalid")
                 self._run_on_ui(self._update_stats)
+                self._update_progress_header_blind(processed, total, phone, name, eta)
                 continue
 
             res = self.bot.check_number(phone=phone, stop_event=self.stop_event)
@@ -3136,19 +3151,24 @@ class ModernWhatsAppApp(ctk.CTk):
                 self.sent += 1
                 self.log(f"✅ صالح: {phone} | {name}")
                 self.results_log.append({"phone": phone, "name": name, "status": "صالح", "error_code": "-", "timestamp": timestamp})
+                self._add_progress_row_blind([phone, name, timestamp, "عنده واتساب", "صالح للإرسال"], tag="success")
             elif res == "INVALID":
                 self.invalid += 1
                 self.log(f"🚫 غير صالح: {phone}")
                 self.results_log.append({"phone": phone, "name": name, "status": "غير صالح", "error_code": "ERR-20", "timestamp": timestamp})
+                self._add_progress_row_blind([phone, name, timestamp, "بدون واتساب", "الرقم غير صالح أو لا يستخدم واتساب"], tag="invalid")
             elif res == "STOPPED":
                 self.results_log.append({"phone": phone, "name": name, "status": "توقف", "error_code": "-", "timestamp": timestamp})
+                self._add_progress_row_blind([phone, name, timestamp, "توقف", "تم إيقاف الفحص"], tag="stopped")
                 break
             else:
                 self.failed += 1
                 self.log(f"⚠️ تعذر الفحص: {phone} | {res}")
                 self.results_log.append({"phone": phone, "name": name, "status": "فشل", "error_code": res, "timestamp": timestamp})
+                self._add_progress_row_blind([phone, name, timestamp, "فشل", str(res)], tag="failed")
 
             self._run_on_ui(self._update_stats)
+            self._update_progress_header_blind(processed, total, phone, name, eta)
             time.sleep(random.uniform(1.5, 3.0))
 
         report_path, valid_path, invalid_path = self._save_number_check_report()
@@ -3281,17 +3301,40 @@ class ModernWhatsAppApp(ctk.CTk):
     # ═══════════════════════════════════════════════════════════════════════
     #  BLIND MODE PROGRESS WINDOW (BENCHMARK MATCH)
     # ═══════════════════════════════════════════════════════════════════════
-    def _open_progress_window_blind(self, total):
+    def _format_progress_eta(self, seconds):
+        if seconds is None:
+            return "--"
+        try:
+            seconds = int(max(0, seconds))
+        except Exception:
+            return "--"
+        minutes, secs = divmod(seconds, 60)
+        hours, minutes = divmod(minutes, 60)
+        if hours:
+            return f"{hours}س {minutes}د"
+        if minutes:
+            return f"{minutes}د {secs}ث"
+        return f"{secs}ث"
+
+    def _open_progress_window_blind(self, total, mode="send"):
         def _do():
             if self.progress_win and self.progress_win.winfo_exists():
                 try:
                     self.progress_win.destroy()
                 except Exception:
                     pass
+            title_map = {
+                "send": "متابعة الإرسال",
+                "workflow": "متابعة سير العمل",
+                "check": "فحص الأرقام",
+            }
+            title_text = title_map.get(mode, "متابعة العملية")
+            self.progress_title_text = title_text
+            self.progress_metric_labels = {}
             self.progress_win = ctk.CTkToplevel(self)
-            self.progress_win.title("Auto Whatsapp Business Sender Turbo Pro - Blind Mode")
-            self.progress_win.geometry("950x650")
-            self.progress_win.minsize(900, 550)
+            self.progress_win.title(title_text)
+            self.progress_win.geometry("1080x720")
+            self.progress_win.minsize(980, 600)
             self.progress_win.grab_set()
             
             # Focus
@@ -3310,18 +3353,43 @@ class ModernWhatsAppApp(ctk.CTk):
             top_row.pack(fill="x", padx=15, pady=(10, 5))
             
             self.progress_count_label = ctk.CTkLabel(
-                top_row, text=f"Sending Process (0/{total})", 
+                top_row, text=f"{title_text} (0/{total})",
                 font=("Segoe UI", 16, "bold"), text_color=COLORS["text_main"]
             )
             self.progress_count_label.pack(side="left")
             
             status_chip = ctk.CTkLabel(
-                top_row, text="Running 🚀", 
+                top_row, text="جاري",
                 font=("Segoe UI", 12, "bold"), text_color=COLORS["bg_dark"],
                 fg_color=COLORS["primary"], corner_radius=6, padx=10, pady=2
             )
             status_chip.pack(side="right")
             self.progress_state_label = status_chip
+
+            metrics_row = ctk.CTkFrame(header, fg_color="transparent")
+            metrics_row.pack(fill="x", padx=15, pady=(4, 8))
+            metric_defs = [
+                ("processed", "تمت المعالجة", COLORS["info"], "0"),
+                ("sent", "عنده واتساب" if mode == "check" else "تم الإرسال", COLORS["success"], "0"),
+                ("failed", "فشل", COLORS["danger"], "0"),
+                ("invalid", "بدون واتساب", COLORS["warning"], "0"),
+                ("remaining", "متبقي", COLORS["text_muted"], str(total)),
+                ("eta", "وقت تقريبي", COLORS["accent"], "--"),
+            ]
+            metrics_row.grid_columnconfigure(tuple(range(len(metric_defs))), weight=1)
+            for idx, (key, label, color, value) in enumerate(metric_defs):
+                card = ctk.CTkFrame(metrics_row, corner_radius=8, fg_color=COLORS["bg_dark"])
+                card.grid(row=0, column=idx, padx=4, pady=2, sticky="ew")
+                ctk.CTkLabel(
+                    card, text=label, font=("Segoe UI", 11),
+                    text_color=COLORS["text_muted"]
+                ).pack(pady=(8, 1))
+                value_label = ctk.CTkLabel(
+                    card, text=value, font=("Segoe UI", 20, "bold"),
+                    text_color=color
+                )
+                value_label.pack(pady=(0, 8))
+                self.progress_metric_labels[key] = value_label
 
             # Progress Bar (Thick & Green)
             self.progress_bar_small = ctk.CTkProgressBar(header, height=20, corner_radius=0,
@@ -3334,21 +3402,20 @@ class ModernWhatsAppApp(ctk.CTk):
             table_frame = ctk.CTkFrame(main_cont, corner_radius=10, fg_color=COLORS["card_bg"])
             table_frame.pack(fill="both", expand=True, padx=15, pady=(0, 10))
 
-            columns = ("id", "type", "date", "status", "message")
+            columns = ("phone", "name", "date", "status", "message")
             self.progress_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15)
             
-            # Exact Match Columns
-            self.progress_tree.heading("id", text="ID")
-            self.progress_tree.heading("type", text="Type")
-            self.progress_tree.heading("date", text="Sending Date")
-            self.progress_tree.heading("status", text="Status")
-            self.progress_tree.heading("message", text="Message")
+            self.progress_tree.heading("phone", text="الرقم")
+            self.progress_tree.heading("name", text="الاسم / الخطوة")
+            self.progress_tree.heading("date", text="الوقت")
+            self.progress_tree.heading("status", text="الحالة")
+            self.progress_tree.heading("message", text="التفاصيل")
             
-            self.progress_tree.column("id", width=180, anchor="w")
-            self.progress_tree.column("type", width=80, anchor="center")
+            self.progress_tree.column("phone", width=190, anchor="w")
+            self.progress_tree.column("name", width=180, anchor="w")
             self.progress_tree.column("date", width=150, anchor="center")
-            self.progress_tree.column("status", width=90, anchor="center")
-            self.progress_tree.column("message", width=300, anchor="w")
+            self.progress_tree.column("status", width=120, anchor="center")
+            self.progress_tree.column("message", width=360, anchor="w")
 
             # Styling the Treeview
             style = ttk.Style(self.progress_win)
@@ -3390,7 +3457,7 @@ class ModernWhatsAppApp(ctk.CTk):
             footer.pack(fill="x", padx=15, pady=(0, 15))
             
             self.progress_status_label = ctk.CTkLabel(
-                footer, text="Starting...", font=("Segoe UI", 12), text_color=COLORS["text_muted"]
+                footer, text="جاهز للبدء...", font=("Segoe UI", 12), text_color=COLORS["text_muted"]
             )
             self.progress_status_label.pack(side="left", padx=20, pady=15)
 
@@ -3413,13 +3480,15 @@ class ModernWhatsAppApp(ctk.CTk):
         # row_values = [phone, type, time, status, message]
         # Prepend icon to phone (ID)
         icon = ""
-        if tag == "success": icon = "✅ "
-        elif tag == "failed": icon = "❌ "
-        elif tag == "invalid": icon = "🚫 "
-        elif tag == "stopped": icon = "🛑 "
-        elif tag == "waiting": icon = "⏳ "
+        if tag == "success": icon = "OK "
+        elif tag == "failed": icon = "FAIL "
+        elif tag == "invalid": icon = "NO WA "
+        elif tag == "stopped": icon = "STOP "
+        elif tag == "waiting": icon = "... "
         
         new_values = list(row_values)
+        while len(new_values) < 5:
+            new_values.append("")
         new_values[0] = f"{icon}{new_values[0]}"
         
         def _do():
@@ -3427,13 +3496,35 @@ class ModernWhatsAppApp(ctk.CTk):
                 self.progress_tree.insert("", "0", values=new_values, tags=(tag,))
         self._run_on_ui(_do)
 
-    def _update_progress_header_blind(self, processed, total, current_phone=None):
+    def _update_progress_header_blind(self, processed, total, current_phone=None, current_name=None, eta=None, status_text=None):
         def _do():
+            remaining = max(total - processed, 0)
+            title_text = getattr(self, "progress_title_text", "متابعة العملية")
             if self.progress_count_label:
-                self.progress_count_label.configure(text=f"Sending Process ({processed}/{total})")
+                self.progress_count_label.configure(text=f"{title_text} ({processed}/{total})")
             if self.progress_bar_small:
                 self.progress_bar_small.set(processed / total if total else 0)
-            if self.progress_status_label and current_phone:
-                self.progress_status_label.configure(text=f"Sending message to: {current_phone}")
+            metric_values = {
+                "processed": processed,
+                "sent": self.sent,
+                "failed": self.failed,
+                "invalid": self.invalid,
+                "remaining": remaining,
+                "eta": self._format_progress_eta(eta),
+            }
+            for key, value in metric_values.items():
+                label = self.progress_metric_labels.get(key)
+                if label:
+                    label.configure(text=str(value))
+            if self.progress_status_label:
+                if status_text:
+                    text = status_text
+                elif current_phone and current_name:
+                    text = f"جاري العمل على: {current_name} - {current_phone}"
+                elif current_phone:
+                    text = f"جاري العمل على: {current_phone}"
+                else:
+                    text = "جاري العمل..."
+                self.progress_status_label.configure(text=text)
         self._run_on_ui(_do)
 

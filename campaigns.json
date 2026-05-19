@@ -19,5 +19,47 @@
         "timestamp": "2026-02-09 13:55:29"
       }
     ]
+  },
+  {
+    "id": 2,
+    "name": "Campaign 2026-05-18 19:09",
+    "date": "2026-05-18 19:09:13",
+    "total": 231,
+    "sent": 4,
+    "failed": 0,
+    "invalid": 0,
+    "duration_seconds": 354,
+    "success_rate": 1.7,
+    "csv_path": "C:\\Users\\Islam Glab\\Desktop\\WhatsApp_Sender_App\\reports\\report_20260518_190913.csv",
+    "results": [
+      {
+        "phone": "201000090070",
+        "name": "Customer",
+        "status": "نجاح",
+        "error_code": "",
+        "timestamp": "2026-05-18 19:03:44"
+      },
+      {
+        "phone": "201000094954",
+        "name": "Customer",
+        "status": "نجاح",
+        "error_code": "",
+        "timestamp": "2026-05-18 19:05:23"
+      },
+      {
+        "phone": "201000255359",
+        "name": "Customer",
+        "status": "نجاح",
+        "error_code": "",
+        "timestamp": "2026-05-18 19:07:07"
+      },
+      {
+        "phone": "201000431842",
+        "name": "Customer",
+        "status": "نجاح",
+        "error_code": "",
+        "timestamp": "2026-05-18 19:08:51"
+      }
+    ]
   }
 ]
