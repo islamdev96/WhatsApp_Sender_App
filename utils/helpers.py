@@ -234,3 +234,140 @@ def create_contacts_template(file_path):
         return True
     except Exception:
         return False
+
+
+def check_proxy(proxy_type, host, port, username=None, password=None, timeout=10):
+    """Tests a proxy connection using urllib.
+    
+    Returns (success, info_dict).
+    """
+    import urllib.request
+    import urllib.error
+    import json
+
+    proxy_type = proxy_type.lower()
+    proxy_url = f"{proxy_type}://"
+    if username and password:
+        proxy_url += f"{username}:{password}@"
+    proxy_url += f"{host}:{port}"
+    
+    proxy_handler = urllib.request.ProxyHandler({
+        'http': proxy_url,
+        'https': proxy_url
+    })
+    
+    opener = urllib.request.build_opener(proxy_handler)
+    try:
+        # Use http://ip-api.com/json (clean HTTP) to verify public IP and location details
+        response = opener.open("http://ip-api.com/json", timeout=timeout)
+        data = json.loads(response.read().decode('utf-8'))
+        if data.get('status') == 'success':
+            return True, {
+                'ip': data.get('query'),
+                'country': data.get('country'),
+                'city': data.get('city'),
+                'isp': data.get('isp')
+            }
+        else:
+            return True, {
+                'ip': data.get('query') or 'Unknown',
+                'country': 'Unknown',
+                'city': 'Unknown',
+                'isp': 'Unknown'
+            }
+    except Exception as e:
+        return False, {'error': str(e)}
+
+
+def create_proxy_extension(profile_dir, proxy_type, host, port, username, password):
+    """Generates a custom Chrome extension dynamically to handle proxy credentials authentication."""
+    import json
+    ext_dir = os.path.join(profile_dir, "proxy_extension")
+    os.makedirs(ext_dir, exist_ok=True)
+    
+    manifest_path = os.path.join(ext_dir, "manifest.json")
+    background_path = os.path.join(ext_dir, "background.js")
+    
+    manifest_json = {
+        "version": "1.0.0",
+        "manifest_version": 2,
+        "name": "Chrome Proxy Helper Extension",
+        "permissions": [
+            "proxy",
+            "tabs",
+            "unlimitedStorage",
+            "storage",
+            "<all_urls>",
+            "webRequest",
+            "webRequestBlocking"
+        ],
+        "background": {
+            "scripts": ["background.js"]
+        },
+        "minimum_chrome_version": "22.0.0"
+    }
+    
+    background_js = f"""
+    var config = {{
+        mode: "fixed_servers",
+        rules: {{
+            singleProxy: {{
+                scheme: "{proxy_type.lower()}",
+                host: "{host}",
+                port: parseInt({port})
+            }},
+            bypassList: []
+        }}
+    }};
+
+    chrome.proxy.settings.set({{value: config, scope: "regular"}}, function() {{}});
+
+    chrome.webRequest.onAuthRequired.addListener(
+        function(details) {{
+            return {{
+                authCredentials: {{
+                    username: "{username}",
+                    password: "{password}"
+                }}
+            }};
+        }},
+        {{urls: ["<all_urls>"]}},
+        ["blocking"]
+    );
+    """
+    
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest_json, f, indent=4)
+        
+    with open(background_path, "w", encoding="utf-8") as f:
+        f.write(background_js)
+        
+    return ext_dir
+
+
+def generate_random_fingerprint():
+    """Generates a random desktop browser user-agent and resolution footprint."""
+    import random
+    user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15"
+    ]
+    resolutions = [
+        "1920,1080",
+        "1366,768",
+        "1440,900",
+        "1536,864",
+        "1600,900"
+    ]
+    return {
+        "user_agent": random.choice(user_agents),
+        "resolution": random.choice(resolutions)
+    }
+
+

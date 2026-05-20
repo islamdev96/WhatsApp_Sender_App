@@ -922,6 +922,132 @@ class ModernWhatsAppApp(ctk.CTk):
         self.country_code_entry.pack(side="right", padx=5)
         self.country_code_entry.insert(0, str(self.config.get("default_country_code", "20")))
 
+        # Proxy & VPN Settings Card
+        proxy_card = ctk.CTkFrame(scroll, corner_radius=10)
+        proxy_card.pack(fill="x", padx=10, pady=8)
+        ctk.CTkLabel(proxy_card, text="🛡️ إعدادات البروكسي والخصوصية (Proxy & Privacy Settings)",
+                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="e", padx=15, pady=(10, 5))
+
+        # Checkbox and Type row
+        chk_row = ctk.CTkFrame(proxy_card, fg_color="transparent")
+        chk_row.pack(fill="x", padx=15, pady=(0, 5))
+        
+        self.proxy_enabled_var = ctk.BooleanVar(value=False)
+        ctk.CTkCheckBox(chk_row, text="تفعيل اتصال البروكسي", variable=self.proxy_enabled_var,
+                        font=ctk.CTkFont(size=12)).pack(side="right", padx=5)
+                        
+        self.proxy_type_var = ctk.StringVar(value="HTTP")
+        ctk.CTkLabel(chk_row, text="النوع:", font=ctk.CTkFont(size=12)).pack(side="left", padx=(5, 0))
+        self.proxy_type_menu = ctk.CTkOptionMenu(
+            chk_row,
+            values=["HTTP", "SOCKS5"],
+            variable=self.proxy_type_var,
+            width=90,
+            height=28,
+            fg_color=COLORS["card_bg"],
+            button_color=COLORS["primary"],
+            button_hover_color=COLORS["primary_hover"],
+            text_color=COLORS["text_main"],
+            dropdown_fg_color=COLORS["card_bg"],
+            dropdown_text_color=COLORS["text_main"],
+        )
+        self.proxy_type_menu.pack(side="left", padx=5)
+
+        # Host and Port row
+        addr_row = ctk.CTkFrame(proxy_card, fg_color="transparent")
+        addr_row.pack(fill="x", padx=15, pady=5)
+        
+        ctk.CTkLabel(addr_row, text="العنوان (IP/Host):", font=ctk.CTkFont(size=12)).pack(side="right", padx=(5, 0))
+        self.proxy_host_entry = ctk.CTkEntry(addr_row, width=200, height=34, corner_radius=8,
+                                             placeholder_text="e.g. 192.168.1.1 or proxy.com")
+        self.proxy_host_entry.pack(side="right", padx=5)
+        
+        ctk.CTkLabel(addr_row, text="المنفذ (Port):", font=ctk.CTkFont(size=12)).pack(side="right", padx=(5, 0))
+        self.proxy_port_entry = ctk.CTkEntry(addr_row, width=80, height=34, corner_radius=8,
+                                            justify="center", placeholder_text="8080")
+        self.proxy_port_entry.pack(side="right", padx=5)
+
+        # Auth credentials row
+        auth_row = ctk.CTkFrame(proxy_card, fg_color="transparent")
+        auth_row.pack(fill="x", padx=15, pady=5)
+        
+        ctk.CTkLabel(auth_row, text="المستخدم (اختياري):", font=ctk.CTkFont(size=12)).pack(side="right", padx=(5, 0))
+        self.proxy_username_entry = ctk.CTkEntry(auth_row, width=120, height=34, corner_radius=8,
+                                                 placeholder_text="Username")
+        self.proxy_username_entry.pack(side="right", padx=5)
+        
+        ctk.CTkLabel(auth_row, text="كلمة المرور (اختياري):", font=ctk.CTkFont(size=12)).pack(side="right", padx=(5, 0))
+        self.proxy_password_entry = ctk.CTkEntry(auth_row, width=120, height=34, corner_radius=8,
+                                                 show="*", placeholder_text="Password")
+        self.proxy_password_entry.pack(side="right", padx=5)
+
+        # Action/Test connection row
+        action_row = ctk.CTkFrame(proxy_card, fg_color="transparent")
+        action_row.pack(fill="x", padx=15, pady=(5, 10))
+        
+        self.test_proxy_btn = ctk.CTkButton(
+            action_row,
+            text="⚡ فحص الاتصال",
+            width=120,
+            height=32,
+            fg_color=COLORS["accent"],
+            hover_color=COLORS["accent_hover"],
+            font=ctk.CTkFont(size=12, weight="bold"),
+            command=self._test_proxy_connection
+        )
+        self.test_proxy_btn.pack(side="right", padx=5)
+        
+        self.proxy_status_label = ctk.CTkLabel(
+            action_row,
+            text="الحالة: لم يتم الفحص",
+            font=ctk.CTkFont(size=12),
+            text_color=COLORS["text_muted"]
+        )
+        self.proxy_status_label.pack(side="left", padx=5)
+
+        # Fingerprint section separator
+        sep = ctk.CTkFrame(proxy_card, height=2, fg_color=COLORS["border"])
+        sep.pack(fill="x", padx=15, pady=8)
+        
+        ctk.CTkLabel(proxy_card, text="🛡️ بصمة المتصفح وحماية الهوية (Identity Protection)",
+                     font=ctk.CTkFont(size=13, weight="bold")).pack(anchor="e", padx=15, pady=(2, 5))
+
+        # Fingerprint toggle row
+        fp_toggle_row = ctk.CTkFrame(proxy_card, fg_color="transparent")
+        fp_toggle_row.pack(fill="x", padx=15, pady=2)
+        
+        self.fp_enabled_var = ctk.BooleanVar(value=True)
+        ctk.CTkCheckBox(fp_toggle_row, text="تغيير بصمة المتصفح (User-Agent & Viewport) للحساب", 
+                        variable=self.fp_enabled_var, font=ctk.CTkFont(size=12)).pack(side="right", padx=5)
+
+        # Fingerprint values display row
+        fp_row = ctk.CTkFrame(proxy_card, fg_color="transparent")
+        fp_row.pack(fill="x", padx=15, pady=5)
+        
+        # User-Agent read-only entry
+        ctk.CTkLabel(fp_row, text="User-Agent:", font=ctk.CTkFont(size=11)).pack(side="right", padx=(5, 0))
+        self.fp_ua_entry = ctk.CTkEntry(fp_row, width=280, height=28, corner_radius=6, font=ctk.CTkFont(size=10))
+        self.fp_ua_entry.pack(side="right", padx=5)
+        
+        # Resolution entry
+        ctk.CTkLabel(fp_row, text="الأبعاد:", font=ctk.CTkFont(size=11)).pack(side="right", padx=(5, 0))
+        self.fp_res_entry = ctk.CTkEntry(fp_row, width=80, height=28, corner_radius=6, justify="center", font=ctk.CTkFont(size=11))
+        self.fp_res_entry.pack(side="right", padx=5)
+        
+        # Generate new fingerprint button
+        self.fp_gen_btn = ctk.CTkButton(
+            fp_row,
+            text="🔄 توليد جديدة",
+            width=90,
+            height=28,
+            fg_color=COLORS["secondary"],
+            hover_color=COLORS["secondary_hover"],
+            text_color=COLORS["secondary_text"],
+            font=ctk.CTkFont(size=11, weight="bold"),
+            command=self._generate_new_profile_fingerprint
+        )
+        self.fp_gen_btn.pack(side="left", padx=5)
+
         # Save Button
         ctk.CTkButton(scroll, text="💾 حفظ الإعدادات", height=42,
                       font=ctk.CTkFont(size=14, weight="bold"),
@@ -2228,6 +2354,22 @@ class ModernWhatsAppApp(ctk.CTk):
                 return
             self.config.set("default_country_code", cc_raw)
 
+            if hasattr(self, "proxy_enabled_var"):
+                current_profile = self.config.get("profile_name", "Default")
+                profile_proxies = self.config.get("profile_proxies", {})
+                profile_proxies[current_profile] = {
+                    "enabled": self.proxy_enabled_var.get(),
+                    "type": self.proxy_type_var.get(),
+                    "host": self.proxy_host_entry.get().strip(),
+                    "port": self.proxy_port_entry.get().strip(),
+                    "username": self.proxy_username_entry.get().strip(),
+                    "password": self.proxy_password_entry.get().strip(),
+                    "fingerprint_enabled": self.fp_enabled_var.get(),
+                    "user_agent": self.fp_ua_entry.get().strip(),
+                    "resolution": self.fp_res_entry.get().strip()
+                }
+                self.config.set("profile_proxies", profile_proxies)
+
             self.config.save()
             messagebox.showinfo("تم", "تم حفظ الإعدادات بنجاح.")
         except ValueError:
@@ -2291,6 +2433,10 @@ class ModernWhatsAppApp(ctk.CTk):
             last_wf = self.config.get("last_workflow", "")
             if last_wf:
                 self.workflow_var.set(last_wf)
+
+        # Load profile proxy settings at startup
+        profile_name = self.config.get("profile_name", "Default")
+        self._load_profile_proxy_settings(profile_name)
 
     def _save_current_state(self):
         self.config.set("last_contacts_file", self.contacts_entry.get())
@@ -2380,7 +2526,10 @@ class ModernWhatsAppApp(ctk.CTk):
             try:
                 self._set_session_status("الحالة: جاري فتح المتصفح...", COLORS["info"])
                 self.log("جاري فتح المتصفح...")
-                self.bot = WhatsAppBot(self.user_data_dir)
+                active_profile = self.config.get("profile_name", "Default")
+                profile_proxies = self.config.get("profile_proxies", {})
+                proxy_config = profile_proxies.get(active_profile, {"enabled": False})
+                self.bot = WhatsAppBot(self.user_data_dir, proxy_config=proxy_config)
                 self.bot.open_whatsapp()
                 self.bot.background_mode = False
                 self.bot.bring_to_front()
@@ -2454,6 +2603,24 @@ class ModernWhatsAppApp(ctk.CTk):
             else:
                 self.profile_var.set(os.path.basename(self.user_data_dir))
             return
+
+        # Save current proxy fields to the old profile configuration
+        if hasattr(self, "proxy_enabled_var"):
+            old_profile = self.config.get("profile_name", "Default")
+            profile_proxies = self.config.get("profile_proxies", {})
+            profile_proxies[old_profile] = {
+                "enabled": self.proxy_enabled_var.get(),
+                "type": self.proxy_type_var.get(),
+                "host": self.proxy_host_entry.get().strip(),
+                "port": self.proxy_port_entry.get().strip(),
+                "username": self.proxy_username_entry.get().strip(),
+                "password": self.proxy_password_entry.get().strip(),
+                "fingerprint_enabled": self.fp_enabled_var.get(),
+                "user_agent": self.fp_ua_entry.get().strip(),
+                "resolution": self.fp_res_entry.get().strip()
+            }
+            self.config.set("profile_proxies", profile_proxies)
+
         if choice == "Legacy" and os.path.exists(self.legacy_profile_dir):
             self.user_data_dir = self.legacy_profile_dir
         else:
@@ -2463,6 +2630,10 @@ class ModernWhatsAppApp(ctk.CTk):
         self.config.set("profiles_dir", os.path.relpath(self.profiles_dir, os.getcwd()))
         self.config.save()
         self.log(f"👤 تم تغيير الملف الشخصي إلى: {choice}")
+
+        # Load new profile proxy settings
+        if hasattr(self, "proxy_enabled_var"):
+            self._load_profile_proxy_settings(choice)
 
     def _create_new_profile(self):
         dialog = ctk.CTkInputDialog(text="أدخل اسم الحساب الجديد:", title="حساب جديد")
@@ -3683,4 +3854,102 @@ class ModernWhatsAppApp(ctk.CTk):
                     text = "جاري العمل..."
                 self.progress_status_label.configure(text=text)
         self._run_on_ui(_do)
+
+    def _load_profile_proxy_settings(self, profile_name):
+        profile_proxies = self.config.get("profile_proxies", {})
+        prof_config = profile_proxies.get(profile_name, {
+            "enabled": False,
+            "type": "HTTP",
+            "host": "",
+            "port": "",
+            "username": "",
+            "password": "",
+            "fingerprint_enabled": True,
+            "user_agent": "",
+            "resolution": ""
+        })
+        
+        self.proxy_enabled_var.set(prof_config.get("enabled", False))
+        self.proxy_type_var.set(prof_config.get("type", "HTTP"))
+        
+        self.proxy_host_entry.delete(0, "end")
+        self.proxy_host_entry.insert(0, prof_config.get("host", ""))
+        
+        self.proxy_port_entry.delete(0, "end")
+        self.proxy_port_entry.insert(0, prof_config.get("port", ""))
+        
+        self.proxy_username_entry.delete(0, "end")
+        self.proxy_username_entry.insert(0, prof_config.get("username", ""))
+        
+        self.proxy_password_entry.delete(0, "end")
+        self.proxy_password_entry.insert(0, prof_config.get("password", ""))
+        
+        # Load fingerprint settings
+        self.fp_enabled_var.set(prof_config.get("fingerprint_enabled", True))
+        
+        ua = prof_config.get("user_agent", "").strip()
+        res = prof_config.get("resolution", "").strip()
+        if not ua or not res:
+            from utils.helpers import generate_random_fingerprint
+            fp = generate_random_fingerprint()
+            ua = fp["user_agent"]
+            res = fp["resolution"]
+            
+        self.fp_ua_entry.delete(0, "end")
+        self.fp_ua_entry.insert(0, ua)
+        
+        self.fp_res_entry.delete(0, "end")
+        self.fp_res_entry.insert(0, res)
+        
+        self.proxy_status_label.configure(text="الحالة: لم يتم الفحص", text_color=COLORS["text_muted"])
+
+    def _test_proxy_connection(self):
+        proxy_type = self.proxy_type_var.get().lower()
+        host = self.proxy_host_entry.get().strip()
+        port = self.proxy_port_entry.get().strip()
+        user = self.proxy_username_entry.get().strip()
+        pwd = self.proxy_password_entry.get().strip()
+        
+        if not host or not port:
+            messagebox.showerror("خطأ", "يرجى إدخال عنوان البروكسي والمنفذ (Host & Port).")
+            return
+            
+        self.proxy_status_label.configure(text="جاري فحص الاتصال...", text_color=COLORS["warning"])
+        self.test_proxy_btn.configure(state="disabled")
+        
+        def run_test():
+            from utils.helpers import check_proxy
+            success, info = check_proxy(proxy_type, host, port, user, pwd)
+            
+            def update_ui():
+                self.test_proxy_btn.configure(state="normal")
+                if success:
+                    ip = info.get("ip", "Unknown")
+                    country = info.get("country", "Unknown")
+                    city = info.get("city", "")
+                    loc = f"{country} ({city})" if city else country
+                    self.proxy_status_label.configure(
+                        text=f"🟢 متصل | IP: {ip} | الدولة: {loc}",
+                        text_color=COLORS["success"]
+                    )
+                else:
+                    err = info.get("error", "فشل غير معروف")
+                    self.proxy_status_label.configure(
+                        text=f"🔴 فشل الاتصال: {err}",
+                        text_color=COLORS["danger"]
+                    )
+            
+            self._run_on_ui(update_ui)
+            
+        threading.Thread(target=run_test, daemon=True).start()
+
+    def _generate_new_profile_fingerprint(self):
+        from utils.helpers import generate_random_fingerprint
+        fp = generate_random_fingerprint()
+        
+        self.fp_ua_entry.delete(0, "end")
+        self.fp_ua_entry.insert(0, fp["user_agent"])
+        
+        self.fp_res_entry.delete(0, "end")
+        self.fp_res_entry.insert(0, fp["resolution"])
 

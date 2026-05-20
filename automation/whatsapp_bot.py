@@ -11,8 +11,9 @@ from selenium.common.exceptions import TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 
 class WhatsAppBot:
-    def __init__(self, user_data_dir):
+    def __init__(self, user_data_dir, proxy_config=None):
         self.user_data_dir = user_data_dir
+        self.proxy_config = proxy_config
         self.driver = None
         self.background_mode = False
 
@@ -242,8 +243,37 @@ class WhatsAppBot:
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
-        options.add_argument("--disable-extensions")
-        options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+        
+        # Apply proxy settings if enabled
+        is_auth_proxy = False
+        if self.proxy_config and self.proxy_config.get("enabled"):
+            p_type = str(self.proxy_config.get("type", "http")).lower()
+            p_host = str(self.proxy_config.get("host", "")).strip()
+            p_port = str(self.proxy_config.get("port", "")).strip()
+            p_user = str(self.proxy_config.get("username", "")).strip()
+            p_pass = str(self.proxy_config.get("password", "")).strip()
+            
+            if p_host and p_port:
+                if p_user and p_pass:
+                    is_auth_proxy = True
+                    # Authenticated proxy: generate extension and load it
+                    from utils.helpers import create_proxy_extension
+                    ext_dir = create_proxy_extension(self.user_data_dir, p_type, p_host, p_port, p_user, p_pass)
+                    options.add_argument(f"--load-extension={ext_dir}")
+                else:
+                    # Unauthenticated proxy
+                    options.add_argument(f"--proxy-server={p_type}://{p_host}:{p_port}")
+
+        if not is_auth_proxy:
+            options.add_argument("--disable-extensions")
+        # Apply custom fingerprint if enabled
+        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        if self.proxy_config and self.proxy_config.get("fingerprint_enabled"):
+            user_agent = self.proxy_config.get("user_agent", user_agent)
+            resolution = self.proxy_config.get("resolution", "1920,1080")
+            options.add_argument(f"--window-size={resolution}")
+            
+        options.add_argument(f"user-agent={user_agent}")
         options.add_argument("--remote-allow-origins=*")
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option('useAutomationExtension', False)
