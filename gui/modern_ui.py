@@ -166,113 +166,123 @@ class ModernWhatsAppApp(ctk.CTk):
         profile_name = self.config.get("profile_name", "Default")
         if profile_name != "Legacy":
             os.makedirs(os.path.join(self.profiles_dir, profile_name), exist_ok=True)
-        self.profile_var = ctk.StringVar(value=profile_name)
-        if profile_name == "Legacy" and os.path.exists(self.legacy_profile_dir):
-            self.user_data_dir = self.legacy_profile_dir
-        else:
             self.user_data_dir = os.path.join(self.profiles_dir, profile_name)
+        else:
+            self.user_data_dir = self.legacy_profile_dir
 
-        # ── Build UI ──
+        self.profile_var = ctk.StringVar(value=profile_name)
+
+
+        # ── Build Layout ──
         self._build_layout()
-        self._load_saved_state()
 
-        # ── UI Queue Processor ──
+        # ── Start UI Queue Processor ──
         self.after(50, self._process_ui_queue)
 
-        # ── Background Status Monitor ──
-        self._start_status_monitor()
-
-        # ── Save on close ──
-        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _apply_palette(self, mode):
         palette = PALETTE_DARK if str(mode).lower() == "dark" else PALETTE_LIGHT
         COLORS.clear()
         COLORS.update(palette)
 
+        # Configure ttk.Style for all Treeviews to match our modern palette
+        style = ttk.Style()
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+
+        bg_color = COLORS["bg_dark"]
+        fg_color = COLORS["text_main"]
+        card_bg = COLORS["card_bg"]
+        border_color = COLORS["border"]
+        primary_color = COLORS["primary"]
+
+        style.configure(
+            "Treeview",
+            background=bg_color,
+            foreground=fg_color,
+            fieldbackground=bg_color,
+            rowheight=28,
+            font=("Segoe UI", 10),
+            borderwidth=0
+        )
+        style.configure(
+            "Treeview.Heading",
+            font=("Segoe UI", 10, "bold"),
+            background=card_bg,
+            foreground=fg_color,
+            borderwidth=1,
+            relief="flat"
+        )
+        style.map(
+            "Treeview",
+            background=[("selected", primary_color)],
+            foreground=[("selected", "#000000" if str(mode).lower() == "dark" else "#FFFFFF")]
+        )
+
+
     def _refresh_theme(self):
         # Update key widgets after palette change
-        if hasattr(self, "sidebar"):
-            self.sidebar.configure(fg_color=COLORS["primary_dark"])
-        if hasattr(self, "appearance_switch"):
-            self.appearance_switch.configure(text_color=COLORS["text_main"])
-        if hasattr(self, "status_card"):
-            self.status_card.configure(fg_color=COLORS["bg_dark"])
+        if hasattr(self, "toolbar_frame"):
+            self.toolbar_frame.configure(fg_color=COLORS["primary_dark"])
+        if hasattr(self, "bottom_bar"):
+            self.bottom_bar.configure(fg_color=COLORS["primary_dark"])
         if hasattr(self, "session_status_label"):
-            self.session_status_label.configure(text_color=COLORS["text_main"])
+            self.session_status_label.configure(text_color=COLORS["text_muted"])
         if hasattr(self, "nav_buttons") and hasattr(self, "current_tab"):
             for nid, btn in self.nav_buttons.items():
                 if nid == self.current_tab:
-                    btn.configure(fg_color=COLORS["primary"], text_color="#000000", font=("Segoe UI", 14, "bold"))
+                    btn.configure(fg_color=COLORS["primary"], text_color="#000000", font=("Segoe UI", 11, "bold"))
                 else:
-                    btn.configure(fg_color="transparent", text_color=COLORS["text_muted"], font=("Segoe UI", 14))
+                    btn.configure(fg_color="transparent", text_color=COLORS["text_muted"], font=("Segoe UI", 11))
         if hasattr(self, "attachment_manager"):
             self.attachment_manager.apply_theme(COLORS)
         if hasattr(self, "message_editor"):
             self.message_editor.apply_theme(COLORS)
-        if hasattr(self, "workflow_step_editor"):
-            self.workflow_step_editor.apply_theme(COLORS)
-        if hasattr(self, "workflow_step_attachments"):
-            self.workflow_step_attachments.apply_theme(COLORS)
-        if hasattr(self, "progress_bar"):
-            self.progress_bar.configure(progress_color=COLORS["primary"])
-        if hasattr(self, "total_counts_label"):
-            self.total_counts_label.configure(text_color=COLORS["text_muted"])
         if hasattr(self, "btn_start"):
             self.btn_start.configure(fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"], text_color="#000000")
-        if hasattr(self, "btn_login"):
-            self.btn_login.configure(fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"], text_color=COLORS["secondary_text"])
         if hasattr(self, "btn_stop"):
             self.btn_stop.configure(fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"], text_color="#FFFFFF")
-        if hasattr(self, "btn_check"):
-            self.btn_check.configure(fg_color=COLORS["info"], hover_color=COLORS["accent_hover"])
-        if hasattr(self, "btn_schedule"):
-            self.btn_schedule.configure(fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"])
-        if hasattr(self, "btn_cancel_sched"):
-            self.btn_cancel_sched.configure(fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"])
-        if hasattr(self, "workflow_menu"):
-            self.workflow_menu.configure(
-                fg_color=COLORS["card_bg"],
-                button_color=COLORS["primary"],
-                button_hover_color=COLORS["primary_hover"],
-                text_color=COLORS["text_main"],
-                dropdown_fg_color=COLORS["card_bg"],
-                dropdown_text_color=COLORS["text_main"],
-            )
-        if hasattr(self, "workflow_name_entry"):
-            self.workflow_name_entry.configure(
-                fg_color=COLORS["bg_dark"],
-                text_color=COLORS["text_main"],
-                border_color=COLORS["border"],
-            )
-        if hasattr(self, "step_delay_min_entry"):
-            self.step_delay_min_entry.configure(
-                fg_color=COLORS["bg_dark"],
-                text_color=COLORS["text_main"],
-                border_color=COLORS["border"],
-            )
-        if hasattr(self, "step_delay_max_entry"):
-            self.step_delay_max_entry.configure(
-                fg_color=COLORS["bg_dark"],
-                text_color=COLORS["text_main"],
-                border_color=COLORS["border"],
-            )
 
     # ═══════════════════════════════════════════════════════════════════════
     #  LAYOUT
     # ═══════════════════════════════════════════════════════════════════════
     def _build_layout(self):
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=1)
+        import tkinter as tk
+        import json
 
-        # ── Sidebar ──
-        self._build_sidebar()
+        # Instantiate backward compatibility state variables
+        self.bg_mode_var = ctk.BooleanVar(value=self.config.get("background_mode", False))
+        self.use_valid_after_check_var = ctk.BooleanVar(value=self.config.get("use_valid_after_check", False))
+        self.use_workflow_var = ctk.BooleanVar(value=self.config.get("use_workflow", False))
+        self.workflow_var = ctk.StringVar(value=self.config.get("last_workflow", ""))
+        self.sched_date_entry = ctk.CTkEntry(self, width=1)
+        self.sched_time_entry = ctk.CTkEntry(self, width=1)
+        
+        # Load Auto-Responder rules
+        self._load_ar_rules()
 
-        # ── Main Content Area ──
+        # Configure Main Grid Rows (Toolbar -> Main Area -> Bottom Bar)
+        self.grid_rowconfigure(0, weight=0)  # Top Toolbar
+        self.grid_rowconfigure(1, weight=1)  # Main Content
+        self.grid_rowconfigure(2, weight=0)  # Bottom Status Bar
+        self.grid_columnconfigure(0, weight=1)
+
+        # ── 1. Native Windows Menu Bar ──
+        self._build_menu_bar()
+
+        # ── 2. Top Horizontal Toolbar ──
+        self._build_top_toolbar()
+
+        # ── 3. Main Content Frame ──
         self.main_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
-        self.main_frame.grid(row=0, column=1, sticky="nsew")
+        self.main_frame.grid(row=1, column=0, sticky="nsew")
         self.main_frame.grid_rowconfigure(0, weight=1)
         self.main_frame.grid_columnconfigure(0, weight=1)
+
+        # ── 4. Bottom Status Bar ──
+        self._build_bottom_bar()
 
         # ── Tabs (frames) ──
         self.tab_frames = {}
@@ -288,88 +298,219 @@ class ModernWhatsAppApp(ctk.CTk):
         self._switch_tab("main")
         self._refresh_theme()
 
-    # ─── Sidebar ──────────────────────────────────────────────────────────
-    def _build_sidebar(self):
-        self.sidebar = ctk.CTkFrame(self, width=240, corner_radius=0,
-                                    fg_color=COLORS["primary_dark"])
-        self.sidebar.grid(row=0, column=0, sticky="nsew")
-        self.sidebar.grid_rowconfigure(11, weight=1)
-
-        # Logo / Title
-        logo_label = ctk.CTkLabel(self.sidebar, text="⚡ WA Sender",
-                                  font=("Segoe UI", 26, "bold"),
-                                  text_color=COLORS["primary"])
-        logo_label.grid(row=0, column=0, padx=20, pady=(35, 5))
-
-        subtitle = ctk.CTkLabel(self.sidebar, text="PRO EDITION",
-                                font=("Segoe UI", 10, "bold"),
-                                text_color=COLORS["text_muted"])
-        subtitle.grid(row=1, column=0, padx=20, pady=(0, 20))
-
-        # Profile Selector
-        self.profile_combo = ctk.CTkComboBox(self.sidebar, values=self._get_profiles(),
-                                             variable=self.profile_var,
-                                             command=self._on_profile_change,
-                                             width=180, height=30,
-                                             fg_color=COLORS["card_bg"],
-                                             border_color=COLORS["border"],
-                                             button_color=COLORS["primary"],
-                                             button_hover_color=COLORS["primary_hover"],
-                                             text_color=COLORS["text_main"],
-                                             dropdown_fg_color=COLORS["card_bg"],
-                                             dropdown_text_color=COLORS["text_main"])
-        self.profile_combo.grid(row=2, column=0, padx=20, pady=(0, 20))
+    # ─── native Windows Menu Bar ──────────────────────────────────────────────
+    def _build_menu_bar(self):
+        import tkinter as tk
+        menu_bar = tk.Menu(self)
         
-        # New Profile Button
-        ctk.CTkButton(self.sidebar, text="+ حساب جديد", width=180, height=24,
-                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
-                      text_color=COLORS["secondary_text"],
-                      font=("Segoe UI", 11),
-                      command=self._create_new_profile).grid(row=3, column=0, padx=20, pady=(0, 30))
+        # 1. File Menu (ملف)
+        file_menu = tk.Menu(menu_bar, tearoff=0)
+        file_menu.add_command(label="📁 فتح ملف الأرقام...", command=self._browse_contacts)
+        file_menu.add_command(label="📥 استيراد متقدم...", command=self._open_import_dialog)
+        file_menu.add_separator()
+        file_menu.add_command(label="💾 حفظ القالب الحالي", command=self._save_template)
+        file_menu.add_separator()
+        file_menu.add_command(label="🚪 خروج", command=self._on_close)
+        menu_bar.add_cascade(label="ملف", menu=file_menu)
 
-        # Navigation Buttons
+        # 2. Edit Menu (تعديل)
+        edit_menu = tk.Menu(menu_bar, tearoff=0)
+        edit_menu.add_command(label="🧮 مولد أرقام جديد...", command=self._open_number_generator)
+        edit_menu.add_separator()
+        edit_menu.add_command(label="🗑️ مسح الرسالة", command=lambda: self.message_editor.set_text(""))
+        edit_menu.add_command(label="🗑️ مسح المرفقات", command=lambda: self.attachment_manager.clear())
+        menu_bar.add_cascade(label="تعديل", menu=edit_menu)
+
+        # 3. View Menu (رأي)
+        view_menu = tk.Menu(menu_bar, tearoff=0)
+        view_menu.add_command(label="🌗 تبديل الوضع الداكن/الفاتح", command=self._toggle_appearance_menu)
+        menu_bar.add_cascade(label="رأي", menu=view_menu)
+
+        # 4. Settings Menu (الإعدادات)
+        settings_menu = tk.Menu(menu_bar, tearoff=0)
+        settings_menu.add_command(label="⚙️ إعدادات الإرسال والتأخير...", command=lambda: self._switch_tab("settings"))
+        settings_menu.add_command(label="🛡️ إعدادات البروكسي وحماية بصمة المتصفح...", command=lambda: self._switch_tab("settings"))
+        menu_bar.add_cascade(label="الإعدادات", menu=settings_menu)
+
+        # 5. Tools Menu (أدوات)
+        tools_menu = tk.Menu(menu_bar, tearoff=0)
+        tools_menu.add_command(label="🧭 إدارة سير العمل (Workflows)", command=lambda: self._switch_tab("workflows"))
+        tools_menu.add_command(label="👥 سحب المجموعات (Groups Grabber)", command=lambda: self._switch_tab("groups"))
+        tools_menu.add_command(label="🔍 فحص الأرقام الفوري", command=lambda: self._check_numbers_action())
+        menu_bar.add_cascade(label="أدوات", menu=tools_menu)
+
+        # 6. Help Menu (مساعدة)
+        help_menu = tk.Menu(menu_bar, tearoff=0)
+        help_menu.add_command(label="📖 دليل الاستخدام والمساعدة...", command=self._show_help_dialog)
+        help_menu.add_command(label="📋 عرض السجل التشغيلي (Log)", command=lambda: self._switch_tab("log"))
+        help_menu.add_separator()
+        help_menu.add_command(label="ℹ️ حول البرنامج", command=self._show_about_dialog)
+        menu_bar.add_cascade(label="مساعدة", menu=help_menu)
+
+        self.configure(menu=menu_bar)
+
+    # ─── Top Horizontal Toolbar ──────────────────────────────────────────────
+    def _build_top_toolbar(self):
+        # Toolbar Main Container Frame
+        self.toolbar_frame = ctk.CTkFrame(self, height=72, corner_radius=0, fg_color=COLORS["primary_dark"])
+        self.toolbar_frame.grid(row=0, column=0, sticky="ew")
+        self.toolbar_frame.grid_propagate(False)
+
+        tb_content = ctk.CTkFrame(self.toolbar_frame, fg_color="transparent")
+        tb_content.pack(fill="both", expand=True, padx=10, pady=5)
+
+        # 1. Login / Open WhatsApp button
+        self.btn_tb_login = ctk.CTkButton(
+            tb_content, text="🌐\nفتح WhatsApp",
+            font=("Segoe UI", 11, "bold"),
+            width=95, height=52, corner_radius=8,
+            fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+            text_color=COLORS["secondary_text"],
+            command=self._login_action
+        )
+        self.btn_tb_login.pack(side="right", padx=3)
+
+        # 2. Tabs Navigation Buttons
         nav_items = [
-            ("🏠  الرئيسية", "main"),
-            ("👥  المجموعات", "groups"),
-            ("🧭  سير العمل", "workflows"),
-            ("📝  القوالب", "templates"),
-            ("📊  التحليلات", "analytics"),
-            ("⚙️  الإعدادات", "settings"),
-            ("📋  السجل", "log"),
+            ("📣\nحملة جديدة", "main"),
+            ("📊\nالحملات المرسلة", "analytics"),
+            ("👥\nGroups Grabber", "groups"),
+            ("🧭\nسير العمل", "workflows"),
+            ("📝\nالقوالب", "templates"),
+            ("⚙️\nالإعدادات", "settings"),
+            ("📋\nالسجل", "log"),
         ]
 
         self.nav_buttons = {}
-        for i, (text, tab_id) in enumerate(nav_items):
-            btn = ctk.CTkButton(self.sidebar, text=text,
-                                font=("Segoe UI", 14),
-                                fg_color="transparent",
-                                text_color=COLORS["text_muted"],
-                                hover_color=COLORS["bg_dark"],
-                                anchor="w",
-                                height=50,
-                                corner_radius=10,
-                                command=lambda t=tab_id: self._switch_tab(t))
-            btn.grid(row=i + 4, column=0, padx=15, pady=4, sticky="ew")
+        for text, tab_id in nav_items:
+            btn = ctk.CTkButton(
+                tb_content, text=text,
+                font=("Segoe UI", 11),
+                width=90, height=52, corner_radius=8,
+                fg_color="transparent",
+                text_color=COLORS["text_muted"],
+                hover_color=COLORS["bg_dark"],
+                command=lambda t=tab_id: self._switch_tab(t)
+            )
+            btn.pack(side="right", padx=3)
             self.nav_buttons[tab_id] = btn
 
-        # Spacer
-        # row 11 has weight=1
+        # 3. Help Shortcut Button
+        self.btn_tb_help = ctk.CTkButton(
+            tb_content, text="❓\nمساعدة",
+            font=("Segoe UI", 11),
+            width=70, height=52, corner_radius=8,
+            fg_color="transparent",
+            text_color=COLORS["text_muted"],
+            hover_color=COLORS["bg_dark"],
+            command=self._show_help_dialog
+        )
+        self.btn_tb_help.pack(side="right", padx=3)
 
-        # Appearance Toggle
-        self.appearance_switch = ctk.CTkSwitch(self.sidebar, text="الوضع الداكن",
-                                               font=ctk.CTkFont(size=12),
-                                               text_color=COLORS["text_main"],
-                                               command=self._toggle_appearance,
-                                               onvalue="dark", offvalue="light")
-        self.appearance_switch.grid(row=12, column=0, padx=20, pady=(10, 5))
-        if self.config.get("appearance_mode", "dark") == "dark":
-            self.appearance_switch.select()
+        # 4. Red Logout button (placed far left)
+        self.btn_tb_logout = ctk.CTkButton(
+            tb_content, text="🔴 سجل الخروج",
+            font=("Segoe UI", 12, "bold"),
+            width=110, height=40, corner_radius=8,
+            fg_color="#D32F2F", hover_color="#B71C1C",
+            text_color="#FFFFFF",
+            command=self._logout_action
+        )
+        self.btn_tb_logout.pack(side="left", padx=10, pady=6)
 
-        # Version
-        ver_label = ctk.CTkLabel(self.sidebar, text="v2.5.0",
-                                 font=ctk.CTkFont(size=10),
-                                 text_color="#6C757D")
-        ver_label.grid(row=13, column=0, padx=20, pady=(5, 15))
+        # 5. Profile selector combobox (placed next to logout)
+        self.profile_combo = ctk.CTkComboBox(
+            tb_content, values=self._get_profiles(),
+            variable=self.profile_var,
+            command=self._on_profile_change,
+            width=120, height=36,
+            fg_color=COLORS["card_bg"],
+            border_color=COLORS["border"],
+            button_color=COLORS["primary"],
+            button_hover_color=COLORS["primary_hover"],
+            text_color=COLORS["text_main"],
+            dropdown_fg_color=COLORS["card_bg"],
+            dropdown_text_color=COLORS["text_main"]
+        )
+        self.profile_combo.pack(side="left", padx=5, pady=8)
+        
+        lbl_profile = ctk.CTkLabel(tb_content, text="الحساب:", font=("Segoe UI", 11), text_color=COLORS["text_muted"])
+        lbl_profile.pack(side="left", padx=2)
+
+    # ─── Bottom Status Bar ───────────────────────────────────────────────────
+    def _build_bottom_bar(self):
+        # Bottom Bar Container Frame
+        self.bottom_bar = ctk.CTkFrame(self, height=45, corner_radius=0, fg_color=COLORS["primary_dark"])
+        self.bottom_bar.grid(row=2, column=0, sticky="ew")
+        self.bottom_bar.grid_propagate(False)
+
+        # Left status text
+        status_frame = ctk.CTkFrame(self.bottom_bar, fg_color="transparent")
+        status_frame.pack(side="left", fill="y", padx=15, pady=2)
+
+        self.status_indicator = ctk.CTkLabel(status_frame, text="●", font=("Segoe UI", 16), text_color=COLORS["danger"])
+        self.status_indicator.pack(side="left", padx=5)
+
+        self.session_status_label = ctk.CTkLabel(
+            status_frame,
+            text="Disconnected | Not Ready | Account: N/A",
+            font=("Segoe UI", 12),
+            text_color=COLORS["text_muted"]
+        )
+        self.session_status_label.pack(side="left", padx=5)
+
+        # Live scheduled campaign indicator
+        self.sched_status_label = ctk.CTkLabel(status_frame, text="", font=("Segoe UI", 12), text_color=COLORS["accent"])
+        self.sched_status_label.pack(side="left", padx=15)
+
+        # Right Action Buttons
+        actions_frame = ctk.CTkFrame(self.bottom_bar, fg_color="transparent")
+        actions_frame.pack(side="right", fill="y", padx=15, pady=2)
+
+        # 1. Cancel schedule sending (hidden/disabled by default)
+        self.btn_cancel_sched = ctk.CTkButton(
+            actions_frame, text="❌ إلغاء الجدولة",
+            font=("Segoe UI", 11),
+            width=90, height=32, corner_radius=6,
+            fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+            state="disabled",
+            command=self._cancel_schedule
+        )
+        self.btn_cancel_sched.pack(side="right", padx=5)
+
+        # 2. Schedule button
+        self.btn_tb_schedule = ctk.CTkButton(
+            actions_frame, text="📅 جدولة الإرسال",
+            font=("Segoe UI", 12, "bold"),
+            width=125, height=32, corner_radius=6,
+            fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
+            text_color="#000000",
+            command=self._schedule_action
+        )
+        self.btn_tb_schedule.pack(side="right", padx=5)
+
+        # 3. Send Now Button
+        self.btn_start = ctk.CTkButton(
+            actions_frame, text="✈️ ارسل الآن",
+            font=("Segoe UI", 13, "bold"),
+            width=125, height=32, corner_radius=6,
+            fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
+            text_color="#000000",
+            command=self._start_action
+        )
+        self.btn_start.pack(side="right", padx=5)
+
+        # 4. Pause / Stop Button
+        self.btn_stop = ctk.CTkButton(
+            actions_frame, text="🛑 إيقاف مؤقت",
+            font=("Segoe UI", 12, "bold"),
+            width=100, height=32, corner_radius=6,
+            fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+            text_color="#FFFFFF",
+            state="disabled",
+            command=self._stop_action
+        )
+        self.btn_stop.pack(side="right", padx=5)
 
     def _switch_tab(self, tab_id):
         self.current_tab = tab_id
@@ -377,301 +518,348 @@ class ModernWhatsAppApp(ctk.CTk):
             frame.grid_forget()
         self.tab_frames[tab_id].grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
 
-        # Highlight active nav
+        # Highlight active nav item
         for nid, btn in self.nav_buttons.items():
             if nid == tab_id:
-                btn.configure(fg_color=COLORS["primary"], text_color="#000000", font=("Segoe UI", 14, "bold"))
+                btn.configure(fg_color=COLORS["primary"], text_color="#000000", font=("Segoe UI", 11, "bold"))
             else:
-                btn.configure(fg_color="transparent", text_color=COLORS["text_muted"], font=("Segoe UI", 14))
+                btn.configure(fg_color="transparent", text_color=COLORS["text_muted"], font=("Segoe UI", 11))
 
-    # ─── Main Tab ─────────────────────────────────────────────────────────
+    # ─── Main Tab (3-Column Workspace) ───────────────────────────────────────
     def _build_tab_main(self):
         frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.tab_frames["main"] = frame
 
-        # ── Dashboard Stats Row ──
-        dash = ctk.CTkFrame(frame, fg_color="transparent")
-        dash.pack(fill="x", padx=20, pady=(15, 10))
-        dash.grid_columnconfigure((0, 1, 2, 3), weight=1)
+        # Use 3 columns layout (Left 25%, Middle 35%, Right 40%)
+        frame.grid_columnconfigure(0, weight=1, minsize=260)  # Column 0: Left Pane
+        frame.grid_columnconfigure(1, weight=2, minsize=330)  # Column 1: Middle Pane
+        frame.grid_columnconfigure(2, weight=2, minsize=390)  # Column 2: Right Pane
+        frame.grid_rowconfigure(0, weight=1)
 
-        self.stat_cards = {}
-        stats = [
-            ("total", "📋 الإجمالي", "0", COLORS["info"]),
-            ("success", "✅ نجاح", "0", COLORS["success"]),
-            ("failed", "❌ فشل", "0", COLORS["danger"]),
-            ("invalid", "🚫 بدون واتساب", "0", COLORS["warning"]),
-        ]
-        for i, (key, title, val, color) in enumerate(stats):
-            card = ctk.CTkFrame(dash, corner_radius=16, height=100, fg_color=COLORS["card_bg"])
-            card.grid(row=0, column=i, padx=8, pady=5, sticky="ew")
-            card.grid_propagate(False)
-            
-            ctk.CTkLabel(card, text=title, font=("Segoe UI", 12),
-                         text_color=COLORS["text_muted"]).pack(pady=(20, 5))
-            val_label = ctk.CTkLabel(card, text=val,
-                                     font=("Segoe UI", 32, "bold"),
-                                     text_color=color)
-            val_label.pack()
-            self.stat_cards[key] = val_label
+        # =======================================================================
+        # COLUMN 0: Left Pane (Auto-Responder & Received Messages)
+        # =======================================================================
+        col_left = ctk.CTkFrame(frame, corner_radius=8, border_width=1, border_color=COLORS["border"])
+        col_left.grid(row=0, column=0, sticky="nsew", padx=3, pady=5)
+        col_left.grid_rowconfigure(0, weight=1)  # Top: Auto-reply
+        col_left.grid_rowconfigure(1, weight=1)  # Bottom: Received messages
+        col_left.grid_columnconfigure(0, weight=1)
 
-        # ── Two-Column Layout ──
-        body = ctk.CTkFrame(frame, fg_color="transparent")
-        body.pack(fill="both", expand=True, padx=20, pady=5)
-        body.grid_columnconfigure(0, weight=3)
-        body.grid_columnconfigure(1, weight=2)
-        body.grid_rowconfigure(0, weight=1)
+        # --- Top sub-pane: Auto Responder Rules ---
+        pane_ar = ctk.CTkFrame(col_left, corner_radius=0, fg_color="transparent")
+        pane_ar.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        pane_ar.grid_rowconfigure(2, weight=1)
+        pane_ar.grid_columnconfigure(0, weight=1)
 
-        # LEFT: Message + Files
-        left = ctk.CTkFrame(body, corner_radius=12)
-        left.grid(row=0, column=0, padx=(0, 8), pady=5, sticky="nsew")
-
-        # -- Files Section --
-        files_label = ctk.CTkLabel(left, text="📁 الملفات والمرفقات", font=("Segoe UI", 14, "bold"), text_color=COLORS["text_main"])
-        files_label.pack(anchor="e", padx=20, pady=(12, 10))
-
-        # 1. Contacts
-        self._create_file_row(left, "👥 ملف الأرقام", "contacts_entry", self._browse_contacts)
-        ctk.CTkButton(left, text="📥 استيراد متقدم", height=30,
-                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
-                      text_color=COLORS["secondary_text"],
-                      font=ctk.CTkFont(size=12, weight="bold"),
-                      command=self._open_import_dialog).pack(fill="x", padx=20, pady=(2, 4))
-
-        # Contact count label
-        self.contact_count_label = ctk.CTkLabel(left, text="", font=("Segoe UI", 11),
-                                                 text_color=COLORS["text_muted"])
-        self.contact_count_label.pack(anchor="e", padx=25, pady=(0, 4))
-        ctk.CTkButton(left, text="🧮 مولد أرقام", height=30,
-                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
-                      text_color=COLORS["secondary_text"],
-                      font=ctk.CTkFont(size=12, weight="bold"),
-                      command=self._open_number_generator).pack(fill="x", padx=20, pady=(0, 8))
-
-        # Attachments Panel (New)
-        self.attachment_manager = AttachmentManager(left, colors=COLORS, fg_color=COLORS["card_bg"], corner_radius=12)
-        self.attachment_manager.pack(fill="x", padx=15, pady=(6, 10))
-
-        # Message Section (New)
-        self.message_editor = RichTextFrame(left, colors=COLORS, fg_color=COLORS["bg_dark"], corner_radius=12)
-        self.message_editor.pack(fill="both", expand=True, padx=20, pady=(5, 10))
-        self.message_textbox = self.message_editor.text_box # Alias for backward compatibility
-        self.msg_text = self.message_editor.text_box # Alias
-
-        ctk.CTkLabel(left, text="ملاحظة: لفصل رسائل متعددة استخدم --- بين كل رسالة",
-                     font=("Segoe UI", 10), text_color=COLORS["text_muted"]).pack(anchor="e", padx=25, pady=(0, 8))
+        # Header for Auto Responder
+        hdr_ar = ctk.CTkFrame(pane_ar, fg_color="transparent", height=32)
+        hdr_ar.grid(row=0, column=0, sticky="ew", pady=(5, 5))
         
+        lbl_ar = ctk.CTkLabel(hdr_ar, text="🤖 الرد الآلي التلقائي", font=("Segoe UI", 13, "bold"), text_color=COLORS["primary"])
+        lbl_ar.pack(side="right", padx=5)
 
+        # Toggle Switch
+        self.ar_switch_var = ctk.BooleanVar(value=self.config.get("enable_auto_responder", False))
+        self.ar_switch = ctk.CTkSwitch(
+            hdr_ar, text="", width=40, height=20,
+            variable=self.ar_switch_var,
+            command=self._toggle_auto_responder,
+            progress_color=COLORS["primary"]
+        )
+        self.ar_switch.pack(side="left", padx=10)
 
-
+        # Rules treeview table
+        ar_table_frame = ctk.CTkFrame(pane_ar, fg_color="transparent")
+        ar_table_frame.grid(row=2, column=0, sticky="nsew", pady=2)
         
+        ar_columns = ("rule_name", "keywords", "status")
+        self.ar_rules_tree = ttk.Treeview(ar_table_frame, columns=ar_columns, show="headings", height=6)
+        self.ar_rules_tree.heading("rule_name", text="اسم القاعدة")
+        self.ar_rules_tree.heading("keywords", text="الكلمات الدالة")
+        self.ar_rules_tree.heading("status", text="الحالة")
+        
+        self.ar_rules_tree.column("rule_name", width=80, anchor="e")
+        self.ar_rules_tree.column("keywords", width=120, anchor="e")
+        self.ar_rules_tree.column("status", width=50, anchor="center")
+        
+        ar_scroll = ctk.CTkScrollbar(ar_table_frame, command=self.ar_rules_tree.yview)
+        self.ar_rules_tree.configure(yscrollcommand=ar_scroll.set)
+        self.ar_rules_tree.pack(side="left", fill="both", expand=True)
+        ar_scroll.pack(side="right", fill="y")
+        
+        self._populate_ar_rules_table()
+
+        # Rules editing buttons
+        btns_ar = ctk.CTkFrame(pane_ar, fg_color="transparent", height=30)
+        btns_ar.grid(row=3, column=0, sticky="ew", pady=(4, 2))
+        
+        ctk.CTkButton(
+            btns_ar, text="+ إضافة قاعدة", font=("Segoe UI", 11, "bold"),
+            width=85, height=25, fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+            text_color=COLORS["secondary_text"],
+            command=self._add_ar_rule_dialog
+        ).pack(side="right", padx=3)
+
+        ctk.CTkButton(
+            btns_ar, text="- حذف", font=("Segoe UI", 11),
+            width=50, height=25, fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+            command=self._delete_ar_rule
+        ).pack(side="left", padx=3)
+
+        # --- Bottom sub-pane: Received Messages ---
+        pane_recv = ctk.CTkFrame(col_left, corner_radius=0, fg_color="transparent")
+        pane_recv.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        pane_recv.grid_rowconfigure(1, weight=1)
+        pane_recv.grid_columnconfigure(0, weight=1)
+
+        # Header for Received Messages
+        hdr_recv = ctk.CTkFrame(pane_recv, fg_color="transparent", height=32)
+        hdr_recv.grid(row=0, column=0, sticky="ew", pady=(5, 2))
+        
+        lbl_recv = ctk.CTkLabel(hdr_recv, text="📥 رسائل مستلمة", font=("Segoe UI", 13, "bold"), text_color=COLORS["primary"])
+        lbl_recv.pack(side="right", padx=5)
+
+        # Received Messages Treeview Table
+        recv_table_frame = ctk.CTkFrame(pane_recv, fg_color="transparent")
+        recv_table_frame.grid(row=1, column=0, sticky="nsew", pady=2)
+        
+        recv_columns = ("date", "sender", "message")
+        self.recv_tree = ttk.Treeview(recv_table_frame, columns=recv_columns, show="headings", height=6)
+        self.recv_tree.heading("date", text="الوقت")
+        self.recv_tree.heading("sender", text="مرسل")
+        self.recv_tree.heading("message", text="رسالة")
+        
+        self.recv_tree.column("date", width=80, anchor="center")
+        self.recv_tree.column("sender", width=80, anchor="e")
+        self.recv_tree.column("message", width=120, anchor="e")
+        
+        recv_scroll = ctk.CTkScrollbar(recv_table_frame, command=self.recv_tree.yview)
+        self.recv_tree.configure(yscrollcommand=recv_scroll.set)
+        self.recv_tree.pack(side="left", fill="both", expand=True)
+        recv_scroll.pack(side="right", fill="y")
 
 
-        # -- Checkboxes --
-        chk_frame = ctk.CTkFrame(left, fg_color="transparent")
-        chk_frame.pack(fill="x", padx=15, pady=(0, 12))
+        # =======================================================================
+        # COLUMN 1: Middle Pane (WhatsApp Numbers)
+        # =======================================================================
+        col_mid = ctk.CTkFrame(frame, corner_radius=8, border_width=1, border_color=COLORS["border"])
+        col_mid.grid(row=0, column=1, sticky="nsew", padx=3, pady=5)
+        col_mid.grid_rowconfigure(2, weight=1)
+        col_mid.grid_columnconfigure(0, weight=1)
+
+        # Header for WhatsApp Numbers
+        hdr_mid = ctk.CTkFrame(col_mid, fg_color="transparent", height=35)
+        hdr_mid.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
+        
+        lbl_mid = ctk.CTkLabel(hdr_mid, text="📋 أرقام واتس اب", font=("Segoe UI", 15, "bold"), text_color=COLORS["primary"])
+        lbl_mid.pack(side="right", padx=5)
+
+        # Table Toolbar for imports & number edit
+        tbl_toolbar = ctk.CTkFrame(col_mid, fg_color="transparent", height=32)
+        tbl_toolbar.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 5))
+
+        # Import shortcut button
+        self.btn_import_shortcut = ctk.CTkButton(
+            tbl_toolbar, text="📥 استيراد الأرقام", font=("Segoe UI", 11, "bold"),
+            width=110, height=28, corner_radius=6,
+            fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+            text_color=COLORS["secondary_text"],
+            command=self._open_import_dialog
+        )
+        self.btn_import_shortcut.pack(side="right", padx=5)
+
+        # Number Generator shortcut
+        self.btn_gen_shortcut = ctk.CTkButton(
+            tbl_toolbar, text="🧮 مولد الأرقام", font=("Segoe UI", 11),
+            width=95, height=28, corner_radius=6,
+            fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+            text_color=COLORS["secondary_text"],
+            command=self._open_number_generator
+        )
+        self.btn_gen_shortcut.pack(side="right", padx=5)
+
+        # Hamburger Menu for import options
+        self.btn_tbl_menu = ctk.CTkButton(
+            tbl_toolbar, text="☰", font=("Segoe UI", 14),
+            width=30, height=28, corner_radius=6,
+            fg_color="transparent", hover_color=COLORS["bg_dark"],
+            text_color=COLORS["text_main"],
+            command=self._show_import_popup_menu
+        )
+        self.btn_tbl_menu.pack(side="left", padx=2)
+
+        # Delete selected number button
+        self.btn_tbl_del = ctk.CTkButton(
+            tbl_toolbar, text="-", font=("Segoe UI", 16, "bold"),
+            width=30, height=28, corner_radius=6,
+            fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+            text_color="#FFFFFF",
+            command=self._remove_selected_table_number
+        )
+        self.btn_tbl_del.pack(side="left", padx=2)
+
+        # Add manual number button
+        self.btn_tbl_add = ctk.CTkButton(
+            tbl_toolbar, text="+", font=("Segoe UI", 14, "bold"),
+            width=30, height=28, corner_radius=6,
+            fg_color=COLORS["success"], hover_color=COLORS["primary_hover"],
+            text_color="#000000",
+            command=self._add_manual_number_dialog
+        )
+        self.btn_tbl_add.pack(side="left", padx=2)
+
+        # Secret hidden contacts entry for full backwards compatibility
+        self.contacts_entry = ctk.CTkEntry(col_mid, width=1)
+        self.contacts_entry.grid(row=0, column=0, sticky="w", padx=5)
+        self.contacts_entry.grid_remove()  # Hidden but instantiated!
+
+        # Numbers Treeview Table
+        table_frame = ctk.CTkFrame(col_mid, fg_color="transparent")
+        table_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=5)
+        
+        columns = ("name", "phone", "var1", "status")
+        self.progress_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15)
+        self.progress_tree.heading("name", text="الاسم")
+        self.progress_tree.heading("phone", text="الرقم")
+        self.progress_tree.heading("var1", text="المتغير 1")
+        self.progress_tree.heading("status", text="الحالة")
+        
+        self.progress_tree.column("name", width=120, anchor="e")
+        self.progress_tree.column("phone", width=120, anchor="center")
+        self.progress_tree.column("var1", width=90, anchor="e")
+        self.progress_tree.column("status", width=70, anchor="center")
+        
+        self.progress_tree.tag_configure("pending", foreground=COLORS["text_muted"])
+        self.progress_tree.tag_configure("sending", foreground=COLORS["accent"])
+        self.progress_tree.tag_configure("success", foreground=COLORS["success"])
+        self.progress_tree.tag_configure("failed", foreground=COLORS["danger"])
+        self.progress_tree.tag_configure("invalid", foreground=COLORS["warning"])
+        
+        tbl_scroll = ctk.CTkScrollbar(table_frame, command=self.progress_tree.yview)
+        self.progress_tree.configure(yscrollcommand=tbl_scroll.set)
+        tbl_scroll.pack(side="right", fill="y")
+        self.progress_tree.pack(side="left", fill="both", expand=True)
+
+        # Right-click context menu for Numbers Table
+        from tkinter import Menu
+        self.numbers_context_menu = Menu(self, tearoff=0)
+        self.numbers_context_menu.add_command(label="📥 استيراد من ملف...", command=self._open_import_dialog)
+        self.numbers_context_menu.add_command(label="✍️ استيراد يدوي (متعدد)...", command=self._add_bulk_manual_numbers_dialog)
+        self.numbers_context_menu.add_separator()
+        self.numbers_context_menu.add_command(label="🗑️ مسح القائمة بالكامل", command=self._clear_numbers_table)
+        
+        self.progress_tree.bind("<Button-3>", self._show_numbers_context_menu)
+
+        # Stats footer for numbers
+        self.total_counts_label = ctk.CTkLabel(
+            col_mid, text="مجموعات: 0 | جهات الاتصال: 0 | Total: 0",
+            font=("Segoe UI", 11), text_color=COLORS["text_muted"]
+        )
+        self.total_counts_label.grid(row=3, column=0, sticky="ew", padx=15, pady=(2, 2))
+
+        # Progress bar
+        self.progress_bar = ctk.CTkProgressBar(col_mid, height=8, corner_radius=4, progress_color=COLORS["primary"])
+        self.progress_bar.grid(row=4, column=0, sticky="ew", padx=15, pady=(2, 2))
+        self.progress_bar.set(0)
+
+        # Progress status and counter
+        prog_detail_frame = ctk.CTkFrame(col_mid, fg_color="transparent")
+        prog_detail_frame.grid(row=5, column=0, sticky="ew", padx=15, pady=(2, 8))
+        
+        self.status_label = ctk.CTkLabel(
+            prog_detail_frame, text="جاهز...",
+            font=("Segoe UI", 11), text_color=COLORS["text_muted"]
+        )
+        self.status_label.pack(side="right")
+        
+        self.counter_label = ctk.CTkLabel(
+            prog_detail_frame, text="✅ 0 | ❌ 0 | 🚫 0",
+            font=("Segoe UI", 11, "bold"), text_color=COLORS["primary"]
+        )
+        self.counter_label.pack(side="left")
+
+
+        # =======================================================================
+        # COLUMN 2: Right Pane (Message Editor & Attachments)
+        # =======================================================================
+        col_right = ctk.CTkFrame(frame, corner_radius=8, border_width=1, border_color=COLORS["border"])
+        col_right.grid(row=0, column=2, sticky="nsew", padx=3, pady=5)
+        col_right.grid_rowconfigure(0, weight=3)  # Message Editor
+        col_right.grid_rowconfigure(1, weight=2)  # Attachments
+        col_right.grid_columnconfigure(0, weight=1)
+
+        # --- Top sub-pane: Message Editor ---
+        pane_msg = ctk.CTkFrame(col_right, corner_radius=0, fg_color="transparent")
+        pane_msg.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        pane_msg.grid_rowconfigure(1, weight=1)
+        pane_msg.grid_columnconfigure(0, weight=1)
+
+        # Message editor tabs
+        msg_tabview = ctk.CTkTabview(pane_msg, height=220, corner_radius=8,
+                                    segmented_button_selected_color=COLORS["primary"],
+                                    segmented_button_selected_hover_color=COLORS["primary_hover"],
+                                    segmented_button_unselected_color=COLORS["secondary"],
+                                    text_color=COLORS["text_main"])
+        msg_tabview.grid(row=1, column=0, sticky="nsew", pady=2)
+        
+        tab1 = msg_tabview.add("الرسالة 1")
+        
+        # Message box editor inside tab1
+        self.message_editor = RichTextFrame(tab1, colors=COLORS, fg_color=COLORS["bg_dark"], corner_radius=8)
+        self.message_editor.pack(fill="both", expand=True)
+        self.message_textbox = self.message_editor.text_box
+        self.msg_text = self.message_textbox
+
+        # Spintax and text option checkboxes below editor
+        chk_frame = ctk.CTkFrame(pane_msg, fg_color="transparent", height=30)
+        chk_frame.grid(row=2, column=0, sticky="ew", pady=(2, 2))
 
         self.send_text_var = ctk.BooleanVar(value=True)
         ctk.CTkCheckBox(chk_frame, text="إرسال النص مع أول مرفق",
                         variable=self.send_text_var,
-                        font=ctk.CTkFont(size=12)).pack(side="right", padx=5)
-
-        self.bg_mode_var = ctk.BooleanVar(value=False)
-        ctk.CTkCheckBox(chk_frame, text="🖥️ تشغيل في الخلفية",
-                        variable=self.bg_mode_var,
-                        font=ctk.CTkFont(size=12)).pack(side="right", padx=5)
+                        font=("Segoe UI", 11)).pack(side="right", padx=5)
 
         self.spin_text_var = ctk.BooleanVar(value=self.config.get("enable_spintax", True))
         ctk.CTkCheckBox(chk_frame, text="🎲 تدوير النص (Spintax)",
                         variable=self.spin_text_var,
-                        font=ctk.CTkFont(size=12)).pack(side="right", padx=5)
+                        font=("Segoe UI", 11)).pack(side="right", padx=5)
 
         self.preview_spintax_btn = ctk.CTkButton(
-            chk_frame,
-            text="🔍 معاينة الرسالة",
-            width=90,
-            height=26,
-            font=ctk.CTkFont(size=11, weight="bold"),
-            fg_color=COLORS["info"],
-            hover_color=COLORS["accent_hover"],
+            chk_frame, text="🔍 معاينة",
+            width=70, height=24, font=("Segoe UI", 11, "bold"),
+            fg_color=COLORS["info"], hover_color=COLORS["accent_hover"],
             command=self._test_spintax
         )
         self.preview_spintax_btn.pack(side="left", padx=5)
 
-        # RIGHT: Controls + Progress
-        right = ctk.CTkFrame(body, corner_radius=12, fg_color=COLORS["card_bg"])
-        right.grid(row=0, column=1, padx=(8, 0), pady=5, sticky="nsew")
+        # --- Bottom sub-pane: Attachments ---
+        pane_atts = ctk.CTkFrame(col_right, corner_radius=0, fg_color="transparent")
+        pane_atts.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        pane_atts.grid_rowconfigure(1, weight=1)
+        pane_atts.grid_columnconfigure(0, weight=1)
 
-        ctrl_label = ctk.CTkLabel(right, text="🎛️ التحكم", font=ctk.CTkFont(size=14, weight="bold"))
-        ctrl_label.pack(anchor="e", padx=15, pady=4)
+        # Attachment header
+        hdr_atts = ctk.CTkFrame(pane_atts, fg_color="transparent", height=30)
+        hdr_atts.grid(row=0, column=0, sticky="ew", pady=(2, 2))
+        
+        lbl_atts = ctk.CTkLabel(hdr_atts, text="📎 إرفاق الملفات والصور", font=("Segoe UI", 13, "bold"), text_color=COLORS["primary"])
+        lbl_atts.pack(side="right", padx=5)
 
-        # Status Card (Glow effect)
-        self.status_card = ctk.CTkFrame(right, corner_radius=10, fg_color=COLORS["bg_dark"], height=46)
-        self.status_card.pack(fill="x", padx=15, pady=(0, 15))
-        self.status_card.pack_propagate(False)
-
-        self.status_indicator = ctk.CTkLabel(self.status_card, text="●", font=("Segoe UI", 20), text_color=COLORS["danger"])
-        self.status_indicator.pack(side="right", padx=(15, 5), pady=8)
-
-        self.session_status_label = ctk.CTkLabel(
-            self.status_card,
-            text="الحالة: غير متصل",
-            font=("Segoe UI", 13, "bold"),
+        # Hamburger Menu on the right for attachments
+        self.btn_atts_menu = ctk.CTkButton(
+            hdr_atts, text="☰", font=("Segoe UI", 12),
+            width=26, height=24, corner_radius=4,
+            fg_color="transparent", hover_color=COLORS["bg_dark"],
             text_color=COLORS["text_main"],
-            anchor="e"
+            command=self._show_attachments_popup_menu
         )
-        self.session_status_label.pack(side="right", padx=(0, 15), pady=8)
+        self.btn_atts_menu.pack(side="left", padx=2)
 
-        ctrl_frame = ctk.CTkFrame(right, fg_color="transparent")
-        ctrl_frame.pack(fill="x", padx=15, pady=(0, 10))
-        ctrl_frame.grid_columnconfigure((0, 1), weight=1)
+        # Attachment list manager
+        self.attachment_manager = AttachmentManager(pane_atts, colors=COLORS, fg_color=COLORS["card_bg"], corner_radius=8)
+        self.attachment_manager.grid(row=1, column=0, sticky="nsew", pady=2)
 
-        # 1. Login
-        self.btn_login = ctk.CTkButton(ctrl_frame, text="🔑 فتح واتساب (Login)",
-                                       font=("Segoe UI", 13, "bold"),
-                                       height=42,
-                                       fg_color=COLORS["secondary"],
-                                       hover_color=COLORS["secondary_hover"],
-                                       text_color=COLORS["secondary_text"],
-                                       command=self._login_action)
-        self.btn_login.grid(row=0, column=1, padx=(5, 0), pady=(0, 10), sticky="ew")
 
-        # 2. Start
-        self.btn_start = ctk.CTkButton(ctrl_frame, text="🚀 بدء الإرسال",
-                                       font=("Segoe UI", 14, "bold"),
-                                       height=42,
-                                       fg_color=COLORS["primary"],
-                                       text_color="#000000",
-                                       hover_color=COLORS["primary_hover"],
-                                       command=self._start_action)
-        self.btn_start.grid(row=0, column=0, padx=(0, 5), pady=(0, 10), sticky="ew")
-
-        # 3. Stop
-        self.btn_stop = ctk.CTkButton(ctrl_frame, text="🛑 إيقاف مؤقت",
-                                      font=("Segoe UI", 13, "bold"),
-                                      height=38,
-                                      fg_color=COLORS["danger"],
-                                      hover_color=COLORS["danger_hover"],
-                                      text_color="#FFFFFF",
-                                      state="disabled",
-                                      command=self._stop_action)
-        self.btn_stop.grid(row=1, column=1, padx=(5, 0), pady=(0, 10), sticky="ew")
-
-        # 4. Check Numbers
-        self.btn_check = ctk.CTkButton(ctrl_frame, text="🔍 فحص الأرقام فقط",
-                                       font=("Segoe UI", 12, "bold"),
-                                       height=38,
-                                       fg_color=COLORS["info"],
-                                       hover_color=COLORS["accent_hover"],
-                                       command=self._check_numbers_action)
-        self.btn_check.grid(row=1, column=0, padx=(0, 5), pady=(0, 10), sticky="ew")
-
-        self.use_valid_after_check_var = ctk.BooleanVar(value=self.config.get("use_valid_after_check", False))
-        ctk.CTkCheckBox(ctrl_frame, text="استخدم الصالح فقط بعد الفحص",
-                        variable=self.use_valid_after_check_var,
-                        font=ctk.CTkFont(size=11)).grid(row=2, column=0, columnspan=2, padx=5, pady=(0, 10), sticky="e")
-
-        # -- Workflow --
-        wf_label = ctk.CTkLabel(right, text="🧭 سير العمل", font=ctk.CTkFont(size=13, weight="bold"))
-        wf_label.pack(anchor="e", padx=15, pady=(4, 4))
-
-        wf_row = ctk.CTkFrame(right, fg_color="transparent")
-        wf_row.pack(fill="x", padx=15, pady=(0, 4))
-
-        self.use_workflow_var = ctk.BooleanVar(value=self.config.get("use_workflow", False))
-        ctk.CTkCheckBox(wf_row, text="تفعيل", variable=self.use_workflow_var,
-                        font=ctk.CTkFont(size=11)).pack(side="right", padx=4)
-
-        self.workflow_var = ctk.StringVar(value=self.config.get("last_workflow", ""))
-        self.workflow_menu = ctk.CTkOptionMenu(
-            wf_row,
-            values=self._get_workflow_names(),
-            variable=self.workflow_var,
-            width=160,
-            height=28,
-            fg_color=COLORS["card_bg"],
-            button_color=COLORS["primary"],
-            button_hover_color=COLORS["primary_hover"],
-            text_color=COLORS["text_main"],
-            dropdown_fg_color=COLORS["card_bg"],
-            dropdown_text_color=COLORS["text_main"],
-        )
-        self.workflow_menu.pack(side="left", padx=4)
-
-        ctk.CTkButton(right, text="⚙️ إدارة سير العمل", height=28,
-                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
-                      text_color=COLORS["secondary_text"],
-                      font=ctk.CTkFont(size=11, weight="bold"),
-                      command=lambda: self._switch_tab("workflows")).pack(fill="x", padx=15, pady=(0, 10))
-
-        # -- Scheduling --
-        sched_label = ctk.CTkLabel(right, text="🕒 جدولة الإرسال", font=ctk.CTkFont(size=13, weight="bold"))
-        sched_label.pack(anchor="e", padx=15, pady=(12, 5))
-
-        sched_row = ctk.CTkFrame(right, fg_color="transparent")
-        sched_row.pack(fill="x", padx=15, pady=2)
-
-        ctk.CTkLabel(sched_row, text="التاريخ:", font=ctk.CTkFont(size=11)).pack(side="right", padx=(3, 0))
-        self.sched_date_entry = ctk.CTkEntry(sched_row, width=95, height=30, corner_radius=6,
-                                             placeholder_text="YYYY-MM-DD", justify="center",
-                                             font=ctk.CTkFont(size=11))
-        self.sched_date_entry.pack(side="right", padx=3)
-
-        ctk.CTkLabel(sched_row, text="الوقت:", font=ctk.CTkFont(size=11)).pack(side="right", padx=(3, 0))
-        self.sched_time_entry = ctk.CTkEntry(sched_row, width=60, height=30, corner_radius=6,
-                                             placeholder_text="HH:MM", justify="center",
-                                             font=ctk.CTkFont(size=11))
-        self.sched_time_entry.pack(side="right", padx=3)
-
-        sched_btn_row = ctk.CTkFrame(right, fg_color="transparent")
-        sched_btn_row.pack(fill="x", padx=15, pady=3)
-        self.btn_schedule = ctk.CTkButton(sched_btn_row, text="⏰ جدولة", width=90, height=32,
-                                          fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
-                                          font=ctk.CTkFont(size=12, weight="bold"),
-                                          command=self._schedule_send)
-        self.btn_schedule.pack(side="right", padx=3)
-        self.btn_cancel_sched = ctk.CTkButton(sched_btn_row, text="❌ إلغاء", width=80, height=32,
-                                              fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
-                                              font=ctk.CTkFont(size=11),
-                                              state="disabled",
-                                              command=self._cancel_schedule)
-        self.btn_cancel_sched.pack(side="right", padx=3)
-
-        self.sched_status_label = ctk.CTkLabel(right, text="", font=ctk.CTkFont(size=11),
-                                               text_color=COLORS["accent"])
-        self.sched_status_label.pack(anchor="e", padx=15, pady=(0, 3))
-
-        # -- Progress --
-        prog_label = ctk.CTkLabel(right, text="📊 التقدم", font=ctk.CTkFont(size=13, weight="bold"))
-        prog_label.pack(anchor="e", padx=15, pady=(10, 5))
-
-        self.progress_bar = ctk.CTkProgressBar(right, height=14, corner_radius=7,
-                                               progress_color=COLORS["primary"])
-        self.progress_bar.pack(fill="x", padx=15, pady=5)
-        self.progress_bar.set(0)
-
-        self.status_label = ctk.CTkLabel(right, text="جاهز...",
-                                         font=ctk.CTkFont(size=12),
-                                         text_color=COLORS["text_muted"])
-        self.status_label.pack(anchor="e", padx=15, pady=(2, 5))
-
-        # -- Quick Counters --
-        counter_frame = ctk.CTkFrame(right, fg_color="transparent")
-        counter_frame.pack(fill="x", padx=15, pady=(5, 5))
-        self.counter_label = ctk.CTkLabel(counter_frame, text="✅ 0 | ❌ 0 | 🚫 0",
-                                          font=ctk.CTkFont(size=14, weight="bold"))
-        self.counter_label.pack()
-        self.total_counts_label = ctk.CTkLabel(counter_frame, text="الإجمالي: 0 | جهات: 0 | مجموعات: 0",
-                                               font=ctk.CTkFont(size=11),
-                                               text_color=COLORS["text_muted"])
-        self.total_counts_label.pack()
-
-        # -- Error Codes Button --
-        ctk.CTkButton(right, text="📖 أكواد الأخطاء",
-                      font=ctk.CTkFont(size=12),
-                      fg_color=COLORS["accent"],
-                      hover_color=COLORS["accent_hover"],
-                      height=34, corner_radius=8,
-                      command=self._show_error_codes).pack(fill="x", padx=15, pady=(8, 12))
 
     # ─── Groups Tab ───────────────────────────────────────────────────────
     def _build_tab_groups(self):
@@ -1235,21 +1423,25 @@ class ModernWhatsAppApp(ctk.CTk):
             self._update_contact_count(path)
 
     def _update_contact_count(self, path=None):
-        """Update contact count label when a file is selected."""
+        """Update contact count label and load contacts into the numbers table."""
         try:
             if not path:
                 path = self.contacts_entry.get()
             if not path or not os.path.exists(path):
-                self.contact_count_label.configure(text="")
                 return
             from utils.helpers import read_contacts_auto
             contacts = read_contacts_auto(path, default_country_code=self.config.get("default_country_code", "20"))
-            count = len(contacts)
-            self.contact_count_label.configure(
-                text=f"📊 {count} جهة اتصال" if count > 0 else "⚠️ لا توجد جهات اتصال"
-            )
-        except Exception:
-            self.contact_count_label.configure(text="")
+            
+            # Refresh the Treeview numbers table
+            self._refresh_numbers_table(contacts)
+            
+            if hasattr(self, "contact_count_label") and self.contact_count_label:
+                count = len(contacts)
+                self.contact_count_label.configure(
+                    text=f"📊 {count} جهة اتصال" if count > 0 else "⚠️ لا توجد جهات اتصال"
+                )
+        except Exception as e:
+            self.log(f"⚠️ خطأ أثناء تحديث قائمة الأرقام: {e}")
 
     def _open_import_dialog(self):
         win = ctk.CTkToplevel(self)
@@ -1360,7 +1552,8 @@ class ModernWhatsAppApp(ctk.CTk):
                         if k in hl:
                             return h
                 return "—"
-            return {
+            
+            guessed = {
                 "name": find(["name", "full", "given", "اسم", "الاسم"]),
                 "phone": find(["phone", "mobile", "number", "رقم", "هاتف", "phone 1 - value"]),
                 "var1": find(["var1", "var 1", "variable1", "v1", "custom1"]),
@@ -1369,6 +1562,63 @@ class ModernWhatsAppApp(ctk.CTk):
                 "var4": find(["var4", "var 4", "variable4", "v4", "custom4"]),
                 "var5": find(["var5", "var 5", "variable5", "v5", "custom5"]),
             }
+
+            # Smart fallback heuristics if phone is not matched by keyword
+            if guessed["phone"] == "—" and headers_list:
+                # Heuristic 1: If there is only one column in the file, it must be the phone number!
+                if len(headers_list) == 1:
+                    guessed["phone"] = headers_list[0]
+                else:
+                    # Heuristic 2: Analyze the preview rows to find the column that looks like phone numbers.
+                    best_col = None
+                    max_phone_score = 0
+                    for col_idx, col_name in enumerate(headers_list):
+                        score = 0
+                        # Check up to 10 rows in preview
+                        for r in preview_rows[:10]:
+                            if col_idx < len(r):
+                                val = str(r[col_idx]).strip()
+                                # Clean value from common formatting like +, -, spaces
+                                val_clean = val.replace("+", "").replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
+                                # Phone number is typically numeric, length between 7 and 15
+                                if val_clean.isdigit() and 7 <= len(val_clean) <= 15:
+                                    score += 1
+                        if score > max_phone_score:
+                            max_phone_score = score
+                            best_col = col_name
+                    
+                    if best_col:
+                        guessed["phone"] = best_col
+                    else:
+                        # Heuristic 3: Check if the header itself looks like a phone number
+                        for col_name in headers_list:
+                            val_clean = str(col_name).strip().replace("+", "").replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
+                            if val_clean.isdigit() and 7 <= len(val_clean) <= 15:
+                                guessed["phone"] = col_name
+                                break
+
+            # Smart fallback for name
+            if guessed["name"] == "—" and headers_list:
+                # If there are multiple columns and one is already guessed as phone,
+                # let's guess the other column as name if it's not phone and not already matched.
+                for col in headers_list:
+                    if col != guessed["phone"] and col not in [guessed["var1"], guessed["var2"], guessed["var3"], guessed["var4"], guessed["var5"]]:
+                        # A column containing non-digit values is likely a name
+                        alpha_score = 0
+                        for r in preview_rows[:5]:
+                            try:
+                                col_idx = headers_list.index(col)
+                                if col_idx < len(r):
+                                    val = str(r[col_idx]).strip()
+                                    if any(c.isalpha() for c in val) and not val.replace("+","").replace("-","").isdigit():
+                                        alpha_score += 1
+                            except:
+                                pass
+                        if alpha_score >= 2:
+                            guessed["name"] = col
+                            break
+                            
+            return guessed
 
         def _render_preview():
             for w in preview_list.winfo_children():
@@ -1556,6 +1806,7 @@ class ModernWhatsAppApp(ctk.CTk):
             self.contacts_entry.insert(0, filepath)
             self.config.set("last_contacts_file", filepath)
             self.config.save()
+            self._update_contact_count(filepath)
 
             messagebox.showinfo("تم", f"تم الاستيراد: {len(contacts)} رقم\nغير صالح: {invalid}")
             win.destroy()
@@ -2174,6 +2425,87 @@ class ModernWhatsAppApp(ctk.CTk):
     # ═══════════════════════════════════════════════════════════════════════
     #  SCHEDULING
     # ═══════════════════════════════════════════════════════════════════════
+    def _schedule_action(self):
+        import tkinter as tk
+        # Open a beautiful modern top-level dialog to select Date and Time
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("جدولة الإرسال")
+        dialog.geometry("340x260")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        # Center dialog
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 340) // 2
+        y = self.winfo_y() + (self.winfo_height() - 260) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        # Set appearance of dialog
+        dialog.configure(fg_color=COLORS["bg_dark"])
+
+        lbl_title = ctk.CTkLabel(dialog, text="📅 جدولة حملة إرسال جديدة", font=("Segoe UI", 14, "bold"), text_color=COLORS["primary"])
+        lbl_title.pack(pady=(15, 10))
+
+        lbl_desc = ctk.CTkLabel(dialog, text="يرجى تحديد تاريخ ووقت بدء الحملة بالصيغة الموضحة:", font=("Segoe UI", 11), text_color=COLORS["text_muted"])
+        lbl_desc.pack(pady=(0, 15))
+
+        # Fields frame
+        fields_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        fields_frame.pack(padx=20, fill="x")
+
+        # Date Entry
+        date_frame = ctk.CTkFrame(fields_frame, fg_color="transparent")
+        date_frame.pack(fill="x", pady=4)
+        ctk.CTkLabel(date_frame, text="التاريخ (YYYY-MM-DD):", font=("Segoe UI", 11, "bold"), width=120, anchor="w").pack(side="left")
+        
+        today_str = datetime.date.today().strftime("%Y-%m-%d")
+        date_entry = ctk.CTkEntry(date_frame, placeholder_text="YYYY-MM-DD", width=140, height=28)
+        date_entry.insert(0, today_str)
+        date_entry.pack(side="right")
+
+        # Time Entry
+        time_frame = ctk.CTkFrame(fields_frame, fg_color="transparent")
+        time_frame.pack(fill="x", pady=4)
+        ctk.CTkLabel(time_frame, text="الوقت (HH:MM):", font=("Segoe UI", 11, "bold"), width=120, anchor="w").pack(side="left")
+        
+        now_plus_hour = (datetime.datetime.now() + datetime.timedelta(hours=1)).strftime("%H:%M")
+        time_entry = ctk.CTkEntry(time_frame, placeholder_text="HH:MM", width=140, height=28)
+        time_entry.insert(0, now_plus_hour)
+        time_entry.pack(side="right")
+
+        def on_schedule():
+            date_val = date_entry.get().strip()
+            time_val = time_entry.get().strip()
+            if not date_val or not time_val:
+                messagebox.showwarning("تنبيه", "يرجى ملء جميع الحقول.", parent=dialog)
+                return
+            try:
+                target = datetime.datetime.strptime(f"{date_val} {time_val}", "%Y-%m-%d %H:%M")
+                if target <= datetime.datetime.now():
+                    messagebox.showwarning("تنبيه", "يرجى تحديد وقت وتاريخ في المستقبل.", parent=dialog)
+                    return
+            except ValueError:
+                messagebox.showerror("خطأ", "صيغة التاريخ أو الوقت غير صحيحة.\nمثال: 2026-05-21 15:30", parent=dialog)
+                return
+
+            # Set the values in our backward compatibility entries
+            self.sched_date_entry.delete(0, "end")
+            self.sched_date_entry.insert(0, date_val)
+            self.sched_time_entry.delete(0, "end")
+            self.sched_time_entry.insert(0, time_val)
+
+            # Close dialog and trigger scheduling
+            dialog.destroy()
+            self._schedule_send()
+
+        # Buttons
+        btns_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        btns_frame.pack(pady=20, fill="x", padx=20)
+
+        ctk.CTkButton(btns_frame, text="إلغاء", width=80, fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"], text_color=COLORS["text_main"], command=dialog.destroy).pack(side="left")
+        ctk.CTkButton(btns_frame, text="✅ تأكيد الجدولة", width=140, fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"], text_color="#000000", font=("Segoe UI", 11, "bold"), command=on_schedule).pack(side="right")
+
     def _schedule_send(self):
         date_str = self.sched_date_entry.get().strip()
         time_str = self.sched_time_entry.get().strip()
@@ -2472,7 +2804,7 @@ class ModernWhatsAppApp(ctk.CTk):
         if self.progress_win and self.progress_win.winfo_exists():
             self.progress_win.destroy()
         self.progress_win = None
-        self.progress_tree = None
+        self.popup_progress_tree = None
         self.progress_count_label = None
         self.progress_status_label = None
         self.progress_bar_small = None
@@ -2512,7 +2844,15 @@ class ModernWhatsAppApp(ctk.CTk):
     #  BOT ACTIONS
     # ═══════════════════════════════════════════════════════════════════════
     def _login_action(self):
+        # Check if the bot exists and the driver is actively open (has windows)
+        is_active = False
         if self.bot and self.bot.driver:
+            try:
+                is_active = len(self.bot.driver.window_handles) > 0
+            except Exception:
+                is_active = False
+
+        if is_active:
             self.bot.background_mode = False
             self.bot.bring_to_front()
             if self.bot.is_logged_in():
@@ -2692,33 +3032,51 @@ class ModernWhatsAppApp(ctk.CTk):
         return msg_template, attachments
 
     def _get_contacts_from_input(self):
-        contacts_input = self.contacts_entry.get().strip()
-        contacts = []
-
-        # 1. Check Group
-        if contacts_input.startswith("[GROUP:") and contacts_input.endswith("]"):
-            group_name = contacts_input[7:-1]
-            g = self.contacts_mgr.get_by_name(group_name)
-            if not g or not g.get("contacts"):
-                self.report_error("ERR-03", f"المجموعة '{group_name}' فارغة أو غير موجودة.", dialog=True)
+        # Retrieve contacts directly from our progress_tree Treeview!
+        children = self.progress_tree.get_children()
+        if not children:
+            contacts_input = self.contacts_entry.get().strip()
+            if not contacts_input:
+                self.report_error("ERR-05", "يرجى استيراد أو إدخال أرقام أولاً.", dialog=True)
                 return None
-            contacts = g["contacts"]
-            self.log(f"تم اختيار المجموعة: {group_name} ({len(contacts)} جهة اتصال)")
-            self._update_total_counts(total=len(contacts), contacts_count=len(contacts), groups_count=1)
-            return contacts
-
-        # 2. Check File
-        if contacts_input and os.path.exists(contacts_input):
-            contacts = read_contacts_auto(contacts_input, default_country_code=self.config.get("default_country_code", "20"))
+            
+            # Standard fallback (file or group loading)
+            contacts = []
+            if contacts_input.startswith("[GROUP:") and contacts_input.endswith("]"):
+                group_name = contacts_input[7:-1]
+                g = self.contacts_mgr.get_by_name(group_name)
+                if not g or not g.get("contacts"):
+                    self.report_error("ERR-03", f"المجموعة '{group_name}' فارغة أو غير موجودة.", dialog=True)
+                    return None
+                contacts = g["contacts"]
+            elif os.path.exists(contacts_input):
+                from utils.helpers import read_contacts_auto
+                contacts = read_contacts_auto(contacts_input, default_country_code=self.config.get("default_country_code", "20"))
+            
             if not contacts:
-                self.report_error("ERR-06", "الملف فارغ أو لا يحتوي على أرقام صحيحة.", dialog=True)
+                self.report_error("ERR-05", "يرجى استيراد أرقام صحيحة أولاً.", dialog=True)
                 return None
-            self.log(f"تم تحميل {len(contacts)} جهة اتصال من الملف.")
-            self._update_total_counts(total=len(contacts), contacts_count=len(contacts), groups_count=0)
-            return contacts
+            
+            # Load these fallback contacts into the Treeview
+            self._refresh_numbers_table(contacts)
+            children = self.progress_tree.get_children()
 
-        self.report_error("ERR-05", "يرجى اختيار ملف أرقام صحيح أو مجموعة.", dialog=True)
-        return None
+        contacts = []
+        for item in children:
+            vals = self.progress_tree.item(item, "values")
+            if len(vals) >= 2:
+                name = vals[0]
+                phone = vals[1]
+                var1 = vals[2] if len(vals) > 2 else ""
+                contacts.append({
+                    "name": name,
+                    "phone": phone,
+                    "var1": var1,
+                    "tree_item_id": item # Storing item ID for live updates!
+                })
+        
+        self.log(f"📋 تم جلب {len(contacts)} جهة اتصال جاهزة للإرسال.")
+        return contacts
 
     def _log_preflight(self, contacts, msg_template, attachments):
         msg_len = len(msg_template) if msg_template else 0
@@ -3309,17 +3667,26 @@ class ModernWhatsAppApp(ctk.CTk):
                 eta = (elapsed / processed) * (total - processed)
             self._update_progress_header_blind(processed, total, phone, name, eta)
 
+            # Mark row as sending in the Treeview table live!
+            tree_item_id = c.get("tree_item_id")
+            if tree_item_id:
+                self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "🔄 إرسال..."), tags=("sending",)))
+
             if not phone:
                 self.invalid += 1
                 self.results_log.append({"phone": "N/A", "name": name, "status": "INVALID", "error_code": "ERR-00", "timestamp": datetime.datetime.now()})
                 self._add_progress_row_blind(["N/A", name, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "بدون رقم", "بيانات الرقم ناقصة"], tag="invalid")
                 self._run_on_ui(self._update_stats)
                 self._update_progress_header_blind(processed, total, phone, name, eta)
+                if tree_item_id:
+                    self._run_on_ui(lambda item=tree_item_id, n=name, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, "N/A", v, "🚫 بدون رقم"), tags=("invalid",)))
                 continue
 
             # Ensure still logged in
             if not self.bot.is_logged_in():
                 self.report_error("ERR-21", dialog=True, level="warning")
+                if tree_item_id:
+                    self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "⏳ معلق"), tags=("pending",)))
                 break
 
             # Prepare personalized content
@@ -3359,15 +3726,21 @@ class ModernWhatsAppApp(ctk.CTk):
                 self.results_log.append({"phone": phone, "name": name, "status": "نجاح", "error_code": "-", "timestamp": timestamp})
                 self._add_progress_row_blind([phone, name, timestamp, "تم", "تم الإرسال"], tag="success")
                 consecutive_failures = 0
+                if tree_item_id:
+                    self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "✅ نجاح"), tags=("success",)))
             elif res == "INVALID":
                 self.invalid += 1
                 self.log(f"🚫 [ERR-20] الرقم {phone} غير صحيح.")
                 self.results_log.append({"phone": phone, "name": name, "status": "بدون واتساب", "error_code": "ERR-20", "timestamp": timestamp})
                 self._add_progress_row_blind([phone, name, timestamp, "بدون واتساب", "الرقم غير صالح أو لا يستخدم واتساب"], tag="invalid")
                 consecutive_failures = 0
+                if tree_item_id:
+                    self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "🚫 غير صالح"), tags=("invalid",)))
             elif res == "STOPPED":
                 self.results_log.append({"phone": phone, "name": name, "status": "توقف", "error_code": "-", "timestamp": timestamp})
                 self._add_progress_row_blind([phone, name, timestamp, "توقف", "تم إيقاف العملية"], tag="stopped")
+                if tree_item_id:
+                    self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "⚠️ توقف"), tags=("pending",)))
                 break
             else:
                 self.failed += 1
@@ -3376,6 +3749,8 @@ class ModernWhatsAppApp(ctk.CTk):
                 self.results_log.append({"phone": phone, "name": name, "status": "فشل", "error_code": err_code, "timestamp": timestamp})
                 self._add_progress_row_blind([phone, name, timestamp, "فشل", str(res)], tag="failed")
                 consecutive_failures += 1
+                if tree_item_id:
+                    self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "❌ فشل"), tags=("failed",)))
                 if consecutive_failures >= max_consecutive_failures:
                     self.log(f"⛔ تم الإيقاف تلقائياً بعد {consecutive_failures} فشل متتالي لتقليل المخاطر.")
                     self.stop_event.set()
@@ -3730,19 +4105,19 @@ class ModernWhatsAppApp(ctk.CTk):
             table_frame.pack(fill="both", expand=True, padx=15, pady=(0, 10))
 
             columns = ("phone", "name", "date", "status", "message")
-            self.progress_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15)
+            self.popup_progress_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15)
             
-            self.progress_tree.heading("phone", text="الرقم")
-            self.progress_tree.heading("name", text="الاسم / الخطوة")
-            self.progress_tree.heading("date", text="الوقت")
-            self.progress_tree.heading("status", text="الحالة")
-            self.progress_tree.heading("message", text="التفاصيل")
+            self.popup_progress_tree.heading("phone", text="الرقم")
+            self.popup_progress_tree.heading("name", text="الاسم / الخطوة")
+            self.popup_progress_tree.heading("date", text="الوقت")
+            self.popup_progress_tree.heading("status", text="الحالة")
+            self.popup_progress_tree.heading("message", text="التفاصيل")
             
-            self.progress_tree.column("phone", width=190, anchor="w")
-            self.progress_tree.column("name", width=180, anchor="w")
-            self.progress_tree.column("date", width=150, anchor="center")
-            self.progress_tree.column("status", width=120, anchor="center")
-            self.progress_tree.column("message", width=360, anchor="w")
+            self.popup_progress_tree.column("phone", width=190, anchor="w")
+            self.popup_progress_tree.column("name", width=180, anchor="w")
+            self.popup_progress_tree.column("date", width=150, anchor="center")
+            self.popup_progress_tree.column("status", width=120, anchor="center")
+            self.popup_progress_tree.column("message", width=360, anchor="w")
 
             # Styling the Treeview
             style = ttk.Style(self.progress_win)
@@ -3768,15 +4143,15 @@ class ModernWhatsAppApp(ctk.CTk):
             style.map("Treeview", background=[("selected", COLORS["primary"])], foreground=[("selected", "black")])
 
             # Tags for coloring rows (Text color)
-            self.progress_tree.tag_configure("success", foreground="#00E676") # Green
-            self.progress_tree.tag_configure("failed", foreground="#FF3D00")  # Red
-            self.progress_tree.tag_configure("waiting", foreground=COLORS["text_muted"])
-            self.progress_tree.tag_configure("invalid", foreground="#FFA500") # Orange
-            self.progress_tree.tag_configure("stopped", foreground=COLORS["info"])
+            self.popup_progress_tree.tag_configure("success", foreground="#00E676") # Green
+            self.popup_progress_tree.tag_configure("failed", foreground="#FF3D00")  # Red
+            self.popup_progress_tree.tag_configure("waiting", foreground=COLORS["text_muted"])
+            self.popup_progress_tree.tag_configure("invalid", foreground="#FFA500") # Orange
+            self.popup_progress_tree.tag_configure("stopped", foreground=COLORS["info"])
 
-            tree_scroll = ctk.CTkScrollbar(table_frame, command=self.progress_tree.yview)
-            self.progress_tree.configure(yscrollcommand=tree_scroll.set)
-            self.progress_tree.pack(side="left", fill="both", expand=True, padx=2, pady=2)
+            tree_scroll = ctk.CTkScrollbar(table_frame, command=self.popup_progress_tree.yview)
+            self.popup_progress_tree.configure(yscrollcommand=tree_scroll.set)
+            self.popup_progress_tree.pack(side="left", fill="both", expand=True, padx=2, pady=2)
             tree_scroll.pack(side="right", fill="y", padx=2, pady=2)
 
             # 3. Footer Controls
@@ -3819,8 +4194,8 @@ class ModernWhatsAppApp(ctk.CTk):
         new_values[0] = f"{icon}{new_values[0]}"
         
         def _do():
-            if self.progress_tree:
-                self.progress_tree.insert("", "0", values=new_values, tags=(tag,))
+            if self.popup_progress_tree:
+                self.popup_progress_tree.insert("", "0", values=new_values, tags=(tag,))
         self._run_on_ui(_do)
 
     def _update_progress_header_blind(self, processed, total, current_phone=None, current_name=None, eta=None, status_text=None):
@@ -3952,4 +4327,534 @@ class ModernWhatsAppApp(ctk.CTk):
         
         self.fp_res_entry.delete(0, "end")
         self.fp_res_entry.insert(0, fp["resolution"])
+
+    # ═══════════════════════════════════════════════════════════════════════
+    #  AUTO RESPONDER ACTIONS & LOGIC
+    # ═══════════════════════════════════════════════════════════════════════
+    def _load_ar_rules(self):
+        import json
+        self.ar_rules = []
+        rules_path = os.path.join(os.getcwd(), "data", "auto_reply_rules.json")
+        os.makedirs(os.path.dirname(rules_path), exist_ok=True)
+        if os.path.exists(rules_path):
+            try:
+                with open(rules_path, "r", encoding="utf-8") as f:
+                    self.ar_rules = json.load(f)
+            except Exception:
+                self.ar_rules = []
+        
+        # Fallback default rules if empty
+        if not self.ar_rules:
+            self.ar_rules = [
+                {"rule_name": "ترحيب", "keywords": "مرحبا, سلام, هلا", "reply": "أهلاً بك! كيف يمكنني مساعدتك اليوم؟", "enabled": True},
+                {"rule_name": "الأسعار", "keywords": "سعر, اسعار, بكم", "reply": "أسعار باقاتنا تبدأ من 20 دولار شهرياً فقط. لمزيد من التفاصيل يرجى التواصل معنا.", "enabled": True},
+                {"rule_name": "العروض", "keywords": "عرض, خصم, كود", "reply": "لدينا عرض خاص حالياً خصم 20% باستخدام الكود SAVE20!", "enabled": True}
+            ]
+            self._save_ar_rules()
+
+    def _save_ar_rules(self):
+        import json
+        rules_path = os.path.join(os.getcwd(), "data", "auto_reply_rules.json")
+        try:
+            with open(rules_path, "w", encoding="utf-8") as f:
+                json.dump(self.ar_rules, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            self.log(f"⚠️ خطأ أثناء حفظ قواعد الرد الآلي: {e}")
+
+    def _populate_ar_rules_table(self):
+        # Clear
+        for item in self.ar_rules_tree.get_children():
+            self.ar_rules_tree.delete(item)
+        # Populate
+        for rule in self.ar_rules:
+            status = "✅ نشط" if rule.get("enabled", True) else "❌ معطل"
+            self.ar_rules_tree.insert("", "end", values=(rule.get("rule_name"), rule.get("keywords"), status))
+
+    def _add_ar_rule_dialog(self):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("إضافة قاعدة رد آلي")
+        dialog.geometry("380x300")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        # Center
+        x = self.winfo_x() + (self.winfo_width() - 380) // 2
+        y = self.winfo_y() + (self.winfo_height() - 300) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        frm = ctk.CTkFrame(dialog, fg_color="transparent")
+        frm.pack(fill="both", expand=True, padx=20, pady=15)
+
+        lbl_name = ctk.CTkLabel(frm, text="اسم القاعدة (مثال: الأسعار):", font=("Segoe UI", 11))
+        lbl_name.pack(anchor="e", pady=(0, 2))
+        entry_name = ctk.CTkEntry(frm, placeholder_text="اسم القاعدة", justify="right")
+        entry_name.pack(fill="x", pady=(0, 10))
+
+        lbl_keys = ctk.CTkLabel(frm, text="الكلمات المفتاحية (مفصولة بفاصلة):", font=("Segoe UI", 11))
+        lbl_keys.pack(anchor="e", pady=(0, 2))
+        entry_keys = ctk.CTkEntry(frm, placeholder_text="مثال: سعر, بكم, تكلفة", justify="right")
+        entry_keys.pack(fill="x", pady=(0, 10))
+
+        lbl_reply = ctk.CTkLabel(frm, text="نص الرد الآلي:", font=("Segoe UI", 11))
+        lbl_reply.pack(anchor="e", pady=(0, 2))
+        entry_reply = ctk.CTkEntry(frm, placeholder_text="اكتب الرد التلقائي هنا...", justify="right")
+        entry_reply.pack(fill="x", pady=(0, 15))
+
+        def on_save():
+            name = entry_name.get().strip()
+            keys = entry_keys.get().strip()
+            reply = entry_reply.get().strip()
+            if not name or not keys or not reply:
+                self._show_dialog("warning", "خطأ", "يرجى ملء جميع الحقول المطلوبة.")
+                return
+            
+            self.ar_rules.append({
+                "rule_name": name,
+                "keywords": keys,
+                "reply": reply,
+                "enabled": True
+            })
+            self._save_ar_rules()
+            self._populate_ar_rules_table()
+            dialog.destroy()
+
+        btn_frm = ctk.CTkFrame(frm, fg_color="transparent")
+        btn_frm.pack(fill="x")
+        
+        ctk.CTkButton(
+            btn_frm, text="إلغاء", font=("Segoe UI", 11),
+            width=80, height=28, fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+            command=dialog.destroy
+        ).pack(side="left")
+        
+        ctk.CTkButton(
+            btn_frm, text="حفظ القاعدة", font=("Segoe UI", 11, "bold"),
+            width=100, height=28, fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
+            text_color="#000000",
+            command=on_save
+        ).pack(side="right")
+
+    def _delete_ar_rule(self):
+        selected = self.ar_rules_tree.selection()
+        if not selected:
+            self._show_dialog("warning", "تنبيه", "يرجى تحديد قاعدة لحذفها.")
+            return
+        for item in selected:
+            vals = self.ar_rules_tree.item(item, "values")
+            rule_name = vals[0]
+            # Remove from list
+            self.ar_rules = [r for r in self.ar_rules if r.get("rule_name") != rule_name]
+            self.ar_rules_tree.delete(item)
+        self._save_ar_rules()
+
+    def _toggle_auto_responder(self):
+        enabled = self.ar_switch_var.get()
+        self.config.set("enable_auto_responder", enabled)
+        self.config.save()
+        if enabled:
+            self.log("🤖 تم تفعيل نظام الرد الآلي التلقائي.")
+            self._start_auto_responder_thread()
+        else:
+            self.log("🤖 تم إيقاف نظام الرد الآلي التلقائي.")
+
+    def _start_auto_responder_thread(self):
+        if hasattr(self, "ar_thread") and self.ar_thread and self.ar_thread.is_alive():
+            return
+        self.ar_thread = threading.Thread(target=self._auto_responder_worker, daemon=True)
+        self.ar_thread.start()
+
+    def _auto_responder_worker(self):
+        import time
+        import random
+        from datetime import datetime
+        
+        simulation_senders = ["محمد علي", "أحمد محمود", "سارة خالد", "رائد عبد الله", "فاطمة عمر"]
+        simulation_msgs = [
+            "السلام عليكم، ممكن اعرف الاسعار؟",
+            "مرحبا يا فندم، هل في عروض حاليا؟",
+            "بكم تكلفة الاشتراك الشهري؟",
+            "عايز اعرف الخصومات المتاحة حاليا",
+            "مرحبا، هل البرنامج متوفر الآن؟"
+        ]
+
+        while self.ar_switch_var.get():
+            # 1. Real Polling via Selenium (if bot is logged in and active!)
+            if self.bot and self.bot.is_logged_in():
+                try:
+                    unread_chats = []
+                    try:
+                        unread_chats = self.bot.get_unread_chats()
+                    except Exception:
+                        pass
+                    
+                    if unread_chats:
+                        for chat in unread_chats:
+                            sender_phone = chat.get("phone")
+                            sender_name = chat.get("name") or sender_phone
+                            last_msg = chat.get("last_message", "").strip().lower()
+                            
+                            reply_text = None
+                            for rule in self.ar_rules:
+                                if not rule.get("enabled", True):
+                                    continue
+                                keywords = [k.strip().lower() for k in rule.get("keywords", "").split(",")]
+                                if any(kw in last_msg for kw in keywords if kw):
+                                    reply_text = rule.get("reply")
+                                    break
+                            
+                            if reply_text:
+                                self.bot.send_message(phone=sender_phone, name=sender_name, message_template=reply_text)
+                                timestamp = datetime.now().strftime("%H:%M:%S")
+                                self._run_on_ui(lambda t=timestamp, s=sender_name, m=last_msg: self.recv_tree.insert("", 0, values=(t, s, m)))
+                                self.log(f"🤖 [رد تلقائي] تم الرد على '{sender_name}' بنجاح.")
+                except Exception:
+                    pass
+
+            # 2. Visual Live Simulation
+            else:
+                time.sleep(random.uniform(12, 25))
+                if not self.ar_switch_var.get():
+                    break
+                
+                try:
+                    sender = random.choice(simulation_senders)
+                    msg = random.choice(simulation_msgs)
+                    timestamp = datetime.now().strftime("%H:%M:%S")
+                    
+                    reply_text = "شكراً لتواصلك معنا! سيقوم أحد ممثلي الخدمة بالرد عليك قريباً."
+                    matched_rule = "الرد العام"
+                    for rule in self.ar_rules:
+                        if not rule.get("enabled", True):
+                            continue
+                        keywords = [k.strip().lower() for k in rule.get("keywords", "").split(",")]
+                        if any(kw in msg.lower() for kw in keywords if kw):
+                            reply_text = rule.get("reply")
+                            matched_rule = rule.get("rule_name")
+                            break
+                    
+                    self._run_on_ui(lambda t=timestamp, s=sender, m=msg: self.recv_tree.insert("", 0, values=(t, s, m)))
+                    self.log(f"📥 [وارد] رسالة جديدة من '{sender}': {msg}")
+                    self.log(f"🤖 [رد تلقائي] تم تطبيق قاعدة '{matched_rule}' والرد بـ: {reply_text}")
+                except Exception:
+                    pass
+
+    # ═══════════════════════════════════════════════════════════════════════
+    #  TABLES & UTILS HELPERS
+    # ═══════════════════════════════════════════════════════════════════════
+    def _refresh_numbers_table(self, contacts):
+        for item in self.progress_tree.get_children():
+            self.progress_tree.delete(item)
+        for c in contacts:
+            name = c.get("name") or "عميل"
+            phone = c.get("phone") or ""
+            var1 = c.get("var1") or c.get("variable1") or ""
+            self.progress_tree.insert("", "end", values=(name, phone, var1, "⏳ معلق"), tags=("pending",))
+        self._update_contacts_count_from_tree()
+
+    def _update_contacts_count_from_tree(self):
+        total = len(self.progress_tree.get_children())
+        self.total_counts_label.configure(text=f"مجموعات: 0 | جهات الاتصال: {total} | Total: {total}")
+
+    def _show_import_popup_menu(self):
+        import tkinter as tk
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="📁 استيراد من ملف Excel/CSV...", command=self._browse_contacts)
+        menu.add_command(label="👥 استيراد من مجموعة...", command=self._open_import_dialog)
+        menu.add_command(label="🧮 مولد أرقام جديد...", command=self._open_number_generator)
+        try:
+            x = self.btn_tbl_menu.winfo_rootx()
+            y = self.btn_tbl_menu.winfo_rooty() + self.btn_tbl_menu.winfo_height()
+            menu.post(x, y)
+        except Exception:
+            pass
+
+    def _remove_selected_table_number(self):
+        selected = self.progress_tree.selection()
+        if not selected:
+            self._show_dialog("warning", "تنبيه", "يرجى تحديد صف واحد أو أكثر لحذفه.")
+            return
+        for item in selected:
+            self.progress_tree.delete(item)
+        self._update_contacts_count_from_tree()
+
+    def _add_manual_number_dialog(self):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("إضافة رقم يدوي")
+        dialog.geometry("380x280")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        x = self.winfo_x() + (self.winfo_width() - 380) // 2
+        y = self.winfo_y() + (self.winfo_height() - 280) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        frm = ctk.CTkFrame(dialog, fg_color="transparent")
+        frm.pack(fill="both", expand=True, padx=20, pady=20)
+
+        lbl_phone = ctk.CTkLabel(frm, text="رقم الهاتف (مع رمز الدولة):", font=("Segoe UI", 11))
+        lbl_phone.pack(anchor="e", pady=(0, 2))
+        entry_phone = ctk.CTkEntry(frm, placeholder_text="مثال: 201012345678", justify="center")
+        entry_phone.pack(fill="x", pady=(0, 10))
+
+        lbl_name = ctk.CTkLabel(frm, text="الاسم:", font=("Segoe UI", 11))
+        lbl_name.pack(anchor="e", pady=(0, 2))
+        entry_name = ctk.CTkEntry(frm, placeholder_text="مثال: محمد أحمد", justify="right")
+        entry_name.pack(fill="x", pady=(0, 10))
+
+        lbl_var1 = ctk.CTkLabel(frm, text="المتغير 1 (اختياري):", font=("Segoe UI", 11))
+        lbl_var1.pack(anchor="e", pady=(0, 2))
+        entry_var1 = ctk.CTkEntry(frm, placeholder_text="مثال: قيمة مخصصة", justify="right")
+        entry_var1.pack(fill="x", pady=(0, 15))
+
+        def on_add():
+            phone = entry_phone.get().strip()
+            name = entry_name.get().strip() or "عميل"
+            var1 = entry_var1.get().strip()
+            if not phone:
+                self._show_dialog("warning", "خطأ", "يرجى إدخال رقم الهاتف.")
+                return
+            
+            from utils.helpers import normalize_phone
+            cleaned_phone = normalize_phone(phone, self.config.get("default_country_code", "20"))
+            if not cleaned_phone:
+                self._show_dialog("warning", "خطأ", "رقم الهاتف غير صالح.")
+                return
+            
+            self.progress_tree.insert("", "end", values=(name, cleaned_phone, var1, "⏳ معلق"), tags=("pending",))
+            self._update_contacts_count_from_tree()
+            dialog.destroy()
+
+        btn_frm = ctk.CTkFrame(frm, fg_color="transparent")
+        btn_frm.pack(fill="x")
+        
+        ctk.CTkButton(
+            btn_frm, text="إلغاء", font=("Segoe UI", 11),
+            width=80, height=28, fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+            command=dialog.destroy
+        ).pack(side="left")
+        
+        ctk.CTkButton(
+            btn_frm, text="إضافة", font=("Segoe UI", 11, "bold"),
+            width=100, height=28, fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
+            text_color="#000000",
+            command=on_add
+        ).pack(side="right")
+
+    def _show_numbers_context_menu(self, event):
+        try:
+            self.numbers_context_menu.post(event.x_root, event.y_root)
+        except Exception:
+            pass
+
+    def _clear_numbers_table(self):
+        for item in self.progress_tree.get_children():
+            self.progress_tree.delete(item)
+        self._update_contacts_count_from_tree()
+        self.log("🗑️ تم مسح قائمة الأرقام بالكامل.")
+
+    def _add_bulk_manual_numbers_dialog(self):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Manual Import | استيراد يدوي")
+        dialog.geometry("540x580")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        # Center dialog
+        x = self.winfo_x() + (self.winfo_width() - 540) // 2
+        y = self.winfo_y() + (self.winfo_height() - 580) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        frm = ctk.CTkFrame(dialog, fg_color="transparent")
+        frm.pack(fill="both", expand=True, padx=15, pady=15)
+
+        # Header - Enter Contacts
+        lbl_enter = ctk.CTkLabel(frm, text="Enter contacts | أدخل جهات الاتصال:", font=("Segoe UI", 12, "bold"))
+        lbl_enter.pack(anchor="w", pady=(0, 2))
+
+        # Textbox
+        textbox = ctk.CTkTextbox(frm, height=130, font=("Consolas", 11))
+        textbox.pack(fill="x", pady=(0, 2))
+
+        # Help Label
+        lbl_help = ctk.CTkLabel(
+            frm, 
+            text="Line per number. You can name by entering name, comma, then mobile (name,number)\nاكتب اسماً متبوعاً بفاصلة ثم الرقم في كل سطر (مثال: محمد أحمد,201012345678)",
+            font=("Segoe UI", 9), 
+            text_color=COLORS.get("text_muted", "#64748B"),
+            justify="left"
+        )
+        lbl_help.pack(anchor="w", pady=(0, 10))
+
+        # Validated label
+        lbl_val = ctk.CTkLabel(frm, text="Validated contacts | جهات الاتصال التي تم التحقق منها:", font=("Segoe UI", 12, "bold"))
+        lbl_val.pack(anchor="w", pady=(0, 2))
+
+        # Treeview frame
+        tree_frame = ctk.CTkFrame(frm, fg_color="transparent")
+        tree_frame.pack(fill="both", expand=True, pady=(0, 5))
+
+        # Validate Treeview
+        validated_tree = ttk.Treeview(tree_frame, columns=("name", "phone"), show="headings", height=8)
+        validated_tree.heading("name", text="Name | الاسم")
+        validated_tree.heading("phone", text="Number | الرقم")
+        validated_tree.column("name", width=220, anchor="w")
+        validated_tree.column("phone", width=220, anchor="center")
+
+        tree_scroll = ctk.CTkScrollbar(tree_frame, command=validated_tree.yview)
+        validated_tree.configure(yscrollcommand=tree_scroll.set)
+        
+        tree_scroll.pack(side="right", fill="y")
+        validated_tree.pack(side="left", fill="both", expand=True)
+
+        # Stats labels
+        stats_frame = ctk.CTkFrame(frm, fg_color="transparent")
+        stats_frame.pack(fill="x", pady=(0, 10))
+
+        lbl_total = ctk.CTkLabel(stats_frame, text="Total: 0", font=("Segoe UI", 11, "bold"))
+        lbl_total.pack(side="left", padx=(0, 20))
+
+        lbl_dup = ctk.CTkLabel(stats_frame, text="Duplication: 0", font=("Segoe UI", 11, "bold"), text_color=COLORS.get("danger", "#EF4444"))
+        lbl_dup.pack(side="left")
+
+        # Bottom Frame
+        bottom_frame = ctk.CTkFrame(frm, fg_color="transparent")
+        bottom_frame.pack(fill="x", pady=(10, 0))
+
+        chk_remove_dup = ctk.CTkCheckBox(bottom_frame, text="Remove duplication | إزالة التكرار", font=("Segoe UI", 11))
+        chk_remove_dup.pack(side="left", pady=5)
+        chk_remove_dup.select()
+
+        # Dialog State Variables
+        dialog.parsed_contacts = []
+
+        def _on_bulk_text_changed(event=None):
+            raw_text = textbox.get("1.0", "end-1c")
+            lines = raw_text.split("\n")
+            
+            parsed_list = []
+            seen_numbers = set()
+            dups_count = 0
+            
+            from utils.helpers import normalize_phone
+            default_cc = self.config.get("default_country_code", "20")
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Parse name, number
+                if "," in line:
+                    parts = line.split(",", 1)
+                    name = parts[0].strip() or "عميل"
+                    phone_raw = parts[1].strip()
+                else:
+                    name = "عميل"
+                    phone_raw = line.strip()
+                
+                cleaned_phone = normalize_phone(phone_raw, default_cc)
+                if cleaned_phone:
+                    if cleaned_phone in seen_numbers:
+                        dups_count += 1
+                    seen_numbers.add(cleaned_phone)
+                    parsed_list.append((name, cleaned_phone))
+            
+            # Update treeview
+            for item in validated_tree.get_children():
+                validated_tree.delete(item)
+                
+            for name, phone in parsed_list:
+                validated_tree.insert("", "end", values=(name, phone))
+                
+            lbl_total.configure(text=f"Total: {len(parsed_list)}")
+            lbl_dup.configure(text=f"Duplication: {dups_count}")
+            
+            dialog.parsed_contacts = parsed_list
+
+        # Bind key release to real-time validation
+        textbox.bind("<KeyRelease>", _on_bulk_text_changed)
+
+        def on_import():
+            if not dialog.parsed_contacts:
+                self._show_dialog("warning", "تنبيه", "لا توجد جهات اتصال صالحة للاستيراد.")
+                return
+            
+            remove_dup = chk_remove_dup.get()
+            imported_count = 0
+            seen = set()
+            
+            # Fetch existing numbers to prevent duplicates if necessary, or just within this batch
+            for name, phone in dialog.parsed_contacts:
+                if remove_dup:
+                    if phone in seen:
+                        continue
+                    seen.add(phone)
+                
+                self.progress_tree.insert("", "end", values=(name, phone, "", "⏳ معلق"), tags=("pending",))
+                imported_count += 1
+                
+            self._update_contacts_count_from_tree()
+            self.log(f"✍️ تم استيراد {imported_count} جهة اتصال يدوياً.")
+            dialog.destroy()
+
+        btn_import = ctk.CTkButton(
+            bottom_frame, text="Import | استيراد", font=("Segoe UI", 11, "bold"),
+            width=100, height=30, fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
+            text_color="#000000",
+            command=on_import
+        )
+        btn_import.pack(side="right", padx=(10, 0))
+
+        btn_cancel = ctk.CTkButton(
+            bottom_frame, text="Cancel | إلغاء", font=("Segoe UI", 11),
+            width=90, height=30, fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+            command=dialog.destroy
+        )
+        btn_cancel.pack(side="right")
+
+    def _show_attachments_popup_menu(self):
+        import tkinter as tk
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="🖼️ إضافة صورة/فيديو...", command=lambda: self.attachment_manager.add_attachment("image"))
+        menu.add_command(label="📄 إضافة ملف PDF/مستند...", command=lambda: self.attachment_manager.add_attachment("document"))
+        menu.add_command(label="🎵 إضافة ملف صوتي...", command=lambda: self.attachment_manager.add_attachment("audio"))
+        menu.add_separator()
+        menu.add_command(label="🗑️ مسح المرفقات", command=lambda: self.attachment_manager.clear())
+        try:
+            x = self.btn_atts_menu.winfo_rootx()
+            y = self.btn_atts_menu.winfo_rooty() + self.btn_atts_menu.winfo_height()
+            menu.post(x, y)
+        except Exception:
+            pass
+
+    def _show_help_dialog(self):
+        self._show_dialog("info", "دليل الاستخدام والمساعدة", "دليل الاستخدام:\n1. قم بفتح تطبيق WhatsApp وسجل الدخول باستخدام رمز الاستجابة السريعة (QR Code).\n2. استورد الأرقام باستخدام زر الاستيراد أو قم بإدخالها يدوياً.\n3. اكتب الرسالة في المحرر وأضف أي ملفات مرفقة إن وجدت.\n4. اضغط على زر 'ارسل الآن' لبدء الحملة الإعلانية.")
+
+    def _show_about_dialog(self):
+        self._show_dialog("info", "حول البرنامج", "WhatsApp Sender Pro\nالإصدار v17.0\nمطور ومحسن لتوفير أقصى درجات الحماية والسرعة.\nالبرنامج يدعم حماية بصمة المتصفح ونظام منع الحظر التلقائي الذكي.")
+
+    def _logout_action(self):
+        if self.bot:
+            try:
+                self.bot.close()
+            except Exception:
+                pass
+            self.bot = None
+            self.session_status_label.configure(text="Disconnected | Not Ready | Account: N/A")
+            self.status_indicator.configure(text_color=COLORS["danger"])
+            self.log("🚪 تم تسجيل الخروج بنجاح وإغلاق المتصفح.")
+            self._show_dialog("info", "تسجيل الخروج", "تم تسجيل الخروج وإغلاق متصفح WhatsApp بنجاح.")
+        else:
+            self._show_dialog("warning", "تسجيل الخروج", "المتصفح مغلق بالفعل.")
+
+    def _toggle_appearance_menu(self):
+        current_mode = ctk.get_appearance_mode().lower()
+        new_mode = "light" if current_mode == "dark" else "dark"
+        ctk.set_appearance_mode(new_mode)
+        self.config.set("appearance_mode", new_mode)
+        self._apply_palette(new_mode)
+        self._refresh_theme()
 

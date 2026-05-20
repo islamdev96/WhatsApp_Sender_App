@@ -1,16 +1,10 @@
 {
   "appearance_mode": "light",
   "language": "ar",
-  "last_contacts_file": "C:\\Users\\Islam Glab\\Desktop\\WhatsApp_Sender_App\\contacts.csv",
-  "last_image_file": "G:/صور/صور لاهم العروض/صور مناسبات/5.png",
-  "last_attachments": [
-    {
-      "path": "G:/صور/صور لاهم العروض/صور مناسبات/5.png",
-      "type": "image",
-      "caption": ""
-    }
-  ],
-  "last_message": "",
+  "last_contacts_file": "",
+  "last_image_file": "",
+  "last_attachments": [],
+  "last_message": "qefwefewf",
   "send_text_with_image": true,
   "background_mode": false,
   "delay_min": 30,
@@ -30,7 +24,7 @@
   "profile_name": "Default",
   "profiles_dir": "data\\profiles",
   "window_width": 1920,
-  "window_height": 1001,
+  "window_height": 976,
   "default_country_code": "20",
   "last_video_file": "",
   "last_doc_file": ""

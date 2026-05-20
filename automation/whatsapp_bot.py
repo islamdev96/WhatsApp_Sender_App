@@ -16,6 +16,7 @@ class WhatsAppBot:
         self.proxy_config = proxy_config
         self.driver = None
         self.background_mode = False
+        self._just_launched = False
 
         # Common locators (mix XPath + CSS for robustness)
         self.LOGGED_IN_LOCATORS = [
@@ -244,6 +245,13 @@ class WhatsAppBot:
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
         
+        # Open in Chrome App Mode for a clean, minimal popup window (no address bar or tabs)
+        options.add_argument("--app=https://web.whatsapp.com")
+        options.add_argument("--disable-notifications")
+        options.add_argument("--no-first-run")
+        options.add_argument("--no-default-browser-check")
+        options.add_argument("--disable-sync")
+
         # Apply proxy settings if enabled
         is_auth_proxy = False
         if self.proxy_config and self.proxy_config.get("enabled"):
@@ -266,12 +274,16 @@ class WhatsAppBot:
 
         if not is_auth_proxy:
             options.add_argument("--disable-extensions")
-        # Apply custom fingerprint if enabled
+            
+        # Apply custom fingerprint or premium default app-window size if enabled
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         if self.proxy_config and self.proxy_config.get("fingerprint_enabled"):
             user_agent = self.proxy_config.get("user_agent", user_agent)
-            resolution = self.proxy_config.get("resolution", "1920,1080")
+            resolution = self.proxy_config.get("resolution", "1000,750")
             options.add_argument(f"--window-size={resolution}")
+        else:
+            if not start_minimized:
+                options.add_argument("--window-size=1000,750")
             
         options.add_argument(f"user-agent={user_agent}")
         options.add_argument("--remote-allow-origins=*")
@@ -285,22 +297,45 @@ class WhatsAppBot:
         if start_minimized:
             options.add_argument("--start-minimized")
         
+        # Attempt lightning-fast native driver initialization first (uses C++ compiled Selenium Manager cache)
+        # This completely avoids the slow 5-10s network overhead of webdriver-manager checks.
         try:
-            service = Service(ChromeDriverManager().install())
-            self.driver = webdriver.Chrome(service=service, options=options)
+            self.driver = webdriver.Chrome(options=options)
             self.background_mode = start_minimized
+            self._just_launched = True
             return self.driver
-        except Exception as e:
-            err_msg = str(e).lower()
-            if "user data directory is already in use" in err_msg or "in use" in err_msg or "user data dir" in err_msg:
-                raise Exception("ERR_PROFILE_LOCKED")
-            raise e
+        except Exception:
+            # Fallback to slower webdriver-manager if local environment lacks native support
+            try:
+                service = Service(ChromeDriverManager().install())
+                self.driver = webdriver.Chrome(service=service, options=options)
+                self.background_mode = start_minimized
+                self._just_launched = True
+                return self.driver
+            except Exception as e:
+                err_msg = str(e).lower()
+                if "user data directory is already in use" in err_msg or "in use" in err_msg or "user data dir" in err_msg:
+                    raise Exception("ERR_PROFILE_LOCKED")
+                raise e
 
     def open_whatsapp(self):
         """Opens WhatsApp Web and waits for login."""
         if not self.driver:
             self.setup_driver()
-        self.driver.get("https://web.whatsapp.com")
+            # If we just launched, the --app flag already loaded web.whatsapp.com automatically! No double reload.
+            self._just_launched = False
+        else:
+            if getattr(self, "_just_launched", False):
+                self._just_launched = False
+                return
+            try:
+                if "web.whatsapp.com" not in self.driver.current_url:
+                    self.driver.get("https://web.whatsapp.com")
+            except Exception:
+                try:
+                    self.driver.get("https://web.whatsapp.com")
+                except:
+                    pass
 
     def wait_for_login(self, timeout=900):
         """Waits until the chat list is visible, indicating successful login or browser is closed."""
