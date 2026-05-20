@@ -1,5 +1,12 @@
 {
   "mode": "merge",
+  "LOGGED_IN_LOCATORS": [
+    { "by": "id", "value": "pane-side" },
+    { "by": "xpath", "value": "//div[@id=\"pane-side\"]" },
+    { "by": "xpath", "value": "//div[@data-testid=\"chat-list\"]" },
+    { "by": "xpath", "value": "//header[@data-testid=\"chatlist-header\"]" },
+    { "by": "xpath", "value": "//div[@id=\"side\"]" }
+  ],
   "SEARCH_BOX_LOCATORS": [
     { "by": "xpath", "value": "//div[@contenteditable=\"true\"][@data-tab=\"3\"]" },
     { "by": "xpath", "value": "//div[@role=\"textbox\" and @aria-label=\"Search input textbox\"]" },

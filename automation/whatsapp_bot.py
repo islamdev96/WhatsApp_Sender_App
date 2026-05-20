@@ -17,6 +17,14 @@ class WhatsAppBot:
         self.background_mode = False
 
         # Common locators (mix XPath + CSS for robustness)
+        self.LOGGED_IN_LOCATORS = [
+            (By.ID, "pane-side"),
+            (By.XPATH, '//div[@id="pane-side"]'),
+            (By.XPATH, '//div[@data-testid="chat-list"]'),
+            (By.XPATH, '//header[@data-testid="chatlist-header"]'),
+            (By.XPATH, '//div[@id="side"]'),
+            (By.XPATH, '//div[@role="grid" and contains(@class, "chat-list")]'),
+        ]
         self.SEARCH_BOX_LOCATORS = [
             (By.XPATH, '//div[@contenteditable="true"][@data-tab="3"]'),
             (By.XPATH, '//div[@role="textbox" and @aria-label="Search input textbox"]'),
@@ -219,6 +227,8 @@ class WhatsAppBot:
     def is_logged_in(self):
         if not self.driver:
             return False
+        if self._find_any(self.LOGGED_IN_LOCATORS) is not None:
+            return True
         return self._find_any(self.SEARCH_BOX_LOCATORS) is not None or self._find_any(self.CHAT_INPUT_LOCATORS) is not None
 
     def setup_driver(self, start_minimized=False):
@@ -232,6 +242,8 @@ class WhatsAppBot:
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
+        options.add_argument("--disable-extensions")
+        options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
         options.add_argument("--remote-allow-origins=*")
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option('useAutomationExtension', False)
@@ -243,10 +255,16 @@ class WhatsAppBot:
         if start_minimized:
             options.add_argument("--start-minimized")
         
-        service = Service(ChromeDriverManager().install())
-        self.driver = webdriver.Chrome(service=service, options=options)
-        self.background_mode = start_minimized
-        return self.driver
+        try:
+            service = Service(ChromeDriverManager().install())
+            self.driver = webdriver.Chrome(service=service, options=options)
+            self.background_mode = start_minimized
+            return self.driver
+        except Exception as e:
+            err_msg = str(e).lower()
+            if "user data directory is already in use" in err_msg or "in use" in err_msg or "user data dir" in err_msg:
+                raise Exception("ERR_PROFILE_LOCKED")
+            raise e
 
     def open_whatsapp(self):
         """Opens WhatsApp Web and waits for login."""
@@ -254,13 +272,23 @@ class WhatsAppBot:
             self.setup_driver()
         self.driver.get("https://web.whatsapp.com")
 
-    def wait_for_login(self, timeout=120):
-        """Waits until the chat list is visible, indicating successful login."""
-        try:
-            WebDriverWait(self.driver, timeout).until(lambda d: self.is_logged_in())
-            return True
-        except:
-            return False
+    def wait_for_login(self, timeout=900):
+        """Waits until the chat list is visible, indicating successful login or browser is closed."""
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                # Check if driver or window is closed
+                if not self.driver or not self.driver.window_handles:
+                    return "CLOSED"
+                
+                # Check if logged in
+                if self.is_logged_in():
+                    return "SUCCESS"
+            except Exception:
+                # If a webdriver exception is thrown, it usually means the browser window was closed
+                return "CLOSED"
+            time.sleep(1)
+        return "TIMEOUT"
 
     def bring_to_front(self):
         """Brings the browser window to the front."""

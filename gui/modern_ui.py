@@ -104,6 +104,7 @@ ERROR_CATALOG = {
     "ERR-10": "انتهت مهلة تحميل المحادثة.",
     "ERR-20": "الرقم غير صحيح أو ليس لديه واتساب.",
     "ERR-21": "لم يتم تسجيل الدخول بعد.",
+    "ERR-11": "ملف المتصفح الشخصي قيد الاستخدام حالياً. يرجى إغلاق أي متصفح كروم آخر مفتوح بواسطة هذا الحساب وإعادة المحاولة.",
     "ERR-99": "خطأ غير متوقع.",
 }
 
@@ -178,6 +179,9 @@ class ModernWhatsAppApp(ctk.CTk):
         # ── UI Queue Processor ──
         self.after(50, self._process_ui_queue)
 
+        # ── Background Status Monitor ──
+        self._start_status_monitor()
+
         # ── Save on close ──
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -192,6 +196,10 @@ class ModernWhatsAppApp(ctk.CTk):
             self.sidebar.configure(fg_color=COLORS["primary_dark"])
         if hasattr(self, "appearance_switch"):
             self.appearance_switch.configure(text_color=COLORS["text_main"])
+        if hasattr(self, "status_card"):
+            self.status_card.configure(fg_color=COLORS["bg_dark"])
+        if hasattr(self, "session_status_label"):
+            self.session_status_label.configure(text_color=COLORS["text_main"])
         if hasattr(self, "nav_buttons") and hasattr(self, "current_tab"):
             for nid, btn in self.nav_buttons.items():
                 if nid == self.current_tab:
@@ -285,7 +293,7 @@ class ModernWhatsAppApp(ctk.CTk):
         self.sidebar = ctk.CTkFrame(self, width=240, corner_radius=0,
                                     fg_color=COLORS["primary_dark"])
         self.sidebar.grid(row=0, column=0, sticky="nsew")
-        self.sidebar.grid_rowconfigure(9, weight=1)
+        self.sidebar.grid_rowconfigure(11, weight=1)
 
         # Logo / Title
         logo_label = ctk.CTkLabel(self.sidebar, text="⚡ WA Sender",
@@ -341,11 +349,11 @@ class ModernWhatsAppApp(ctk.CTk):
                                 height=50,
                                 corner_radius=10,
                                 command=lambda t=tab_id: self._switch_tab(t))
-            btn.grid(row=i + 2, column=0, padx=15, pady=4, sticky="ew")
+            btn.grid(row=i + 4, column=0, padx=15, pady=4, sticky="ew")
             self.nav_buttons[tab_id] = btn
 
         # Spacer
-        # row 8 has weight=1
+        # row 11 has weight=1
 
         # Appearance Toggle
         self.appearance_switch = ctk.CTkSwitch(self.sidebar, text="الوضع الداكن",
@@ -353,7 +361,7 @@ class ModernWhatsAppApp(ctk.CTk):
                                                text_color=COLORS["text_main"],
                                                command=self._toggle_appearance,
                                                onvalue="dark", offvalue="light")
-        self.appearance_switch.grid(row=10, column=0, padx=20, pady=(10, 5))
+        self.appearance_switch.grid(row=12, column=0, padx=20, pady=(10, 5))
         if self.config.get("appearance_mode", "dark") == "dark":
             self.appearance_switch.select()
 
@@ -361,7 +369,7 @@ class ModernWhatsAppApp(ctk.CTk):
         ver_label = ctk.CTkLabel(self.sidebar, text="v2.5.0",
                                  font=ctk.CTkFont(size=10),
                                  text_color="#6C757D")
-        ver_label.grid(row=11, column=0, padx=20, pady=(5, 15))
+        ver_label.grid(row=13, column=0, padx=20, pady=(5, 15))
 
     def _switch_tab(self, tab_id):
         self.current_tab = tab_id
@@ -477,70 +485,90 @@ class ModernWhatsAppApp(ctk.CTk):
                         variable=self.spin_text_var,
                         font=ctk.CTkFont(size=12)).pack(side="right", padx=5)
 
+        self.preview_spintax_btn = ctk.CTkButton(
+            chk_frame,
+            text="🔍 معاينة الرسالة",
+            width=90,
+            height=26,
+            font=ctk.CTkFont(size=11, weight="bold"),
+            fg_color=COLORS["info"],
+            hover_color=COLORS["accent_hover"],
+            command=self._test_spintax
+        )
+        self.preview_spintax_btn.pack(side="left", padx=5)
+
         # RIGHT: Controls + Progress
-        right = ctk.CTkFrame(body, corner_radius=12)
+        right = ctk.CTkFrame(body, corner_radius=12, fg_color=COLORS["card_bg"])
         right.grid(row=0, column=1, padx=(8, 0), pady=5, sticky="nsew")
 
         ctrl_label = ctk.CTkLabel(right, text="🎛️ التحكم", font=ctk.CTkFont(size=14, weight="bold"))
         ctrl_label.pack(anchor="e", padx=15, pady=4)
 
-        # Session Status
+        # Status Card (Glow effect)
+        self.status_card = ctk.CTkFrame(right, corner_radius=10, fg_color=COLORS["bg_dark"], height=46)
+        self.status_card.pack(fill="x", padx=15, pady=(0, 15))
+        self.status_card.pack_propagate(False)
+
+        self.status_indicator = ctk.CTkLabel(self.status_card, text="●", font=("Segoe UI", 20), text_color=COLORS["danger"])
+        self.status_indicator.pack(side="right", padx=(15, 5), pady=8)
+
         self.session_status_label = ctk.CTkLabel(
-            right,
+            self.status_card,
             text="الحالة: غير متصل",
-            font=ctk.CTkFont(size=12, weight="bold"),
-            text_color=COLORS["danger"],
+            font=("Segoe UI", 13, "bold"),
+            text_color=COLORS["text_main"],
+            anchor="e"
         )
-        self.session_status_label.pack(anchor="e", padx=15, pady=(0, 6))
+        self.session_status_label.pack(side="right", padx=(0, 15), pady=8)
 
         ctrl_frame = ctk.CTkFrame(right, fg_color="transparent")
         ctrl_frame.pack(fill="x", padx=15, pady=(0, 10))
+        ctrl_frame.grid_columnconfigure((0, 1), weight=1)
 
         # 1. Login
         self.btn_login = ctk.CTkButton(ctrl_frame, text="🔑 فتح واتساب (Login)",
                                        font=("Segoe UI", 13, "bold"),
-                                       height=40,
+                                       height=42,
                                        fg_color=COLORS["secondary"],
                                        hover_color=COLORS["secondary_hover"],
                                        text_color=COLORS["secondary_text"],
-                                       image=None, compound="right",
                                        command=self._login_action)
-        self.btn_login.pack(fill="x", pady=(0, 10))
+        self.btn_login.grid(row=0, column=1, padx=(5, 0), pady=(0, 10), sticky="ew")
 
         # 2. Start
         self.btn_start = ctk.CTkButton(ctrl_frame, text="🚀 بدء الإرسال",
                                        font=("Segoe UI", 14, "bold"),
-                                       height=45,
+                                       height=42,
                                        fg_color=COLORS["primary"],
                                        text_color="#000000",
                                        hover_color=COLORS["primary_hover"],
                                        command=self._start_action)
-        self.btn_start.pack(fill="x", pady=(0, 10))
+        self.btn_start.grid(row=0, column=0, padx=(0, 5), pady=(0, 10), sticky="ew")
 
         # 3. Stop
         self.btn_stop = ctk.CTkButton(ctrl_frame, text="🛑 إيقاف مؤقت",
                                       font=("Segoe UI", 13, "bold"),
-                                      height=40,
+                                      height=38,
                                       fg_color=COLORS["danger"],
                                       hover_color=COLORS["danger_hover"],
                                       text_color="#FFFFFF",
                                       state="disabled",
                                       command=self._stop_action)
-        self.btn_stop.pack(fill="x", pady=(0, 10))
+        self.btn_stop.grid(row=1, column=1, padx=(5, 0), pady=(0, 10), sticky="ew")
 
         # 4. Check Numbers
         self.btn_check = ctk.CTkButton(ctrl_frame, text="🔍 فحص الأرقام فقط",
                                        font=("Segoe UI", 12, "bold"),
-                                       height=36,
+                                       height=38,
                                        fg_color=COLORS["info"],
                                        hover_color=COLORS["accent_hover"],
                                        command=self._check_numbers_action)
-        self.btn_check.pack(fill="x", pady=(0, 10))
+        self.btn_check.grid(row=1, column=0, padx=(0, 5), pady=(0, 10), sticky="ew")
 
         self.use_valid_after_check_var = ctk.BooleanVar(value=self.config.get("use_valid_after_check", False))
         ctk.CTkCheckBox(ctrl_frame, text="استخدم الصالح فقط بعد الفحص",
                         variable=self.use_valid_after_check_var,
-                        font=ctk.CTkFont(size=11)).pack(anchor="e", pady=(0, 10))
+                        font=ctk.CTkFont(size=11)).grid(row=2, column=0, columnspan=2, padx=5, pady=(0, 10), sticky="e")
 
         # -- Workflow --
         wf_label = ctk.CTkLabel(right, text="🧭 سير العمل", font=ctk.CTkFont(size=13, weight="bold"))
@@ -881,6 +909,19 @@ class ModernWhatsAppApp(ctk.CTk):
         self.max_fail_entry.pack(side="right", padx=5)
         self.max_fail_entry.insert(0, str(self.config.get("max_consecutive_failures", 5)))
 
+        # General Settings (New)
+        general_card = ctk.CTkFrame(scroll, corner_radius=10)
+        general_card.pack(fill="x", padx=10, pady=8)
+        ctk.CTkLabel(general_card, text="⚙️ إعدادات عامة",
+                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="e", padx=15, pady=(10, 5))
+
+        g1 = ctk.CTkFrame(general_card, fg_color="transparent")
+        g1.pack(fill="x", padx=15, pady=(0, 12))
+        ctk.CTkLabel(g1, text="رمز الدولة الافتراضي (دون +):", font=ctk.CTkFont(size=12)).pack(side="right", padx=(5, 0))
+        self.country_code_entry = ctk.CTkEntry(g1, width=70, height=34, corner_radius=8, justify="center")
+        self.country_code_entry.pack(side="right", padx=5)
+        self.country_code_entry.insert(0, str(self.config.get("default_country_code", "20")))
+
         # Save Button
         ctk.CTkButton(scroll, text="💾 حفظ الإعدادات", height=42,
                       font=ctk.CTkFont(size=14, weight="bold"),
@@ -930,9 +971,54 @@ class ModernWhatsAppApp(ctk.CTk):
                 return
             self.session_status_label.configure(
                 text=text,
-                text_color=color or COLORS["text_muted"],
+                text_color=COLORS["text_main"],
             )
+            if hasattr(self, "status_indicator"):
+                self.status_indicator.configure(
+                    text_color=color or COLORS["text_muted"]
+                )
         self._run_on_ui(_do)
+
+    def _start_status_monitor(self):
+        """Starts a background monitor thread to keep session status updated."""
+        def monitor_loop():
+            last_status = None
+            while True:
+                time.sleep(3)
+                try:
+                    if self.bot and self.bot.driver:
+                        # Check if browser was closed
+                        try:
+                            handles = self.bot.driver.window_handles
+                            if not handles:
+                                status = "closed"
+                            else:
+                                logged = self.bot.is_logged_in()
+                                status = "connected" if logged else "waiting"
+                        except Exception:
+                            status = "closed"
+                    else:
+                        status = "offline"
+
+                    if status != last_status:
+                        last_status = status
+                        self._run_on_ui(lambda s=status: self._update_session_status_from_monitor(s))
+                except Exception:
+                    pass
+
+        threading.Thread(target=monitor_loop, daemon=True).start()
+
+    def _update_session_status_from_monitor(self, status):
+        """Updates the GUI status label safely from the background monitor."""
+        if self.is_running or self.is_checking:
+            return  # Do not overwrite status text during active campaigns or contact checks
+            
+        if status == "connected":
+            self._set_session_status("الحالة: متصل", COLORS["success"])
+        elif status == "waiting":
+            self._set_session_status("الحالة: في انتظار تسجيل الدخول...", COLORS["warning"])
+        elif status == "closed" or status == "offline":
+            self._set_session_status("الحالة: غير متصل", COLORS["danger"])
 
     def log(self, message):
         ts = time.strftime('%H:%M:%S')
@@ -1031,7 +1117,7 @@ class ModernWhatsAppApp(ctk.CTk):
                 self.contact_count_label.configure(text="")
                 return
             from utils.helpers import read_contacts_auto
-            contacts = read_contacts_auto(path)
+            contacts = read_contacts_auto(path, default_country_code=self.config.get("default_country_code", "20"))
             count = len(contacts)
             self.contact_count_label.configure(
                 text=f"📊 {count} جهة اتصال" if count > 0 else "⚠️ لا توجد جهات اتصال"
@@ -1291,7 +1377,7 @@ class ModernWhatsAppApp(ctk.CTk):
             invalid = 0
             for row in data_rows:
                 phone_raw = row[idx_phone] if idx_phone is not None and idx_phone < len(row) else ""
-                phone = normalize_phone(phone_raw)
+                phone = normalize_phone(phone_raw, default_country_code=self.config.get("default_country_code", "20"))
                 if not phone:
                     invalid += 1
                     continue
@@ -1601,7 +1687,7 @@ class ModernWhatsAppApp(ctk.CTk):
             messagebox.showwarning("تنبيه", "يرجى إدخال اسم المجموعة.")
             return
         file_path = self.group_import_entry.get().strip()
-        contacts = read_contacts_auto(file_path) if file_path else []
+        contacts = read_contacts_auto(file_path, default_country_code=self.config.get("default_country_code", "20")) if file_path else []
         if self.contacts_mgr.get_by_name(name):
             messagebox.showwarning("تنبيه", f"المجموعة '{name}' موجودة بالفعل. استخدم 'إضافة جهات اتصال'.")
             return
@@ -1620,7 +1706,7 @@ class ModernWhatsAppApp(ctk.CTk):
         if not file_path:
             messagebox.showwarning("تنبيه", "يرجى اختيار ملف CSV / Excel.")
             return
-        contacts = read_contacts_auto(file_path)
+        contacts = read_contacts_auto(file_path, default_country_code=self.config.get("default_country_code", "20"))
         if not contacts:
             messagebox.showwarning("تنبيه", "لم يتم العثور على جهات اتصال صالحة في الملف.")
             return
@@ -2132,6 +2218,16 @@ class ModernWhatsAppApp(ctk.CTk):
             self.config.set("retry_delay_min", int(self.retry_min_entry.get()))
             self.config.set("retry_delay_max", int(self.retry_max_entry.get()))
             self.config.set("max_consecutive_failures", int(self.max_fail_entry.get()))
+            
+            # Save default country code
+            cc_raw = self.country_code_entry.get().strip().replace("+", "")
+            if not cc_raw:
+                cc_raw = "20"
+            elif not cc_raw.isdigit():
+                messagebox.showerror("خطأ", "كود الدولة يجب أن يتكون من أرقام فقط (مثال: 20 أو 966).")
+                return
+            self.config.set("default_country_code", cc_raw)
+
             self.config.save()
             messagebox.showinfo("تم", "تم حفظ الإعدادات بنجاح.")
         except ValueError:
@@ -2290,7 +2386,10 @@ class ModernWhatsAppApp(ctk.CTk):
                 self.bot.bring_to_front()
                 self._set_session_status("الحالة: في انتظار تسجيل الدخول...", COLORS["warning"])
                 self.log("يرجى فتح واتساب على الهاتف ومسح QR لتسجيل الدخول...")
-                if self.bot.wait_for_login(timeout=120):
+                self.log("💡 تلميح: يرجى الانتظار 3 ثوانٍ بعد ظهور الباركود قبل مسحه بالهاتف لضمان استقرار الاتصال من المرة الأولى.")
+                
+                login_status = self.bot.wait_for_login(timeout=900)
+                if login_status == "SUCCESS":
                     self.log("✅ تم تسجيل الدخول بنجاح!")
                     self._set_session_status("الحالة: متصل", COLORS["success"])
                     self._show_dialog("info", "تم", "تم تسجيل الدخول. يمكنك الآن الضغط على 'بدء الإرسال'.")
@@ -2302,13 +2401,21 @@ class ModernWhatsAppApp(ctk.CTk):
                         self.pending_check_contacts = None
                         self.log("🔍 بدء فحص الأرقام تلقائياً بعد تسجيل الدخول.")
                         self._run_on_ui(lambda: self._check_numbers_action(pending_contacts))
-                else:
+                elif login_status == "CLOSED":
+                    self.log("ℹ️ تم إغلاق متصفح تسجيل الدخول أو إيقافه بواسطة المستخدم.")
+                    self._set_session_status("الحالة: غير متصل", COLORS["danger"])
+                    self.pending_start_payload = None
+                    self.pending_check_contacts = None
+                else:  # "TIMEOUT"
                     self.report_error("ERR-02", dialog=True, level="warning")
                     self._set_session_status("الحالة: غير متصل", COLORS["danger"])
                     self.pending_start_payload = None
                     self.pending_check_contacts = None
             except Exception as e:
-                self.report_error("ERR-01", detail=str(e), dialog=True)
+                if "ERR_PROFILE_LOCKED" in str(e):
+                    self.report_error("ERR-11", dialog=True)
+                else:
+                    self.report_error("ERR-01", detail=str(e), dialog=True)
                 self._set_session_status("الحالة: غير متصل", COLORS["danger"])
                 self.pending_start_payload = None
                 self.pending_check_contacts = None
@@ -2431,7 +2538,7 @@ class ModernWhatsAppApp(ctk.CTk):
 
         # 2. Check File
         if contacts_input and os.path.exists(contacts_input):
-            contacts = read_contacts_auto(contacts_input)
+            contacts = read_contacts_auto(contacts_input, default_country_code=self.config.get("default_country_code", "20"))
             if not contacts:
                 self.report_error("ERR-06", "الملف فارغ أو لا يحتوي على أرقام صحيحة.", dialog=True)
                 return None
@@ -2486,6 +2593,44 @@ class ModernWhatsAppApp(ctk.CTk):
 
             text = pattern.sub(_pick, text)
         return text
+
+    def _test_spintax(self):
+        text = self.message_textbox.get("1.0", "end").strip()
+        if not text:
+            messagebox.showwarning("تنبيه", "يرجى كتابة نص الرسالة أولاً لتجربة التدوير/المتغيرات.")
+            return
+
+        dummy_contact = {
+            "name": "محمد أحمد",
+            "phone": "966500000000",
+            "var1": "منتج مميز",
+            "var2": "100 ريال",
+            "var3": "خصم 20%",
+            "var4": "الرمز: AB12",
+            "var5": "شحن مجاني",
+        }
+
+        # Apply variables and spintax
+        v1 = self._apply_template(text, dummy_contact)
+        v2 = self._apply_template(text, dummy_contact)
+
+        info_text = "✨ معاينة حية للرسالة (باستخدام بيانات تجريبية):\n"
+        info_text += "──────────────────────────\n"
+        info_text += f"👤 الاسم: {dummy_contact['name']} | 📱 الهاتف: {dummy_contact['phone']}\n"
+        if "{var1}" in text or "{var2}" in text or "{var3}" in text or "{var4}" in text or "{var5}" in text:
+            info_text += f"🏷️ المتغيرات التجريبية: v1={dummy_contact['var1']}, v2={dummy_contact['var2']}\n"
+        info_text += "──────────────────────────\n\n"
+
+        if self.spin_text_var.get() and ("{" in text and "|" in text):
+            info_text += "🔹 الاحتمال الأول:\n"
+            info_text += f"« {v1} »\n\n"
+            info_text += "🔹 الاحتمال الثاني (تدوير عشوائي):\n"
+            info_text += f"« {v2} »\n"
+        else:
+            info_text += "📝 الرسالة المعاينة:\n"
+            info_text += f"« {v1} »\n"
+
+        messagebox.showinfo("معاينة الرسالة الحية", info_text)
 
     def _format_attachments_for_contact(self, attachments, contact):
         if not attachments:

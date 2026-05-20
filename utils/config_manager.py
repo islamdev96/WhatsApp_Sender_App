@@ -32,6 +32,7 @@ DEFAULT_CONFIG = {
     "profiles_dir": os.path.join("data", "profiles"),
     "window_width": 1000,
     "window_height": 700,
+    "default_country_code": "20",
 }
 
 

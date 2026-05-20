@@ -15,16 +15,24 @@ def _normalize_phone(phone, default_country_code="20"):
     if not phone:
         return None
     phone = str(phone).strip()
-    # Remove common formatting chars
-    phone = re.sub(r'[\s\-\(\)\.]+', '', phone)
     # Remove .0 from float conversion
     if phone.endswith('.0'):
         phone = phone[:-2]
+    # Remove common formatting chars
+    phone = re.sub(r'[\s\-\(\)\.]+', '', phone)
     # Handle + prefix
     if phone.startswith('+'):
         phone = phone[1:]
+    
+    # Smart generic normalizing: if a local number starts with 0 (e.g. 05xxx or 01xxx)
+    # and default_country_code is set, strip the leading 0 and prepend the country code.
+    if default_country_code:
+        default_cc = str(default_country_code).strip().replace("+", "")
+        if phone.startswith('0') and not phone.startswith('00') and len(phone) > 4:
+            phone = default_cc + phone[1:]
+
     # If already starts with country code, return as-is
-    if default_country_code and phone.startswith(default_country_code):
+    if default_country_code and phone.startswith(str(default_country_code)):
         return phone
     # Egypt-specific: local mobile numbers
     if default_country_code == "20":
@@ -34,7 +42,7 @@ def _normalize_phone(phone, default_country_code="20"):
             return '20' + phone
     # Generic: prepend default country code for short local numbers
     if default_country_code and len(phone) <= 10 and not phone.startswith('0'):
-        return default_country_code + phone
+        return str(default_country_code) + phone
     return phone
 
 
@@ -43,7 +51,7 @@ def normalize_phone(phone, default_country_code="20"):
     return _normalize_phone(phone, default_country_code)
 
 
-def read_contacts(file_path):
+def read_contacts(file_path, default_country_code="20"):
     """Reads contacts from a CSV file and returns a list of dictionaries."""
     contacts = []
     try:
@@ -64,7 +72,7 @@ def read_contacts(file_path):
                 var4 = normalized_row.get('var4') or normalized_row.get('variable4') or normalized_row.get('v4')
                 var5 = normalized_row.get('var5') or normalized_row.get('variable5') or normalized_row.get('v5')
 
-                phone = _normalize_phone(phone)
+                phone = _normalize_phone(phone, default_country_code)
                 if phone:
                     c = {'phone': phone, 'name': name.strip()}
                     if var1: c['var1'] = var1
@@ -79,7 +87,7 @@ def read_contacts(file_path):
     return contacts
 
 
-def read_contacts_excel(file_path):
+def read_contacts_excel(file_path, default_country_code="20"):
     """Reads contacts from an Excel (.xlsx) file."""
     contacts = []
     try:
@@ -131,7 +139,7 @@ def read_contacts_excel(file_path):
             phone_val = row[phone_col].value if phone_col < len(row) else None
             name_val = row[name_col].value if name_col is not None and name_col < len(row) else 'Customer'
 
-            phone = _normalize_phone(phone_val)
+            phone = _normalize_phone(phone_val, default_country_code)
             if phone:
                 c = {'phone': phone, 'name': str(name_val or 'Customer').strip()}
                 for k, idx in var_cols.items():
@@ -148,7 +156,7 @@ def read_contacts_excel(file_path):
     return contacts
 
 
-def read_contacts_txt(file_path):
+def read_contacts_txt(file_path, default_country_code="20"):
     """Reads contacts from a plain text file, extracting phone numbers.
     
     Supports two formats:
@@ -183,7 +191,7 @@ def read_contacts_txt(file_path):
             # If the line is purely digits (with optional +, spaces, dashes, dots)
             cleaned = re.sub(r'[\s\-\.\(\)\+]+', '', line)
             if cleaned.isdigit() and 8 <= len(cleaned) <= 15:
-                phone = _normalize_phone(line)
+                phone = _normalize_phone(line, default_country_code)
                 if phone and phone not in seen:
                     seen.add(phone)
                     contacts.append({'phone': phone, 'name': 'عميل'})
@@ -192,7 +200,7 @@ def read_contacts_txt(file_path):
         if not contacts:
             matches = re.findall(r'\+?\d(?:[\d\-\s\.]*\d){8,14}', content)
             for match in matches:
-                phone = _normalize_phone(match)
+                phone = _normalize_phone(match, default_country_code)
                 if phone and phone not in seen:
                     seen.add(phone)
                     contacts.append({'phone': phone, 'name': 'عميل'})
@@ -203,17 +211,17 @@ def read_contacts_txt(file_path):
     return contacts
 
 
-def read_contacts_auto(file_path):
+def read_contacts_auto(file_path, default_country_code="20"):
     """Auto-detect file type and read contacts accordingly."""
     if not file_path or not os.path.exists(file_path):
         return []
     ext = os.path.splitext(file_path)[1].lower()
     if ext in ('.xlsx', '.xls'):
-        return read_contacts_excel(file_path)
+        return read_contacts_excel(file_path, default_country_code)
     elif ext == '.txt':
-        return read_contacts_txt(file_path)
+        return read_contacts_txt(file_path, default_country_code)
     else:
-        return read_contacts(file_path)
+        return read_contacts(file_path, default_country_code)
 
 
 def create_contacts_template(file_path):
