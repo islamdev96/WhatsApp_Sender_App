@@ -33,5 +33,6 @@
   "window_height": 976,
   "default_country_code": "20",
   "last_video_file": "",
-  "last_doc_file": ""
+  "last_doc_file": "",
+  "enable_auto_responder": false
 }

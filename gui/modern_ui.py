@@ -3059,6 +3059,7 @@ class ModernWhatsAppApp(ctk.CTk):
         self.progress_bar_small = None
         self.progress_state_label = None
         self.progress_metric_labels = {}
+        self.pause_btn = None
 
     def _export_last_report(self):
         if self.last_report_path and os.path.exists(self.last_report_path):
@@ -3072,13 +3073,13 @@ class ModernWhatsAppApp(ctk.CTk):
         if self.is_paused:
             self.pause_event.clear()
             self.is_paused = False
-            if hasattr(self, "pause_btn"):
+            if getattr(self, "pause_btn", None) and self.pause_btn.winfo_exists():
                 self.pause_btn.configure(text="Pause")
             self._set_progress_status("Resumed...")
         else:
             self.pause_event.set()
             self.is_paused = True
-            if hasattr(self, "pause_btn"):
+            if getattr(self, "pause_btn", None) and self.pause_btn.winfo_exists():
                 self.pause_btn.configure(text="Resume")
             self._set_progress_status("Paused")
 
@@ -3455,7 +3456,7 @@ class ModernWhatsAppApp(ctk.CTk):
             self.btn_check.configure(state="disabled")
         self.progress_bar.set(0)
         self.status_label.configure(text="جاري العمل...")
-        if hasattr(self, "pause_btn"):
+        if getattr(self, "pause_btn", None) and self.pause_btn.winfo_exists():
             self.pause_btn.configure(text="Pause")
 
         self._open_progress_window_blind(len(contacts), mode="send")
@@ -3491,7 +3492,7 @@ class ModernWhatsAppApp(ctk.CTk):
             self.btn_check.configure(state="disabled")
         self.progress_bar.set(0)
         self.status_label.configure(text="جاري العمل...")
-        if hasattr(self, "pause_btn"):
+        if getattr(self, "pause_btn", None) and self.pause_btn.winfo_exists():
             self.pause_btn.configure(text="Pause")
 
         self._open_progress_window_blind(len(contacts), mode="workflow")
@@ -3717,7 +3718,7 @@ class ModernWhatsAppApp(ctk.CTk):
             if self.pause_event.is_set():
                 self.pause_event.clear()
                 self.is_paused = False
-                if hasattr(self, "pause_btn"):
+                if getattr(self, "pause_btn", None) and self.pause_btn.winfo_exists():
                     self.pause_btn.configure(text="Pause")
             self.log("🛑 طلب إيقاف...")
 
@@ -4015,8 +4016,8 @@ class ModernWhatsAppApp(ctk.CTk):
             self._run_on_ui(lambda: self.btn_stop.configure(state="disabled"))
             if hasattr(self, "btn_check"):
                 self._run_on_ui(lambda: self.btn_check.configure(state="normal"))
-            if hasattr(self, "pause_btn"):
-                self._run_on_ui(lambda: self.pause_btn.configure(text="Pause"))
+            if getattr(self, "pause_btn", None):
+                self._run_on_ui(lambda: self.pause_btn.configure(text="Pause") if getattr(self, "pause_btn", None) and self.pause_btn.winfo_exists() else None)
             self._run_on_ui(lambda: self.status_label.configure(text="جاهز..."))
 
     def _run_automation(self, contacts, msg_template, attachments):
@@ -4278,8 +4279,8 @@ class ModernWhatsAppApp(ctk.CTk):
             self._run_on_ui(lambda: self.btn_stop.configure(state="disabled"))
             if hasattr(self, "btn_check"):
                 self._run_on_ui(lambda: self.btn_check.configure(state="normal"))
-            if hasattr(self, "pause_btn"):
-                self._run_on_ui(lambda: self.pause_btn.configure(text="Pause"))
+            if getattr(self, "pause_btn", None):
+                self._run_on_ui(lambda: self.pause_btn.configure(text="Pause") if getattr(self, "pause_btn", None) and self.pause_btn.winfo_exists() else None)
             self._run_on_ui(lambda: self.status_label.configure(text="جاهز..."))
 
     def _run_number_check(self, contacts):
