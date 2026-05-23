@@ -191,61 +191,85 @@ class WhatsAppBot:
         return None
 
     def _find_photo_video_input(self):
-        """Find the WhatsApp Photos/Videos file input, avoiding sticker inputs."""
+        """Find the WhatsApp Photos/Videos file input, avoiding sticker inputs.
+        
+        WhatsApp Web has multiple input[type='file'] elements:
+        - Photos/Videos: accept='image/*,video/mp4,video/3gpp,video/quicktime'
+        - Documents: accept='*'
+        - Stickers: accept='image/*' or accept='image/webp,...' (NO video types)
+        
+        The key differentiator: the photo/video input ALWAYS includes video MIME types.
+        The sticker input NEVER includes video MIME types.
+        """
         if not self.driver:
             return None
 
+        # Strategy 1: Try specific locators first
         for by, value in self.PHOTO_VIDEO_INPUT_LOCATORS:
             try:
                 elements = self.driver.find_elements(by, value)
+                if elements:
+                    return elements[0]
             except Exception:
                 continue
-            if elements:
-                return elements[0]
 
+        # Strategy 2: Find ALL file inputs and score them
         try:
             inputs = self.driver.find_elements(By.XPATH, '//input[@type="file"]')
         except Exception:
             return None
 
-        fallback = None
-        # First try exact match for Photos/Videos
-        try:
-            exact = self.driver.find_elements(By.XPATH, '//input[@type="file" and contains(@accept, "video/mp4") and contains(@accept, "image")]')
-            if exact:
-                return exact[0]
-            
-            # WhatsApp sometimes uses image/png,image/jpeg... for photos if they changed it
-            exact2 = self.driver.find_elements(By.XPATH, '//input[@type="file" and contains(@accept, "video/3gpp")]')
-            if exact2:
-                return exact2[0]
-        except Exception:
-            pass
+        if not inputs:
+            return None
 
-        fallback = None
-        # Then search all inputs
+        best_candidate = None
+        best_score = -1
+
         for el in inputs:
             try:
-                accept = (el.get_attribute("accept") or "").lower()
+                accept = (el.get_attribute("accept") or "").lower().strip()
             except Exception:
-                accept = ""
-            
-            # If it's a sticker input, it usually contains webp or has a very short accept string
-            if "sticker" in accept or "webp" in accept:
                 continue
-            
-            if "video/" in accept and "image" in accept:
-                return el
-                
-            # If it accepts images but NOT ALL files (*)
-            if "image" in accept and "*" not in accept and fallback is None:
-                # Still risky, might be a sticker. Let's just take the first one that has "image/*"
-                if "image/*" in accept:
-                    fallback = el
-            elif "image" in accept and fallback is None:
-                fallback = el
 
-        return fallback
+            # Skip if clearly a document input (accept everything)
+            if accept == "*" or accept == "":
+                continue
+
+            # Skip sticker inputs: they accept webp but NO video types
+            has_video = any(v in accept for v in ["video/mp4", "video/3gpp", "video/quicktime", "video/"])
+            has_webp_only = "webp" in accept and not has_video
+            
+            if has_webp_only:
+                continue  # This is a sticker input, skip it
+
+            # Score this input
+            score = 0
+            
+            # Best indicator: has both image AND video types
+            if has_video and "image" in accept:
+                score += 100  # Strong match - this is definitely the photo/video input
+            
+            # Has video types at all
+            if has_video:
+                score += 50
+                
+            # Has image types
+            if "image" in accept:
+                score += 10
+                
+            # Penalize if accept is too short (likely sticker)
+            if len(accept) < 15:
+                score -= 20
+                
+            # Bonus for long accept strings (photo/video input has many MIME types)
+            if len(accept) > 40:
+                score += 20
+
+            if score > best_score:
+                best_score = score
+                best_candidate = el
+
+        return best_candidate
 
     def _wait_for_preview_close(self, timeout=5, poll=0.3, stop_event=None):
         end_time = time.time() + timeout
@@ -599,44 +623,79 @@ class WhatsAppBot:
                 # Check for file input
                 input_el = self._wait_for_any(self.FILE_INPUT_LOCATORS, timeout=5, stop_event=stop_event)
             else:
-                # Image/Video - usually top button "Photos & Videos"
-                # But typically the file input is present and works for images if we just send keys
-                # We can try clicking the "Photos & Videos" button first for robustness
+                # Image/Video - MUST click "Photos & Videos" button first
+                # This is critical to avoid the sticker input
                 media_btn_locators = [
                     (By.XPATH, '//span[@data-icon="attach-image"]'),
+                    (By.CSS_SELECTOR, 'span[data-icon="attach-image"]'),
                     (By.XPATH, '//button[@aria-label="Photos & videos"]'),
                     (By.XPATH, '//div[@aria-label="Photos & videos"]'),
+                    (By.XPATH, '//button[contains(@aria-label,"Photos")]'),
+                    (By.XPATH, '//div[contains(@aria-label,"Photos")]'),
+                    (By.XPATH, '//button[contains(@aria-label,"photos")]'),
+                    (By.XPATH, '//li//button[.//span[@data-icon="attach-image"]]'),
                     (By.XPATH, '//li//*[contains(text(),"Photos & videos")]'),
                     (By.XPATH, '//li//*[contains(text(),"Photos")]'),
+                    (By.XPATH, '//li//*[contains(text(),"صور وفيديوهات")]'),
                     (By.XPATH, '//li//*[contains(text(),"صور")]'),
                     (By.XPATH, '//li//*[contains(text(),"الصور")]'),
-                    (By.XPATH, '//li//*[contains(text(),"صور")]'),
                 ]
                 if stop_event and stop_event.is_set():
                     return "STOPPED"
+                
                 media_btn = self._find_any(media_btn_locators)
                 if media_btn:
                     self.driver.execute_script("arguments[0].click();", media_btn)
-                    
+                    # Wait for the file input to appear after clicking
+                    if stop_event:
+                        stop_event.wait(1.5)
+                    else:
+                        time.sleep(1.5)
+                
+                # Now find the photo/video input (NOT the sticker one)
                 end_time = time.time() + 5
                 while time.time() < end_time and not input_el:
                     if stop_event and stop_event.is_set():
                         return "STOPPED"
                     input_el = self._find_photo_video_input()
+                    if input_el:
+                        break
                     if stop_event:
-                        stop_event.wait(0.2)
+                        stop_event.wait(0.3)
                     else:
-                        time.sleep(0.2)
+                        time.sleep(0.3)
 
-            if stop_event and stop_event.is_set():
-                return "STOPPED"
-
-            if not input_el:
-                if media_type == 'document':
-                    # Fallback: try finding any file input on page
-                    input_el = self.driver.find_element(By.XPATH, '//input[@type="file"]')
-                else:
-                    input_el = self._find_photo_video_input()
+                # FALLBACK: If still can't find the photo/video input,
+                # use the DOCUMENT input instead. WhatsApp sends images
+                # properly (as photos, not stickers) through document input too.
+                if not input_el:
+                    doc_btn_locators = [
+                        (By.XPATH, '//span[@data-icon="attach-document"]'),
+                        (By.CSS_SELECTOR, 'span[data-icon="attach-document"]'),
+                        (By.XPATH, '//li//*[contains(text(),"Document")]'),
+                        (By.XPATH, '//li//*[contains(text(),"مستند")]'),
+                    ]
+                    # Re-open attach menu if it closed
+                    attach_btn2 = self._find_best_clickable(self.ATTACH_BUTTON_LOCATORS) or self._find_any(self.ATTACH_BUTTON_LOCATORS)
+                    if attach_btn2:
+                        self.driver.execute_script("arguments[0].click();", attach_btn2)
+                        if stop_event:
+                            stop_event.wait(1.0)
+                        else:
+                            time.sleep(1.0)
+                    
+                    doc_btn = self._find_any(doc_btn_locators)
+                    if doc_btn:
+                        self.driver.execute_script("arguments[0].click();", doc_btn)
+                        if stop_event:
+                            stop_event.wait(1.0)
+                        else:
+                            time.sleep(1.0)
+                    
+                    input_el = self._wait_for_any(self.FILE_INPUT_LOCATORS, timeout=5, stop_event=stop_event)
+                    # Switch media_type to 'document' for send flow
+                    if input_el:
+                        media_type = 'document'
             
             if not input_el:
                 return "ERR_FILE_INPUT_NOT_FOUND"

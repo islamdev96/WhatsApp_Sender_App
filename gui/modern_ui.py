@@ -185,20 +185,18 @@ class ModernWhatsAppApp(ctk.CTk):
             
         self.current_lang = ctk.StringVar(value=self.config.get("language", "ar"))
 
-    def tr(self, key):
-        """Translate a key based on current language."""
-        lang = self.current_lang.get()
-        if lang not in self.locales:
-            lang = "en"
-        return self.locales.get(lang, {}).get(key, key)
-
-
         # ── Build Layout ──
         self._build_layout()
 
         # ── Start UI Queue Processor ──
         self.after(50, self._process_ui_queue)
 
+    def tr(self, key):
+        """Translate a key based on current language."""
+        lang = self.current_lang.get()
+        if lang not in self.locales:
+            lang = "en"
+        return self.locales.get(lang, {}).get(key, key)
 
     def _apply_palette(self, mode):
         palette = PALETTE_DARK if str(mode).lower() == "dark" else PALETTE_LIGHT
