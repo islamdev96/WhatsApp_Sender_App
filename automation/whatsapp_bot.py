@@ -48,12 +48,20 @@ class WhatsAppBot:
             (By.XPATH, '//span[contains(@data-icon,"send")]'),
             (By.XPATH, '//button[@data-testid="compose-btn-send"]'),
             (By.XPATH, '//button[@aria-label="Send"]'),
+            (By.XPATH, '//button[@aria-label="إرسال"]'),
             (By.XPATH, '//div[@role="button" and @aria-label="Send"]'),
+            (By.XPATH, '//div[@role="button" and @aria-label="إرسال"]'),
             (By.XPATH, '//div[@role="button" and contains(@aria-label,"Send")]'),
+            (By.XPATH, '//div[@role="button" and contains(@aria-label,"إرسال")]'),
             (By.XPATH, '//button[contains(@aria-label,"Send")]'),
+            (By.XPATH, '//button[contains(@aria-label,"إرسال")]'),
             (By.XPATH, '//div[@role="dialog"]//span[contains(@data-icon,"send")]'),
             (By.XPATH, '//div[@role="dialog"]//button[contains(@aria-label,"Send")]'),
+            (By.XPATH, '//div[@role="dialog"]//button[contains(@aria-label,"إرسال")]'),
             (By.XPATH, '//div[@role="dialog"]//div[@role="button" and contains(@aria-label,"Send")]'),
+            (By.XPATH, '//div[@role="dialog"]//div[@role="button" and contains(@aria-label,"إرسال")]'),
+            (By.XPATH, '//div[@aria-label="Send"]'),
+            (By.XPATH, '//div[@aria-label="إرسال"]'),
         ]
         self.ATTACH_BUTTON_LOCATORS = [
             (By.XPATH, '//span[@data-icon="clip"]'),
@@ -70,14 +78,15 @@ class WhatsAppBot:
             (By.CSS_SELECTOR, 'button[data-testid*="clip"]'),
         ]
         self.FILE_INPUT_LOCATORS = [
-            (By.XPATH, '//input[@accept="image/*,video/mp4,video/3gpp,video/quicktime"]'),
-            (By.XPATH, '//input[@type="file" and contains(@accept,"image")]'),
+            (By.XPATH, '//input[@accept="*"]'),
+            (By.XPATH, '//input[@type="file" and not(contains(@accept,"image"))]'),
             (By.XPATH, '//input[@type="file"]'),
         ]
         self.PHOTO_VIDEO_INPUT_LOCATORS = [
             (By.CSS_SELECTOR, 'input[type="file"][accept*="video/mp4"][accept*="image"]'),
             (By.XPATH, '//input[@type="file" and contains(@accept,"video/mp4") and contains(@accept,"image")]'),
             (By.XPATH, '//input[@type="file" and contains(@accept,"video/quicktime") and contains(@accept,"image")]'),
+            (By.XPATH, '//input[@type="file" and contains(@accept,"image/*,video/mp4,video/3gpp,video/quicktime")]'),
         ]
         self.MEDIA_PREVIEW_LOCATORS = [
             (By.XPATH, '//div[@data-testid="media-viewer"]'),
@@ -150,13 +159,18 @@ class WhatsAppBot:
                 return elements[0]
         return None
 
-    def _wait_for_any(self, locators, timeout=30, poll=0.5):
+    def _wait_for_any(self, locators, timeout=30, poll=0.5, stop_event=None):
         end_time = time.time() + timeout
         while time.time() < end_time:
+            if stop_event and stop_event.is_set():
+                return None
             el = self._find_any(locators)
             if el:
                 return el
-            time.sleep(poll)
+            if stop_event:
+                stop_event.wait(poll)
+            else:
+                time.sleep(poll)
         return None
 
     def _find_best_clickable(self, locators):
@@ -195,35 +209,70 @@ class WhatsAppBot:
             return None
 
         fallback = None
+        # First try exact match for Photos/Videos
+        try:
+            exact = self.driver.find_elements(By.XPATH, '//input[@type="file" and contains(@accept, "video/mp4") and contains(@accept, "image")]')
+            if exact:
+                return exact[0]
+            
+            # WhatsApp sometimes uses image/png,image/jpeg... for photos if they changed it
+            exact2 = self.driver.find_elements(By.XPATH, '//input[@type="file" and contains(@accept, "video/3gpp")]')
+            if exact2:
+                return exact2[0]
+        except Exception:
+            pass
+
+        fallback = None
+        # Then search all inputs
         for el in inputs:
             try:
                 accept = (el.get_attribute("accept") or "").lower()
             except Exception:
                 accept = ""
+            
+            # If it's a sticker input, it usually contains webp or has a very short accept string
             if "sticker" in accept or "webp" in accept:
                 continue
+            
             if "video/" in accept and "image" in accept:
                 return el
-            if "image" in accept and fallback is None:
+                
+            # If it accepts images but NOT ALL files (*)
+            if "image" in accept and "*" not in accept and fallback is None:
+                # Still risky, might be a sticker. Let's just take the first one that has "image/*"
+                if "image/*" in accept:
+                    fallback = el
+            elif "image" in accept and fallback is None:
                 fallback = el
+
         return fallback
 
-    def _wait_for_preview_close(self, timeout=5, poll=0.3):
+    def _wait_for_preview_close(self, timeout=5, poll=0.3, stop_event=None):
         end_time = time.time() + timeout
         while time.time() < end_time:
+            if stop_event and stop_event.is_set():
+                return False
             if not self._find_any(self.MEDIA_PREVIEW_LOCATORS):
                 return True
-            time.sleep(poll)
+            if stop_event:
+                stop_event.wait(poll)
+            else:
+                time.sleep(poll)
         return False
 
-    def _wait_for_chat_or_invalid(self, timeout=60, poll=0.5):
+    def _wait_for_chat_or_invalid(self, timeout=60, poll=0.5, stop_event=None):
         end_time = time.time() + timeout
         while time.time() < end_time:
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
             if self._find_any(self.INVALID_NUMBER_LOCATORS):
                 return "INVALID"
             if self._find_any(self.CHAT_INPUT_LOCATORS):
                 return "READY"
-            time.sleep(poll)
+            if stop_event:
+                stop_event.wait(poll)
+            else:
+                time.sleep(poll)
         return "TIMEOUT"
 
     def is_logged_in(self):
@@ -399,13 +448,20 @@ class WhatsAppBot:
             self.driver.get(url)
             
             # 2. Wait for loading
-            ready_state = self._wait_for_chat_or_invalid(timeout=90)
+            ready_state = self._wait_for_chat_or_invalid(timeout=90, stop_event=stop_event)
+            if ready_state == "STOPPED":
+                return "STOPPED"
             if ready_state == "INVALID":
                 return "INVALID"
             if ready_state == "TIMEOUT":
                 return "ERR_TIMEOUT"
 
-            time.sleep(random.uniform(3, 5))
+            if stop_event:
+                stop_event.wait(random.uniform(3, 5))
+            else:
+                time.sleep(random.uniform(3, 5))
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
 
             # 3. Send Content
             # Strategy:
@@ -432,13 +488,16 @@ class WhatsAppBot:
                         caption = message
                     
                     # Perform Attachment
-                    res = self._send_attachment(path, type_, caption)
+                    res = self._send_attachment(path, type_, caption, stop_event=stop_event)
                     if res != "SUCCESS":
                         return res # Fail fast or continue? Fail fast is safer for now.
                     
-                    time.sleep(2)
+                    if stop_event:
+                        stop_event.wait(2)
+                    else:
+                        time.sleep(2)
                 if message and not send_text_with_image:
-                    text_res = self._send_text(message)
+                    text_res = self._send_text(message, stop_event=stop_event)
                     if text_res != "SUCCESS":
                         return text_res
                 # Send extra messages (if any)
@@ -448,14 +507,17 @@ class WhatsAppBot:
                             return "STOPPED"
                         if not m:
                             continue
-                        text_res = self._send_text(m)
+                        text_res = self._send_text(m, stop_event=stop_event)
                         if text_res != "SUCCESS":
                             return text_res
-                        time.sleep(0.4)
+                        if stop_event:
+                            stop_event.wait(0.4)
+                        else:
+                            time.sleep(0.4)
                 return "SUCCESS"
             else:
                 # Text Only
-                res = self._send_text(message)
+                res = self._send_text(message, stop_event=stop_event)
                 if res != "SUCCESS":
                     return res
                 if extra_messages:
@@ -464,10 +526,13 @@ class WhatsAppBot:
                             return "STOPPED"
                         if not m:
                             continue
-                        text_res = self._send_text(m)
+                        text_res = self._send_text(m, stop_event=stop_event)
                         if text_res != "SUCCESS":
                             return text_res
-                        time.sleep(0.4)
+                        if stop_event:
+                            stop_event.wait(0.4)
+                        else:
+                            time.sleep(0.4)
                 return "SUCCESS"
 
         except Exception as e:
@@ -482,24 +547,33 @@ class WhatsAppBot:
         url = f"https://web.whatsapp.com/send?phone={phone}"
         try:
             self.driver.get(url)
-            ready_state = self._wait_for_chat_or_invalid(timeout=45)
+            ready_state = self._wait_for_chat_or_invalid(timeout=45, stop_event=stop_event)
             if ready_state == "INVALID":
                 return "INVALID"
             if ready_state == "READY":
                 return "VALID"
+            if ready_state == "STOPPED":
+                return "STOPPED"
             return "ERR_TIMEOUT"
         except Exception as e:
             return f"ERR_GENERAL: {str(e)[:100]}"
 
-    def _send_attachment(self, path, media_type, caption=None):
+    def _send_attachment(self, path, media_type, caption=None, stop_event=None):
         """Internal method to upload a single file."""
+        if stop_event and stop_event.is_set():
+            return "STOPPED"
         try:
             # 1. Click Attach Button
             attach_btn = self._find_best_clickable(self.ATTACH_BUTTON_LOCATORS) or self._find_any(self.ATTACH_BUTTON_LOCATORS)
             if not attach_btn:
                 return "ERR_ATTACH_BTN_NOT_FOUND"
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
             self.driver.execute_script("arguments[0].click();", attach_btn)
-            time.sleep(1.0)
+            if stop_event:
+                stop_event.wait(1.0)
+            else:
+                time.sleep(1.0)
             
             # 2. Choose Input based on type
             # Photos/Videos usually input[accept*='image']
@@ -516,12 +590,14 @@ class WhatsAppBot:
                     (By.XPATH, '//li//*[contains(text(),"مستند")]'),
                     (By.CSS_SELECTOR, 'span[data-icon="attach-document"]'),
                 ]
+                if stop_event and stop_event.is_set():
+                    return "STOPPED"
                 doc_btn = self._find_any(doc_btn_locators)
                 if doc_btn:
                      self.driver.execute_script("arguments[0].click();", doc_btn)
                 
                 # Check for file input
-                input_el = self._wait_for_any(self.FILE_INPUT_LOCATORS, timeout=5)
+                input_el = self._wait_for_any(self.FILE_INPUT_LOCATORS, timeout=5, stop_event=stop_event)
             else:
                 # Image/Video - usually top button "Photos & Videos"
                 # But typically the file input is present and works for images if we just send keys
@@ -536,14 +612,24 @@ class WhatsAppBot:
                     (By.XPATH, '//li//*[contains(text(),"الصور")]'),
                     (By.XPATH, '//li//*[contains(text(),"صور")]'),
                 ]
+                if stop_event and stop_event.is_set():
+                    return "STOPPED"
                 media_btn = self._find_any(media_btn_locators)
                 if media_btn:
                     self.driver.execute_script("arguments[0].click();", media_btn)
                     
                 end_time = time.time() + 5
                 while time.time() < end_time and not input_el:
+                    if stop_event and stop_event.is_set():
+                        return "STOPPED"
                     input_el = self._find_photo_video_input()
-                    time.sleep(0.2)
+                    if stop_event:
+                        stop_event.wait(0.2)
+                    else:
+                        time.sleep(0.2)
+
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
 
             if not input_el:
                 if media_type == 'document':
@@ -564,47 +650,68 @@ class WhatsAppBot:
             
             if media_type == 'document':
                  # Document preview is just a small box with send button
-                 send_btn = self._find_best_clickable(self.SEND_BUTTON_LOCATORS) or self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=15)
+                 send_btn = self._find_best_clickable(self.SEND_BUTTON_LOCATORS) or self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=15, stop_event=stop_event)
                  if not send_btn:
                      return "ERR_DOC_SEND_BTN_NOT_FOUND"
             else:
                 # Media Preview
-                self._wait_for_any(self.MEDIA_PREVIEW_LOCATORS, timeout=40)
+                self._wait_for_any(self.MEDIA_PREVIEW_LOCATORS, timeout=40, stop_event=stop_event)
+                if stop_event and stop_event.is_set():
+                    return "STOPPED"
                 if caption:
-                    caption_box = self._wait_for_any(self.CAPTION_BOX_LOCATORS, timeout=10)
+                    caption_box = self._wait_for_any(self.CAPTION_BOX_LOCATORS, timeout=10, stop_event=stop_event)
                     if caption_box:
-                        time.sleep(0.5)
+                        if stop_event:
+                            stop_event.wait(0.5)
+                        else:
+                            time.sleep(0.5)
+                        if stop_event and stop_event.is_set():
+                            return "STOPPED"
                         caption_box.send_keys(caption)
-                        time.sleep(1.0)
+                        if stop_event:
+                            stop_event.wait(1.0)
+                        else:
+                            time.sleep(1.0)
                 
-                send_btn = self._find_best_clickable(self.SEND_BUTTON_LOCATORS) or self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=15)
+                send_btn = self._find_best_clickable(self.SEND_BUTTON_LOCATORS) or self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=15, stop_event=stop_event)
             
             if not send_btn:
                 return "ERR_SEND_BTN_NOT_FOUND"
+            
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
                 
             self.driver.execute_script("arguments[0].click();", send_btn)
             
             # Wait for upload/processing - dynamically based on file size
             file_size = os.path.getsize(path) if os.path.exists(path) else 0
             wait_time = max(3, min(30, file_size // (1024 * 1024)))  # 1s per MB, min 3s, max 30s
-            time.sleep(wait_time)
+            if stop_event:
+                stop_event.wait(wait_time)
+            else:
+                time.sleep(wait_time)
             
             # Close preview if stuck (rare for docs, common for media)
             if media_type != 'document':
-                 self._wait_for_preview_close(timeout=10)
+                 self._wait_for_preview_close(timeout=10, stop_event=stop_event)
                  
             return "SUCCESS"
             
         except Exception as e:
             return f"ERR_ATTACH_{media_type.upper()}: {str(e)[:50]}"
 
-    def _human_type(self, element, text):
+    def _human_type(self, element, text, stop_event=None):
         """Types text like a human with random delays."""
         for char in text:
+            if stop_event and stop_event.is_set():
+                break
             element.send_keys(char)
-            time.sleep(random.uniform(0.05, 0.2))
+            if stop_event:
+                stop_event.wait(random.uniform(0.05, 0.2))
+            else:
+                time.sleep(random.uniform(0.05, 0.2))
 
-    def _random_scroll(self):
+    def _random_scroll(self, stop_event=None):
         """Simulates random scrolling in the chat list to mimic human activity."""
         try:
             # Find chat/side pane
@@ -614,29 +721,47 @@ class WhatsAppBot:
             ])
             if pane:
                 self.driver.execute_script("arguments[0].scrollTop += arguments[1]", pane, random.randint(100, 300))
-                time.sleep(random.uniform(0.5, 1.5))
+                if stop_event:
+                    stop_event.wait(random.uniform(0.5, 1.5))
+                else:
+                    time.sleep(random.uniform(0.5, 1.5))
                 self.driver.execute_script("arguments[0].scrollTop -= arguments[1]", pane, random.randint(50, 150))
         except:
             pass
 
-    def _send_text(self, message):
+    def _send_text(self, message, stop_event=None):
+        if stop_event and stop_event.is_set():
+            return "STOPPED"
         try:
-            chat_input = self._wait_for_any(self.CHAT_INPUT_LOCATORS, timeout=30)
+            chat_input = self._wait_for_any(self.CHAT_INPUT_LOCATORS, timeout=30, stop_event=stop_event)
             if not chat_input:
                 return "ERR_CHAT_INPUT_NOT_FOUND"
             
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
             chat_input.click()
-            time.sleep(0.5)
+            if stop_event:
+                stop_event.wait(0.5)
+            else:
+                time.sleep(0.5)
             
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
             # Use human typing for shorter messages to avoid detection
             if len(message) < 200:
-                self._human_type(chat_input, message)
+                self._human_type(chat_input, message, stop_event=stop_event)
             else:
                 chat_input.send_keys(message) # Paste long messages
                 
-            time.sleep(0.5)
+            if stop_event:
+                stop_event.wait(0.5)
+            else:
+                time.sleep(0.5)
 
-            send_btn = self._find_best_clickable(self.SEND_BUTTON_LOCATORS) or self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=10)
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
+
+            send_btn = self._find_best_clickable(self.SEND_BUTTON_LOCATORS) or self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=10, stop_event=stop_event)
             if send_btn:
                 try:
                     send_btn.click()
@@ -646,8 +771,11 @@ class WhatsAppBot:
                 # Fallback Enter
                 chat_input.send_keys(Keys.ENTER)
                 
-            time.sleep(1)
-            self._random_scroll() # Scroll a bit after sending
+            if stop_event:
+                stop_event.wait(1.0)
+            else:
+                time.sleep(1.0)
+            self._random_scroll(stop_event=stop_event) # Scroll a bit after sending
             return "SUCCESS"
         except Exception as e:
             return f"ERR_TEXT_SEND: {str(e)[:50]}"
@@ -663,3 +791,112 @@ class WhatsAppBot:
                 pass
             finally:
                 self.driver = None
+    # â”€â”€â”€ Chatbot Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    def get_unread_chats(self):
+        """Returns a list of unread chat elements."""
+        if not self.driver:
+            return []
+        
+        try:
+            # Common locators for unread badge in WhatsApp Web
+            unread_locators = [
+                (By.XPATH, '//span[contains(@aria-label, "unread message")]'),
+                (By.XPATH, '//span[contains(@aria-label, "Ø±Ø³Ø§Ù„Ø© ØºÙŠØ± Ù…Ù‚Ø±ÙˆØ¡Ø©")]'),
+                (By.XPATH, '//span[contains(@aria-label, "Ø±Ø³Ø§Ù„Ø© ØºÙŠØ± Ù…Ù‚Ø±ÙˆØ¡Ø©")]/ancestor::div[@role="listitem"]'),
+                (By.XPATH, '//span[contains(@aria-label, "unread message")]/ancestor::div[@role="listitem"]'),
+                (By.XPATH, '//div[contains(@aria-label, "unread message")]'),
+                (By.XPATH, '//div[contains(@aria-label, "Ø±Ø³Ø§Ù„Ø© ØºÙŠØ± Ù…Ù‚Ø±ÙˆØ¡Ø©")]')
+            ]
+            
+            for loc_type, loc_val in unread_locators:
+                elements = self.driver.find_elements(loc_type, loc_val)
+                # Filter valid clickables (list items usually)
+                valid_elements = []
+                for el in elements:
+                    try:
+                        # try to find the closest ancestor with role="listitem" or just return the element if it's clickable
+                        if el.is_displayed():
+                            valid_elements.append(el)
+                    except:
+                        pass
+                if valid_elements:
+                    return valid_elements
+            return []
+        except Exception:
+            return []
+
+    def open_chat(self, chat_element):
+        """Clicks on a chat element to open it."""
+        try:
+            self.driver.execute_script("arguments[0].click();", chat_element)
+            time.sleep(1) # wait for chat to load
+            return True
+        except Exception:
+            return False
+
+    def check_number_validity(self, phone):
+        """Checks if a phone number has a WhatsApp account by navigating to wa.me link and checking for errors."""
+        try:
+            url = f"https://web.whatsapp.com/send?phone={phone}"
+            self.driver.get(url)
+            
+            # Wait for either the chat to open or the invalid number popup
+            try:
+                # Look for the modal indicating the number is invalid
+                WebDriverWait(self.driver, 10).until(
+                    lambda d: d.find_element(By.XPATH, '//div[@data-animate-modal-popup="true"]') or 
+                              d.find_element(By.XPATH, '//div[@title="Type a message"]') or
+                              d.find_element(By.XPATH, '//div[@title="اكتب رسالة"]') or
+                              "Phone number shared via url is invalid." in d.page_source or
+                              "رقم الهاتف الذي تمت مشاركته عبر الرابط غير صحيح" in d.page_source
+                )
+            except:
+                pass # Timeout, let's check page source directly
+
+            time.sleep(1) # Give it a moment to render
+            
+            # If we find the invalid text anywhere in the page source, it's invalid
+            if "invalid" in self.driver.page_source.lower() or "غير صحيح" in self.driver.page_source:
+                # Click OK button to close modal if exists
+                try:
+                    btn = self.driver.find_element(By.XPATH, '//div[@data-animate-modal-popup="true"]//button')
+                    btn.click()
+                except:
+                    pass
+                return False
+                
+            # Otherwise, assume valid (chat input is probably visible)
+            return True
+        except Exception as e:
+            return False
+
+    def read_last_message(self):
+        """Reads the last incoming message in the currently open chat."""
+        if not self.driver:
+            return ""
+            
+        try:
+            # Locate incoming messages
+            # 'message-in' is a common class for incoming messages
+            in_msgs = self.driver.find_elements(By.XPATH, '//div[contains(@class, "message-in")]')
+            if not in_msgs:
+                return ""
+            
+            last_msg_container = in_msgs[-1]
+            
+            # Find the actual text span within the message container
+            # Usually it's inside a span with class "selectable-text copyable-text"
+            text_spans = last_msg_container.find_elements(By.XPATH, './/span[contains(@class, "selectable-text") and contains(@class, "copyable-text")]')
+            
+            if text_spans:
+                # The text is usually the inner text of the last span or we can just combine them
+                return " ".join([span.text for span in text_spans]).strip()
+            else:
+                return ""
+        except Exception:
+            return ""
+
+    def reply_to_current_chat(self, message):
+        """Sends a message to the currently open chat."""
+        # Just use the existing _send_text which looks for the chat input and sends
+        return self._send_text(message)

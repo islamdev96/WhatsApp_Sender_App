@@ -3,8 +3,14 @@
   "language": "ar",
   "last_contacts_file": "",
   "last_image_file": "",
-  "last_attachments": [],
-  "last_message": "qefwefewf",
+  "last_attachments": [
+    {
+      "path": "G:/صور/صور لاهم العروض/صور مناسبات/5.png",
+      "type": "document",
+      "caption": ""
+    }
+  ],
+  "last_message": "",
   "send_text_with_image": true,
   "background_mode": false,
   "delay_min": 30,
@@ -27,5 +33,5 @@
   "window_height": 976,
   "default_country_code": "20",
   "last_video_file": "",
-  "last_doc_file": ""
+  "last_doc_file": "G:/صور/صور لاهم العروض/صور مناسبات/5.png"
 }

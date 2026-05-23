@@ -207,7 +207,8 @@ class RichTextFrame(ctk.CTkFrame):
         self.toolbar.pack(fill="x", padx=5, pady=2)
 
         # Tools
-        self.label = ctk.CTkLabel(self.toolbar, text="الرسالة", font=("Segoe UI", 13, "bold"),
+        # Tools
+        self.label = ctk.CTkLabel(self.toolbar, text="📝 Message", font=("Segoe UI", 13, "bold"),
                                   text_color=self._c("text_main", None))
         self.label.pack(side="right", padx=5)
         
@@ -225,7 +226,7 @@ class RichTextFrame(ctk.CTkFrame):
             dropdown_fg_color=self._c("card_bg", None),
             dropdown_text_color=self._c("text_main", None),
         )
-        self.var_option.set("متغير")
+        self.var_option.set("{var}")
         self.var_option.pack(side="left", padx=2)
         
         # Formatting buttons (Simulated for now, as CTkTextbox doesn't support rich tags easily yet)
@@ -269,6 +270,29 @@ class RichTextFrame(ctk.CTkFrame):
             border_color=self._c("border", None),
         )
         self.text_box.pack(fill="both", expand=True, padx=5, pady=(5, 2))
+        
+        # Enable undo in the underlying tk.Text widget
+        try:
+            self.text_box._textbox.configure(undo=True)
+        except Exception:
+            pass
+
+        # Context Menu for Right-Click
+        self.context_menu = tk.Menu(self, tearoff=0, font=("Segoe UI", 11))
+        self.context_menu.add_command(label="تراجع (Undo)", command=self._undo)
+        self.context_menu.add_command(label="إعادة (Redo)", command=self._redo)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="قص (Cut)", command=self._cut)
+        self.context_menu.add_command(label="نسخ (Copy)", command=self._copy)
+        self.context_menu.add_command(label="لصق (Paste)", command=self._paste)
+        self.context_menu.add_command(label="حذف (Delete)", command=self._delete)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="تحديد الكل (Select All)", command=self._select_all)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="اتجاه القراءة من اليمين لليسار (RTL)", command=lambda: self.text_box._textbox.configure(justify="right"))
+        self.context_menu.add_command(label="اتجاه القراءة من اليسار لليمين (LTR)", command=lambda: self.text_box._textbox.configure(justify="left"))
+
+        self.text_box.bind("<Button-3>", self._show_context_menu)
 
         # Character counter
         self.char_counter = ctk.CTkLabel(
@@ -281,6 +305,42 @@ class RichTextFrame(ctk.CTkFrame):
         self.text_box.bind("<KeyRelease>", self._update_char_count)
 
         self.apply_theme(self.colors)
+
+    def _undo(self):
+        try:
+            self.text_box._textbox.edit_undo()
+        except tk.TclError:
+            pass
+
+    def _redo(self):
+        try:
+            self.text_box._textbox.edit_redo()
+        except tk.TclError:
+            pass
+
+    def _cut(self):
+        self.text_box._textbox.event_generate("<<Cut>>")
+
+    def _copy(self):
+        self.text_box._textbox.event_generate("<<Copy>>")
+
+    def _paste(self):
+        self.text_box._textbox.event_generate("<<Paste>>")
+
+    def _delete(self):
+        try:
+            self.text_box._textbox.delete("sel.first", "sel.last")
+        except tk.TclError:
+            pass
+
+    def _select_all(self):
+        self.text_box._textbox.tag_add("sel", "1.0", "end")
+
+    def _show_context_menu(self, event):
+        try:
+            self.context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.context_menu.grab_release()
 
     def _insert_var(self, value):
         self.text_box.insert("insert", f" {value} ")

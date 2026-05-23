@@ -37,6 +37,7 @@ PALETTE_DARK = {
     "danger_hover":  "#DD2C00",
     "warning":       "#FFB020",
     "success":       "#00E676",
+    "success_hover": "#00C853",
     "info":          "#38BDF8",
 
     # UI Elements
@@ -63,6 +64,7 @@ PALETTE_LIGHT = {
     "danger_hover":  "#B91C1C",
     "warning":       "#F59E0B",
     "success":       "#16A34A",
+    "success_hover": "#15803D",
     "info":          "#0284C7",
 
     # UI Elements
@@ -171,6 +173,24 @@ class ModernWhatsAppApp(ctk.CTk):
             self.user_data_dir = self.legacy_profile_dir
 
         self.profile_var = ctk.StringVar(value=profile_name)
+
+        # ── Language (i18n) ──
+        import json
+        self.locales = {}
+        try:
+            with open("locales.json", "r", encoding="utf-8") as f:
+                self.locales = json.load(f)
+        except Exception as e:
+            print(f"Error loading locales: {e}")
+            
+        self.current_lang = ctk.StringVar(value=self.config.get("language", "ar"))
+
+    def tr(self, key):
+        """Translate a key based on current language."""
+        lang = self.current_lang.get()
+        if lang not in self.locales:
+            lang = "en"
+        return self.locales.get(lang, {}).get(key, key)
 
 
         # ── Build Layout ──
@@ -288,11 +308,16 @@ class ModernWhatsAppApp(ctk.CTk):
         self.tab_frames = {}
         self._build_tab_main()
         self._build_tab_groups()
+        self._build_tab_gmaps()
+        self._build_tab_warmer()
+        self._build_tab_chatbot()
         self._build_tab_workflows()
         self._build_tab_templates()
         self._build_tab_settings()
         self._build_tab_analytics()
         self._build_tab_log()
+        self._build_tab_filter()
+        self._build_tab_received()
 
         # Show main tab by default
         self._switch_tab("main")
@@ -361,7 +386,7 @@ class ModernWhatsAppApp(ctk.CTk):
 
         # 1. Login / Open WhatsApp button
         self.btn_tb_login = ctk.CTkButton(
-            tb_content, text="🌐\nفتح WhatsApp",
+            tb_content, text=self.tr("open_whatsapp"),
             font=("Segoe UI", 11, "bold"),
             width=95, height=52, corner_radius=8,
             fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
@@ -372,13 +397,18 @@ class ModernWhatsAppApp(ctk.CTk):
 
         # 2. Tabs Navigation Buttons
         nav_items = [
-            ("📣\nحملة جديدة", "main"),
-            ("📊\nالحملات المرسلة", "analytics"),
-            ("👥\nGroups Grabber", "groups"),
-            ("🧭\nسير العمل", "workflows"),
-            ("📝\nالقوالب", "templates"),
-            ("⚙️\nالإعدادات", "settings"),
-            ("📋\nالسجل", "log"),
+            (self.tr("new_campaign"), "main"),
+            (self.tr("sent_campaigns"), "analytics"),
+            (self.tr("auto_reply"), "chatbot"),
+            (self.tr("received"), "received"),
+            (self.tr("filter_numbers"), "filter"),
+            (self.tr("groups_grabber"), "groups"),
+            (self.tr("gmaps"), "gmaps"),
+            (self.tr("warmer"), "warmer"),
+            (self.tr("workflows"), "workflows"),
+            (self.tr("templates"), "templates"),
+            (self.tr("settings"), "settings"),
+            (self.tr("log"), "log"),
         ]
 
         self.nav_buttons = {}
@@ -397,7 +427,7 @@ class ModernWhatsAppApp(ctk.CTk):
 
         # 3. Help Shortcut Button
         self.btn_tb_help = ctk.CTkButton(
-            tb_content, text="❓\nمساعدة",
+            tb_content, text=self.tr("help"),
             font=("Segoe UI", 11),
             width=70, height=52, corner_radius=8,
             fg_color="transparent",
@@ -409,7 +439,7 @@ class ModernWhatsAppApp(ctk.CTk):
 
         # 4. Red Logout button (placed far left)
         self.btn_tb_logout = ctk.CTkButton(
-            tb_content, text="🔴 سجل الخروج",
+            tb_content, text=self.tr("logout"),
             font=("Segoe UI", 12, "bold"),
             width=110, height=40, corner_radius=8,
             fg_color="#D32F2F", hover_color="#B71C1C",
@@ -434,8 +464,26 @@ class ModernWhatsAppApp(ctk.CTk):
         )
         self.profile_combo.pack(side="left", padx=5, pady=8)
         
-        lbl_profile = ctk.CTkLabel(tb_content, text="الحساب:", font=("Segoe UI", 11), text_color=COLORS["text_muted"])
+        lbl_profile = ctk.CTkLabel(tb_content, text="Account:", font=("Segoe UI", 11), text_color=COLORS["text_muted"])
         lbl_profile.pack(side="left", padx=2)
+        
+        # 6. Language Toggle Button
+        lang_text = "🇬🇧 EN" if self.current_lang.get() == "ar" else "🇸🇦 AR"
+        self.btn_lang_toggle = ctk.CTkButton(
+            tb_content, text=lang_text,
+            font=("Segoe UI", 12, "bold"),
+            width=60, height=36, corner_radius=8,
+            fg_color=COLORS["card_bg"], hover_color=COLORS["border"],
+            text_color=COLORS["text_main"],
+            command=self._toggle_language
+        )
+        self.btn_lang_toggle.pack(side="left", padx=15, pady=8)
+
+    def _toggle_language(self):
+        new_lang = "en" if self.current_lang.get() == "ar" else "ar"
+        self.current_lang.set(new_lang)
+        self.config.set("language", new_lang)
+        messagebox.showinfo("Language Changed", "Language has been changed. Please restart the application to apply the changes.")
 
     # ─── Bottom Status Bar ───────────────────────────────────────────────────
     def _build_bottom_bar(self):
@@ -469,7 +517,7 @@ class ModernWhatsAppApp(ctk.CTk):
 
         # 1. Cancel schedule sending (hidden/disabled by default)
         self.btn_cancel_sched = ctk.CTkButton(
-            actions_frame, text="❌ إلغاء الجدولة",
+            actions_frame, text="❌ Cancel",
             font=("Segoe UI", 11),
             width=90, height=32, corner_radius=6,
             fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
@@ -480,7 +528,7 @@ class ModernWhatsAppApp(ctk.CTk):
 
         # 2. Schedule button
         self.btn_tb_schedule = ctk.CTkButton(
-            actions_frame, text="📅 جدولة الإرسال",
+            actions_frame, text="📅 " + self.tr("btn_schedule_send"),
             font=("Segoe UI", 12, "bold"),
             width=125, height=32, corner_radius=6,
             fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
@@ -491,7 +539,7 @@ class ModernWhatsAppApp(ctk.CTk):
 
         # 3. Send Now Button
         self.btn_start = ctk.CTkButton(
-            actions_frame, text="✈️ ارسل الآن",
+            actions_frame, text="✈️ " + self.tr("btn_send_now"),
             font=("Segoe UI", 13, "bold"),
             width=125, height=32, corner_radius=6,
             fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
@@ -502,7 +550,7 @@ class ModernWhatsAppApp(ctk.CTk):
 
         # 4. Pause / Stop Button
         self.btn_stop = ctk.CTkButton(
-            actions_frame, text="🛑 إيقاف مؤقت",
+            actions_frame, text="🛑 " + self.tr("btn_pause_send"),
             font=("Segoe UI", 12, "bold"),
             width=100, height=32, corner_radius=6,
             fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
@@ -555,7 +603,7 @@ class ModernWhatsAppApp(ctk.CTk):
         hdr_ar = ctk.CTkFrame(pane_ar, fg_color="transparent", height=32)
         hdr_ar.grid(row=0, column=0, sticky="ew", pady=(5, 5))
         
-        lbl_ar = ctk.CTkLabel(hdr_ar, text="🤖 الرد الآلي التلقائي", font=("Segoe UI", 13, "bold"), text_color=COLORS["primary"])
+        lbl_ar = ctk.CTkLabel(hdr_ar, text="🤖 " + self.tr("tab_auto_reply_rules"), font=("Segoe UI", 13, "bold"), text_color=COLORS["primary"])
         lbl_ar.pack(side="right", padx=5)
 
         # Toggle Switch
@@ -574,9 +622,9 @@ class ModernWhatsAppApp(ctk.CTk):
         
         ar_columns = ("rule_name", "keywords", "status")
         self.ar_rules_tree = ttk.Treeview(ar_table_frame, columns=ar_columns, show="headings", height=6)
-        self.ar_rules_tree.heading("rule_name", text="اسم القاعدة")
-        self.ar_rules_tree.heading("keywords", text="الكلمات الدالة")
-        self.ar_rules_tree.heading("status", text="الحالة")
+        self.ar_rules_tree.heading("rule_name", text=self.tr("lbl_rules_name"))
+        self.ar_rules_tree.heading("keywords", text=self.tr("lbl_keywords"))
+        self.ar_rules_tree.heading("status", text=self.tr("lbl_status"))
         
         self.ar_rules_tree.column("rule_name", width=80, anchor="e")
         self.ar_rules_tree.column("keywords", width=120, anchor="e")
@@ -594,14 +642,14 @@ class ModernWhatsAppApp(ctk.CTk):
         btns_ar.grid(row=3, column=0, sticky="ew", pady=(4, 2))
         
         ctk.CTkButton(
-            btns_ar, text="+ إضافة قاعدة", font=("Segoe UI", 11, "bold"),
+            btns_ar, text="+ " + self.tr("btn_add_rule"), font=("Segoe UI", 11, "bold"),
             width=85, height=25, fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
             text_color=COLORS["secondary_text"],
             command=self._add_ar_rule_dialog
         ).pack(side="right", padx=3)
 
         ctk.CTkButton(
-            btns_ar, text="- حذف", font=("Segoe UI", 11),
+            btns_ar, text="- " + self.tr("btn_delete_rule"), font=("Segoe UI", 11),
             width=50, height=25, fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
             command=self._delete_ar_rule
         ).pack(side="left", padx=3)
@@ -616,7 +664,7 @@ class ModernWhatsAppApp(ctk.CTk):
         hdr_recv = ctk.CTkFrame(pane_recv, fg_color="transparent", height=32)
         hdr_recv.grid(row=0, column=0, sticky="ew", pady=(5, 2))
         
-        lbl_recv = ctk.CTkLabel(hdr_recv, text="📥 رسائل مستلمة", font=("Segoe UI", 13, "bold"), text_color=COLORS["primary"])
+        lbl_recv = ctk.CTkLabel(hdr_recv, text="📥 " + self.tr("tab_received_messages"), font=("Segoe UI", 13, "bold"), text_color=COLORS["primary"])
         lbl_recv.pack(side="right", padx=5)
 
         # Received Messages Treeview Table
@@ -625,9 +673,9 @@ class ModernWhatsAppApp(ctk.CTk):
         
         recv_columns = ("date", "sender", "message")
         self.recv_tree = ttk.Treeview(recv_table_frame, columns=recv_columns, show="headings", height=6)
-        self.recv_tree.heading("date", text="الوقت")
-        self.recv_tree.heading("sender", text="مرسل")
-        self.recv_tree.heading("message", text="رسالة")
+        self.recv_tree.heading("date", text=self.tr("lbl_date"))
+        self.recv_tree.heading("sender", text=self.tr("lbl_sender"))
+        self.recv_tree.heading("message", text=self.tr("lbl_message"))
         
         self.recv_tree.column("date", width=80, anchor="center")
         self.recv_tree.column("sender", width=80, anchor="e")
@@ -651,7 +699,7 @@ class ModernWhatsAppApp(ctk.CTk):
         hdr_mid = ctk.CTkFrame(col_mid, fg_color="transparent", height=35)
         hdr_mid.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
         
-        lbl_mid = ctk.CTkLabel(hdr_mid, text="📋 أرقام واتس اب", font=("Segoe UI", 15, "bold"), text_color=COLORS["primary"])
+        lbl_mid = ctk.CTkLabel(hdr_mid, text="📋 " + self.tr("tab_whatsapp_numbers"), font=("Segoe UI", 15, "bold"), text_color=COLORS["primary"])
         lbl_mid.pack(side="right", padx=5)
 
         # Table Toolbar for imports & number edit
@@ -719,10 +767,10 @@ class ModernWhatsAppApp(ctk.CTk):
         
         columns = ("name", "phone", "var1", "status")
         self.progress_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15)
-        self.progress_tree.heading("name", text="الاسم")
-        self.progress_tree.heading("phone", text="الرقم")
-        self.progress_tree.heading("var1", text="المتغير 1")
-        self.progress_tree.heading("status", text="الحالة")
+        self.progress_tree.heading("name", text=self.tr("col_name"))
+        self.progress_tree.heading("phone", text=self.tr("col_number"))
+        self.progress_tree.heading("var1", text=self.tr("dialog_var1").replace(" field", "").replace(" حقل", ""))
+        self.progress_tree.heading("status", text=self.tr("col_status"))
         
         self.progress_tree.column("name", width=120, anchor="e")
         self.progress_tree.column("phone", width=120, anchor="center")
@@ -743,16 +791,16 @@ class ModernWhatsAppApp(ctk.CTk):
         # Right-click context menu for Numbers Table
         from tkinter import Menu
         self.numbers_context_menu = Menu(self, tearoff=0)
-        self.numbers_context_menu.add_command(label="📥 استيراد من ملف...", command=self._open_import_dialog)
-        self.numbers_context_menu.add_command(label="✍️ استيراد يدوي (متعدد)...", command=self._add_bulk_manual_numbers_dialog)
+        self.numbers_context_menu.add_command(label="📥 " + self.tr("menu_imports_from_files"), command=self._open_import_dialog)
+        self.numbers_context_menu.add_command(label="✍️ " + self.tr("menu_manual_imports"), command=self._add_bulk_manual_numbers_dialog)
         self.numbers_context_menu.add_separator()
-        self.numbers_context_menu.add_command(label="🗑️ مسح القائمة بالكامل", command=self._clear_numbers_table)
+        self.numbers_context_menu.add_command(label="🗑️ " + self.tr("menu_clear_list"), command=self._clear_numbers_table)
         
         self.progress_tree.bind("<Button-3>", self._show_numbers_context_menu)
 
         # Stats footer for numbers
         self.total_counts_label = ctk.CTkLabel(
-            col_mid, text="مجموعات: 0 | جهات الاتصال: 0 | Total: 0",
+            col_mid, text=f"{self.tr('lbl_groups')} 0 | {self.tr('lbl_contacts')} 0 | {self.tr('lbl_total')} 0",
             font=("Segoe UI", 11), text_color=COLORS["text_muted"]
         )
         self.total_counts_label.grid(row=3, column=0, sticky="ew", padx=15, pady=(2, 2))
@@ -802,7 +850,7 @@ class ModernWhatsAppApp(ctk.CTk):
                                     text_color=COLORS["text_main"])
         msg_tabview.grid(row=1, column=0, sticky="nsew", pady=2)
         
-        tab1 = msg_tabview.add("الرسالة 1")
+        tab1 = msg_tabview.add(self.tr("tab_message") + " 1")
         
         # Message box editor inside tab1
         self.message_editor = RichTextFrame(tab1, colors=COLORS, fg_color=COLORS["bg_dark"], corner_radius=8)
@@ -842,7 +890,7 @@ class ModernWhatsAppApp(ctk.CTk):
         hdr_atts = ctk.CTkFrame(pane_atts, fg_color="transparent", height=30)
         hdr_atts.grid(row=0, column=0, sticky="ew", pady=(2, 2))
         
-        lbl_atts = ctk.CTkLabel(hdr_atts, text="📎 إرفاق الملفات والصور", font=("Segoe UI", 13, "bold"), text_color=COLORS["primary"])
+        lbl_atts = ctk.CTkLabel(hdr_atts, text="📎 " + self.tr("lbl_attach_files"), font=("Segoe UI", 13, "bold"), text_color=COLORS["primary"])
         lbl_atts.pack(side="right", padx=5)
 
         # Hamburger Menu on the right for attachments
@@ -942,6 +990,161 @@ class ModernWhatsAppApp(ctk.CTk):
         self.group_info_label.pack(anchor="e", padx=12, pady=(0, 10))
 
         self._refresh_groups_list()
+
+    # ─── GMaps Scraper Tab ────────────────────────────────────────────────
+    def _build_tab_gmaps(self):
+        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.tab_frames["gmaps"] = frame
+
+        header = ctk.CTkLabel(frame, text="🗺️ سحب أرقام خرائط جوجل",
+                              font=ctk.CTkFont(size=20, weight="bold"))
+        header.pack(anchor="e", padx=25, pady=(20, 10))
+
+        # Search Controls
+        controls = ctk.CTkFrame(frame, corner_radius=10)
+        controls.pack(fill="x", padx=20, pady=10)
+
+        ctk.CTkLabel(controls, text="الكلمة المفتاحية (مثال: صيدليات في الرياض):", 
+                     font=ctk.CTkFont(size=13)).pack(side="right", padx=10, pady=10)
+
+        self.gmaps_query_entry = ctk.CTkEntry(controls, width=250, height=36, corner_radius=8)
+        self.gmaps_query_entry.pack(side="right", padx=10, pady=10)
+
+        self.btn_gmaps_start = ctk.CTkButton(
+            controls, text="▶️ بدء السحب", width=120, height=36,
+            fg_color=COLORS["success"], hover_color=COLORS["success_hover"],
+            font=ctk.CTkFont(size=13, weight="bold"),
+            command=self._start_gmaps_scraper
+        )
+        self.btn_gmaps_start.pack(side="right", padx=10, pady=10)
+
+        self.btn_gmaps_stop = ctk.CTkButton(
+            controls, text="⏹️ إيقاف", width=100, height=36,
+            fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+            font=ctk.CTkFont(size=13, weight="bold"),
+            state="disabled",
+            command=self._stop_gmaps_scraper
+        )
+        self.btn_gmaps_stop.pack(side="right", padx=10, pady=10)
+        
+        self.gmaps_status_lbl = ctk.CTkLabel(controls, text="", text_color=COLORS["text_muted"], font=ctk.CTkFont(size=12))
+        self.gmaps_status_lbl.pack(side="left", padx=10, pady=10)
+
+        # Results Table
+        table_frame = ctk.CTkFrame(frame, corner_radius=10)
+        table_frame.pack(fill="both", expand=True, padx=20, pady=(0, 15))
+
+        columns = ("name", "phone")
+        self.gmaps_tree = ttk.Treeview(table_frame, columns=columns, show="headings")
+        self.gmaps_tree.heading("name", text="الاسم")
+        self.gmaps_tree.heading("phone", text="رقم الهاتف")
+        self.gmaps_tree.column("name", width=300, anchor="e")
+        self.gmaps_tree.column("phone", width=150, anchor="center")
+
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.gmaps_tree.yview)
+        self.gmaps_tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="left", fill="y", padx=2, pady=2)
+        self.gmaps_tree.pack(side="right", fill="both", expand=True, padx=2, pady=2)
+
+        # Actions
+        actions = ctk.CTkFrame(frame, fg_color="transparent")
+        actions.pack(fill="x", padx=20, pady=(0, 20))
+
+        ctk.CTkButton(actions, text="📤 نقل الأرقام إلى حملة الإرسال", height=38,
+                      fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
+                      font=ctk.CTkFont(size=13, weight="bold"),
+                      command=self._export_gmaps_to_campaign).pack(side="right", padx=(0, 10))
+
+        ctk.CTkButton(actions, text="💾 حفظ في ملف CSV", height=38,
+                      fg_color=COLORS["info"], hover_color=COLORS["secondary_hover"],
+                      font=ctk.CTkFont(size=13, weight="bold"),
+                      command=self._export_gmaps_to_csv).pack(side="right", padx=10)
+
+        ctk.CTkButton(actions, text="🗑️ مسح النتائج", height=38,
+                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+                      text_color=COLORS["secondary_text"],
+                      font=ctk.CTkFont(size=13),
+                      command=self._clear_gmaps_results).pack(side="left", padx=10)
+
+    # ─── Warmer Tab ───────────────────────────────────────────────────────
+    def _build_tab_warmer(self):
+        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.tab_frames["warmer"] = frame
+
+        header = ctk.CTkLabel(frame, text="🔥 نظام تسخين وتقوية الحسابات (Auto-Warmer)",
+                              font=ctk.CTkFont(size=20, weight="bold"))
+        header.pack(anchor="e", padx=25, pady=(20, 10))
+
+        desc = ctk.CTkLabel(frame, text="أضف أرقامك الأخرى أو أصدقائك. سيقوم البرنامج بتبادل رسائل طبيعية بشكل عشوائي معهم لحماية حسابك من الحظر.",
+                            font=ctk.CTkFont(size=12), text_color=COLORS["text_muted"])
+        desc.pack(anchor="e", padx=25, pady=(0, 15))
+
+        content_row = ctk.CTkFrame(frame, fg_color="transparent")
+        content_row.pack(fill="both", expand=True, padx=20, pady=5)
+
+        # Left: Settings & Actions
+        left_panel = ctk.CTkFrame(content_row, corner_radius=10)
+        left_panel.pack(side="left", fill="both", expand=True, padx=(0, 10))
+
+        ctk.CTkLabel(left_panel, text="⚙️ إعدادات التسخين", font=ctk.CTkFont(size=15, weight="bold")).pack(anchor="e", padx=15, pady=15)
+
+        # Delay min/max
+        delay_row = ctk.CTkFrame(left_panel, fg_color="transparent")
+        delay_row.pack(fill="x", padx=15, pady=10)
+        
+        ctk.CTkLabel(delay_row, text="تأخير (بالدقائق) من:", font=ctk.CTkFont(size=12)).pack(side="right", padx=5)
+        self.warmer_delay_min = ctk.CTkEntry(delay_row, width=60, justify="center")
+        self.warmer_delay_min.pack(side="right", padx=5)
+        self.warmer_delay_min.insert(0, "2")
+
+        ctk.CTkLabel(delay_row, text="إلى:", font=ctk.CTkFont(size=12)).pack(side="right", padx=5)
+        self.warmer_delay_max = ctk.CTkEntry(delay_row, width=60, justify="center")
+        self.warmer_delay_max.pack(side="right", padx=5)
+        self.warmer_delay_max.insert(0, "7")
+
+        # Total messages
+        msg_count_row = ctk.CTkFrame(left_panel, fg_color="transparent")
+        msg_count_row.pack(fill="x", padx=15, pady=10)
+        
+        ctk.CTkLabel(msg_count_row, text="إجمالي الرسائل المطلوبة:", font=ctk.CTkFont(size=12)).pack(side="right", padx=5)
+        self.warmer_total_msgs = ctk.CTkEntry(msg_count_row, width=80, justify="center")
+        self.warmer_total_msgs.pack(side="right", padx=5)
+        self.warmer_total_msgs.insert(0, "50")
+
+        # Start / Stop
+        btn_row = ctk.CTkFrame(left_panel, fg_color="transparent")
+        btn_row.pack(fill="x", padx=15, pady=30)
+
+        self.btn_warmer_start = ctk.CTkButton(
+            btn_row, text="▶️ بدء التسخين", height=40,
+            fg_color=COLORS["success"], hover_color=COLORS["success_hover"],
+            font=ctk.CTkFont(size=13, weight="bold"),
+            command=self._start_warmer
+        )
+        self.btn_warmer_start.pack(side="right", fill="x", expand=True, padx=5)
+
+        self.btn_warmer_stop = ctk.CTkButton(
+            btn_row, text="⏹️ إيقاف", height=40,
+            fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+            font=ctk.CTkFont(size=13, weight="bold"),
+            state="disabled",
+            command=self._stop_warmer
+        )
+        self.btn_warmer_stop.pack(side="left", fill="x", expand=True, padx=5)
+        
+        self.warmer_status_lbl = ctk.CTkLabel(left_panel, text="", font=ctk.CTkFont(size=13))
+        self.warmer_status_lbl.pack(pady=10)
+
+        # Right: Targets List
+        right_panel = ctk.CTkFrame(content_row, corner_radius=10, width=300)
+        right_panel.pack(side="right", fill="y")
+        right_panel.pack_propagate(False)
+
+        ctk.CTkLabel(right_panel, text="📱 الأرقام المستهدفة (أصدقاء)", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="e", padx=15, pady=(15, 5))
+        
+        self.warmer_targets_textbox = ctk.CTkTextbox(right_panel, font=ctk.CTkFont(size=13))
+        self.warmer_targets_textbox.pack(fill="both", expand=True, padx=15, pady=10)
+        self.warmer_targets_textbox.insert("0.0", "+20100000000\n+96650000000\n")
 
     # ─── Templates Tab ────────────────────────────────────────────────────
     def _build_tab_templates(self):
@@ -1096,6 +1299,25 @@ class ModernWhatsAppApp(ctk.CTk):
         self.max_fail_entry = ctk.CTkEntry(r3, width=70, height=34, corner_radius=8, justify="center")
         self.max_fail_entry.pack(side="right", padx=5)
         self.max_fail_entry.insert(0, str(self.config.get("max_consecutive_failures", 5)))
+
+        # Rotation Settings (Multi-Account Rotation)
+        rotation_card = ctk.CTkFrame(scroll, corner_radius=10)
+        rotation_card.pack(fill="x", padx=10, pady=8)
+        ctk.CTkLabel(rotation_card, text="🔄 التدوير التلقائي للحسابات",
+                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="e", padx=15, pady=(10, 5))
+
+        rot_row1 = ctk.CTkFrame(rotation_card, fg_color="transparent")
+        rot_row1.pack(fill="x", padx=15, pady=(0, 5))
+        self.rotation_enabled_var = ctk.BooleanVar(value=self.config.get("rotation_enabled", False))
+        ctk.CTkCheckBox(rot_row1, text="تفعيل التبديل التلقائي بين كل الحسابات المحفوظة أثناء الإرسال", 
+                        variable=self.rotation_enabled_var, font=ctk.CTkFont(size=12)).pack(side="right", padx=5)
+
+        rot_row2 = ctk.CTkFrame(rotation_card, fg_color="transparent")
+        rot_row2.pack(fill="x", padx=15, pady=(0, 12))
+        ctk.CTkLabel(rot_row2, text="التبديل إلى حساب جديد بعد إرسال (رسالة):", font=ctk.CTkFont(size=12)).pack(side="right", padx=(5, 0))
+        self.rotation_interval_entry = ctk.CTkEntry(rot_row2, width=70, height=34, corner_radius=8, justify="center")
+        self.rotation_interval_entry.pack(side="right", padx=5)
+        self.rotation_interval_entry.insert(0, str(self.config.get("rotation_interval", 50)))
 
         # General Settings (New)
         general_card = ctk.CTkFrame(scroll, corner_radius=10)
@@ -1272,6 +1494,9 @@ class ModernWhatsAppApp(ctk.CTk):
                 break
             try:
                 fn()
+            except Exception as e:
+                import sys
+                print(f"Error in UI queue callback: {e}", file=sys.stderr)
             finally:
                 self.ui_queue.task_done()
         self.after(50, self._process_ui_queue)
@@ -1377,11 +1602,19 @@ class ModernWhatsAppApp(ctk.CTk):
 
     def _update_stats(self):
         total = self.sent + self.failed + self.invalid
-        self.stat_cards["total"].configure(text=str(total))
-        self.stat_cards["success"].configure(text=str(self.sent))
-        self.stat_cards["failed"].configure(text=str(self.failed))
-        self.stat_cards["invalid"].configure(text=str(self.invalid))
-        self.counter_label.configure(text=f"✅ {self.sent} | ❌ {self.failed} | 🚫 {self.invalid}")
+        if hasattr(self, "stat_cards") and self.stat_cards:
+            try:
+                self.stat_cards["total"].configure(text=str(total))
+                self.stat_cards["success"].configure(text=str(self.sent))
+                self.stat_cards["failed"].configure(text=str(self.failed))
+                self.stat_cards["invalid"].configure(text=str(self.invalid))
+            except Exception:
+                pass
+        if hasattr(self, "counter_label") and self.counter_label and self.counter_label.winfo_exists():
+            try:
+                self.counter_label.configure(text=f"✅ {self.sent} | ❌ {self.failed} | 🚫 {self.invalid}")
+            except Exception:
+                pass
 
     def _update_total_counts(self, total=0, contacts_count=0, groups_count=0):
         if hasattr(self, "total_counts_label"):
@@ -1445,7 +1678,7 @@ class ModernWhatsAppApp(ctk.CTk):
 
     def _open_import_dialog(self):
         win = ctk.CTkToplevel(self)
-        win.title("استيراد الأرقام")
+        win.title(self.tr("dialog_import_title"))
         win.geometry("900x620")
         win.minsize(880, 580)
         win.grab_set()
@@ -1462,7 +1695,7 @@ class ModernWhatsAppApp(ctk.CTk):
         # Top: File picker
         file_frame = ctk.CTkFrame(win, corner_radius=10)
         file_frame.pack(fill="x", padx=15, pady=(15, 8))
-        ctk.CTkLabel(file_frame, text="اختر الملف:", font=ctk.CTkFont(size=12, weight="bold")).pack(side="right", padx=10)
+        ctk.CTkLabel(file_frame, text=self.tr("dialog_select_file") + ":", font=ctk.CTkFont(size=12, weight="bold")).pack(side="right", padx=10)
         file_entry = ctk.CTkEntry(file_frame, textvariable=file_var, height=32, corner_radius=8)
         file_entry.pack(side="right", fill="x", expand=True, padx=10, pady=8)
 
@@ -1472,25 +1705,25 @@ class ModernWhatsAppApp(ctk.CTk):
                 file_var.set(path)
                 _load_preview()
 
-        ctk.CTkButton(file_frame, text="Browse", width=90, height=32,
+        ctk.CTkButton(file_frame, text=self.tr("dialog_browse"), width=90, height=32,
                       fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
                       command=_browse_file).pack(side="left", padx=10)
 
         # Settings
         settings_frame = ctk.CTkFrame(win, corner_radius=10)
         settings_frame.pack(fill="x", padx=15, pady=(0, 8))
-        ctk.CTkLabel(settings_frame, text="إعدادات", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="e", padx=12, pady=(8, 4))
+        ctk.CTkLabel(settings_frame, text=self.tr("dialog_settings"), font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="e", padx=12, pady=(8, 4))
 
         settings_row = ctk.CTkFrame(settings_frame, fg_color="transparent")
         settings_row.pack(fill="x", padx=10, pady=(0, 8))
-        ctk.CTkCheckBox(settings_row, text="اعتبر أول صف عناوين", variable=header_var,
+        ctk.CTkCheckBox(settings_row, text=self.tr("dialog_use_first_row"), variable=header_var,
                         command=lambda: _load_preview()).pack(side="right", padx=6)
-        ctk.CTkCheckBox(settings_row, text="فاصل مخصص", variable=custom_delim_var,
+        ctk.CTkCheckBox(settings_row, text=self.tr("dialog_custom_delimiter"), variable=custom_delim_var,
                         command=lambda: _load_preview()).pack(side="right", padx=6)
         delim_entry = ctk.CTkEntry(settings_row, textvariable=delim_var, width=60, height=28)
         delim_entry.pack(side="right", padx=6)
-        ctk.CTkCheckBox(settings_row, text="إزالة التكرارات", variable=dedup_var).pack(side="right", padx=6)
-        ctk.CTkButton(settings_row, text="تحديث المعاينة", height=28,
+        ctk.CTkCheckBox(settings_row, text=self.tr("dialog_remove_duplications"), variable=dedup_var).pack(side="right", padx=6)
+        ctk.CTkButton(settings_row, text="↻ Refresh", height=28,
                       fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
                       text_color=COLORS["secondary_text"],
                       command=lambda: _load_preview()).pack(side="left", padx=6)
@@ -1498,7 +1731,7 @@ class ModernWhatsAppApp(ctk.CTk):
         # Field Mapping
         mapping_frame = ctk.CTkFrame(win, corner_radius=10)
         mapping_frame.pack(fill="x", padx=15, pady=(0, 8))
-        ctk.CTkLabel(mapping_frame, text="تعيين الحقول", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="e", padx=12, pady=(8, 4))
+        ctk.CTkLabel(mapping_frame, text=self.tr("dialog_assign_fields"), font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="e", padx=12, pady=(8, 4))
 
         map_row = ctk.CTkFrame(mapping_frame, fg_color="transparent")
         map_row.pack(fill="x", padx=10, pady=(0, 8))
@@ -1523,13 +1756,13 @@ class ModernWhatsAppApp(ctk.CTk):
         var5_var = ctk.StringVar(value="—")
 
         menus = {
-            "name": _make_field("الاسم", name_var),
-            "phone": _make_field("الرقم", phone_var),
-            "var1": _make_field("Var1", var1_var),
-            "var2": _make_field("Var2", var2_var),
-            "var3": _make_field("Var3", var3_var),
-            "var4": _make_field("Var4", var4_var),
-            "var5": _make_field("Var5", var5_var),
+            "name": _make_field(self.tr("dialog_name_field"), name_var),
+            "phone": _make_field(self.tr("dialog_number_field"), phone_var),
+            "var1": _make_field(self.tr("dialog_var1"), var1_var),
+            "var2": _make_field(self.tr("dialog_var2"), var2_var),
+            "var3": _make_field(self.tr("dialog_var3"), var3_var),
+            "var4": _make_field(self.tr("dialog_var4"), var4_var),
+            "var5": _make_field(self.tr("dialog_var5"), var5_var),
         }
 
         # Preview
@@ -1814,11 +2047,11 @@ class ModernWhatsAppApp(ctk.CTk):
         # Bottom buttons
         btn_row = ctk.CTkFrame(win, fg_color="transparent")
         btn_row.pack(fill="x", padx=15, pady=(0, 15))
-        ctk.CTkButton(btn_row, text="إلغاء", width=90, height=32,
+        ctk.CTkButton(btn_row, text=self.tr("dialog_btn_cancel"), width=90, height=32,
                       fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
                       text_color=COLORS["secondary_text"],
                       command=win.destroy).pack(side="left", padx=6)
-        ctk.CTkButton(btn_row, text="استيراد", width=100, height=32,
+        ctk.CTkButton(btn_row, text=self.tr("dialog_btn_import"), width=100, height=32,
                       fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
                       command=_import_now).pack(side="left", padx=6)
 
@@ -2677,6 +2910,11 @@ class ModernWhatsAppApp(ctk.CTk):
             self.config.set("retry_delay_max", int(self.retry_max_entry.get()))
             self.config.set("max_consecutive_failures", int(self.max_fail_entry.get()))
             
+            # Rotation Settings
+            if hasattr(self, "rotation_enabled_var"):
+                self.config.set("rotation_enabled", self.rotation_enabled_var.get())
+                self.config.set("rotation_interval", int(self.rotation_interval_entry.get()))
+            
             # Save default country code
             cc_raw = self.country_code_entry.get().strip().replace("+", "")
             if not cc_raw:
@@ -2801,8 +3039,21 @@ class ModernWhatsAppApp(ctk.CTk):
 
 
     def _close_progress_window(self):
+        if self.is_running or self.is_checking:
+            if messagebox.askyesno("تأكيد", "عملية الإرسال/الفحص لا تزال جارية. هل تريد إيقاف العملية وإغلاق هذه الشاشة؟"):
+                self.stop_event.set()
+                if self.pause_event.is_set():
+                    self.pause_event.clear()
+                    self.is_paused = False
+                self.log("🛑 طلب إيقاف وإغلاق من شاشة المتابعة...")
+            else:
+                return  # Do not close
+
         if self.progress_win and self.progress_win.winfo_exists():
-            self.progress_win.destroy()
+            try:
+                self.progress_win.destroy()
+            except Exception:
+                pass
         self.progress_win = None
         self.popup_progress_tree = None
         self.progress_count_label = None
@@ -3254,6 +3505,118 @@ class ModernWhatsAppApp(ctk.CTk):
         ).start()
 
     def _start_action(self):
+        """Show Sending Mode dialog, then proceed with the campaign."""
+        self._show_sending_mode_dialog()
+
+    def _show_sending_mode_dialog(self):
+        """Professional sending-mode picker matching competitor apps."""
+        import tkinter as tk
+
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Sending Mode | وضع الإرسال")
+        dialog.geometry("520x360")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        # Centre on parent
+        x = self.winfo_x() + (self.winfo_width() - 520) // 2
+        y = self.winfo_y() + (self.winfo_height() - 360) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        frm = ctk.CTkFrame(dialog, fg_color="transparent")
+        frm.pack(fill="both", expand=True, padx=25, pady=20)
+
+        # Title
+        title = ctk.CTkLabel(frm, text="اختر وضع الإرسال | Select your sending mode",
+                             font=("Segoe UI", 16, "bold"))
+        title.pack(anchor="w", pady=(0, 20))
+
+        mode_var = tk.StringVar(value="safe")
+
+        # ── Safe Mode Card ──
+        safe_card = ctk.CTkFrame(frm, fg_color=COLORS.get("card_bg", "#1E293B"), corner_radius=10, border_width=2, border_color=COLORS.get("primary", "#00E676"))
+        safe_card.pack(fill="x", pady=(0, 12))
+
+        safe_top = ctk.CTkFrame(safe_card, fg_color="transparent")
+        safe_top.pack(fill="x", padx=15, pady=(12, 4))
+
+        safe_radio = ctk.CTkRadioButton(safe_top, text="الوضع الآمن | Safe Mode",
+                                        font=("Segoe UI", 14, "bold"),
+                                        variable=mode_var, value="safe")
+        safe_radio.pack(side="left")
+
+        safe_badge = ctk.CTkLabel(safe_top, text=" خطر الحظر منخفض ",
+                                  font=("Segoe UI", 11, "bold"),
+                                  fg_color="#16A34A", corner_radius=6,
+                                  text_color="#FFFFFF")
+        safe_badge.pack(side="right")
+
+        safe_desc = ctk.CTkLabel(safe_card,
+                                 text="يرسل فقط إلى جهات الاتصال الآمنة (التي لديك محادثة سابقة معها).\nيتم فحص صلاحية كل رقم قبل الإرسال مما يقلل خطر الحظر بشكل كبير.",
+                                 font=("Segoe UI", 11),
+                                 text_color=COLORS.get("text_muted", "#94A3B8"),
+                                 justify="right", anchor="e")
+        safe_desc.pack(fill="x", padx=15, pady=(0, 12))
+
+        # ── Blind Mode Card ──
+        blind_card = ctk.CTkFrame(frm, fg_color=COLORS.get("card_bg", "#1E293B"), corner_radius=10, border_width=2, border_color=COLORS.get("border", "#334155"))
+        blind_card.pack(fill="x", pady=(0, 12))
+
+        blind_top = ctk.CTkFrame(blind_card, fg_color="transparent")
+        blind_top.pack(fill="x", padx=15, pady=(12, 4))
+
+        blind_radio = ctk.CTkRadioButton(blind_top, text="الوضع العشوائي | Blind Mode",
+                                         font=("Segoe UI", 14, "bold"),
+                                         variable=mode_var, value="blind")
+        blind_radio.pack(side="left")
+
+        blind_badge = ctk.CTkLabel(blind_top, text=" خطر الحظر مرتفع ",
+                                   font=("Segoe UI", 11, "bold"),
+                                   fg_color="#DC2626", corner_radius=6,
+                                   text_color="#FFFFFF")
+        blind_badge.pack(side="right")
+
+        blind_desc = ctk.CTkLabel(blind_card,
+                                  text="يرسل إلى جميع الأرقام المستوردة بغض النظر عن صلاحيتها.\nلن يتم فحص الأرقام مسبقاً — سرعة أعلى لكن خطر الحظر مرتفع.",
+                                  font=("Segoe UI", 11),
+                                  text_color=COLORS.get("text_muted", "#94A3B8"),
+                                  justify="right", anchor="e")
+        blind_desc.pack(fill="x", padx=15, pady=(0, 12))
+
+        # ── Buttons ──
+        btn_frame = ctk.CTkFrame(frm, fg_color="transparent")
+        btn_frame.pack(fill="x", pady=(10, 0))
+
+        btn_cancel = ctk.CTkButton(btn_frame, text="إلغاء | Cancel",
+                                   font=("Segoe UI", 13, "bold"), width=130, height=38,
+                                   fg_color=COLORS.get("danger", "#EF4444"),
+                                   hover_color=COLORS.get("danger_hover", "#DC2626"),
+                                   text_color="#FFFFFF",
+                                   command=dialog.destroy)
+        btn_cancel.pack(side="left", padx=(0, 10))
+
+        def on_ok():
+            chosen = mode_var.get()
+            dialog.destroy()
+            self._proceed_start_action(sending_mode=chosen)
+
+        btn_ok = ctk.CTkButton(btn_frame, text="موافق | OK",
+                               font=("Segoe UI", 13, "bold"), width=130, height=38,
+                               fg_color=COLORS.get("primary", "#00E676"),
+                               hover_color=COLORS.get("primary_hover", "#00C853"),
+                               text_color="#000000",
+                               command=on_ok)
+        btn_ok.pack(side="right")
+
+    def _proceed_start_action(self, sending_mode="safe"):
+        """Actually start the campaign after the user picked a mode."""
+        self.sending_mode = sending_mode
+        if sending_mode == "safe":
+            self.log("🛡️ تم اختيار الوضع الآمن (Safe Mode) — سيتم فحص الأرقام قبل الإرسال.")
+        else:
+            self.log("⚡ تم اختيار الوضع العشوائي (Blind Mode) — سيتم الإرسال لجميع الأرقام بدون فحص.")
+
         # Workflow mode
         if hasattr(self, "use_workflow_var") and self.use_workflow_var.get():
             workflow = self._get_selected_workflow()
@@ -3405,184 +3768,238 @@ class ModernWhatsAppApp(ctk.CTk):
         start_time = datetime.datetime.now()
 
         try:
-            batch_size = int(self.batch_size_entry.get())
-            pause_min = int(self.batch_min_entry.get())
-            pause_max = int(self.batch_max_entry.get())
-            delay_min = int(self.delay_min_entry.get())
-            delay_max = int(self.delay_max_entry.get())
-            max_retries = int(self.config.get("max_retries", 2))
-            retry_delay_min = int(self.config.get("retry_delay_min", 3))
-            retry_delay_max = int(self.config.get("retry_delay_max", 6))
-            max_consecutive_failures = int(self.config.get("max_consecutive_failures", 5))
-        except ValueError:
-            batch_size, pause_min, pause_max, delay_min, delay_max = 50, 300, 600, 10, 20
-            max_retries, retry_delay_min, retry_delay_max, max_consecutive_failures = 2, 3, 6, 5
+            try:
+                batch_size = int(self.batch_size_entry.get())
+                pause_min = int(self.batch_min_entry.get())
+                pause_max = int(self.batch_max_entry.get())
+                delay_min = int(self.delay_min_entry.get())
+                delay_max = int(self.delay_max_entry.get())
+                max_retries = int(self.config.get("max_retries", 2))
+                retry_delay_min = int(self.config.get("retry_delay_min", 3))
+                retry_delay_max = int(self.config.get("retry_delay_max", 6))
+                max_consecutive_failures = int(self.config.get("max_consecutive_failures", 5))
+            except ValueError:
+                batch_size, pause_min, pause_max, delay_min, delay_max = 50, 300, 600, 10, 20
+                max_retries, retry_delay_min, retry_delay_max, max_consecutive_failures = 2, 3, 6, 5
 
-        self.log(f"🧭 بدء سير العمل: {workflow.get('name','')} | جهات: {total}")
-        steps = workflow.get("steps") or []
-        consecutive_failures = 0
+            self.log(f"🧭 بدء سير العمل: {workflow.get('name','')} | جهات: {total}")
+            steps = workflow.get("steps") or []
+            consecutive_failures = 0
 
-        retryable_errors = {
-            "ERR_TIMEOUT",
-            "ERR_CHAT_INPUT_NOT_FOUND",
-            "ERR_ATTACH_BTN_NOT_FOUND",
-            "ERR_FILE_INPUT_NOT_FOUND",
-            "ERR_SEND_BTN_NOT_FOUND",
-            "ERR_SEND_BTN_TIMEOUT",
-            "ERR_TEXT_SEND",
-        }
+            retryable_errors = {
+                "ERR_TIMEOUT",
+                "ERR_CHAT_INPUT_NOT_FOUND",
+                "ERR_ATTACH_BTN_NOT_FOUND",
+                "ERR_FILE_INPUT_NOT_FOUND",
+                "ERR_SEND_BTN_NOT_FOUND",
+                "ERR_SEND_BTN_TIMEOUT",
+                "ERR_TEXT_SEND",
+            }
 
-        for i, c in enumerate(contacts):
-            if self.stop_event.is_set():
-                break
-            while self.pause_event.is_set() and not self.stop_event.is_set():
-                time.sleep(0.3)
-
-            if i > 0 and i % batch_size == 0:
-                pause_time = random.uniform(pause_min, pause_max)
-                self.log(f"⏸ استراحة لمدة {int(pause_time)} ثانية...")
-                time.sleep(pause_time)
-
-            phone = c.get("phone")
-            name = c.get("name", "عميل")
-
-            processed = i + 1
-            self._run_on_ui(lambda p=processed, t=total, n=name: self.status_label.configure(text=f"جاري الإرسال {p}/{t} إلى {n}..."))
-            self._run_on_ui(lambda p=processed, t=total: self.progress_bar.set(p / t))
-            elapsed = (datetime.datetime.now() - start_time).total_seconds()
-            eta = None
-            if processed > 0 and total > processed:
-                eta = (elapsed / processed) * (total - processed)
-            self._update_progress_header_blind(processed, total, phone, name, eta)
-
-            if not phone:
-                self.invalid += 1
-                self.results_log.append({"phone": "N/A", "name": name, "status": "بدون واتساب", "error_code": "ERR-00", "timestamp": datetime.datetime.now()})
-                self._add_progress_row_blind(["N/A", name, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "بدون رقم", "بيانات الرقم ناقصة"], tag="invalid")
-                self._run_on_ui(self._update_stats)
-                self._update_progress_header_blind(processed, total, phone, name, eta)
-                continue
-
-            if not self.bot.is_logged_in():
-                self.report_error("ERR-21", dialog=True, level="warning")
-                break
-
-            contact_status = "SUCCESS"
-            contact_error = "-"
-
-            for s_idx, step in enumerate(steps):
+            for i, c in enumerate(contacts):
                 if self.stop_event.is_set():
-                    contact_status = "STOPPED"
                     break
+                while self.pause_event.is_set() and not self.stop_event.is_set():
+                    self.stop_event.wait(0.3)
 
-                body = step.get("body", "")
-                step_attachments = step.get("attachments") or []
-                if not body and not step_attachments:
+                if i > 0 and i % batch_size == 0:
+                    pause_time = random.uniform(pause_min, pause_max)
+                    self.log(f"⏸ استراحة لمدة {int(pause_time)} ثانية...")
+                    if self.stop_event.wait(pause_time):
+                        break
+
+                # Account Rotation Logic
+                rotation_enabled = self.config.get("rotation_enabled", False)
+                try:
+                    rotation_interval = int(self.config.get("rotation_interval", 50))
+                except ValueError:
+                    rotation_interval = 50
+
+                if rotation_enabled and i > 0 and i % rotation_interval == 0:
+                    self.log("🔄 التبديل التلقائي للحساب التالي (تدوير الحسابات)...")
+                    profiles = self._get_profiles()
+                    current_profile = self.config.get("profile_name", "Default")
+                    if profiles and len(profiles) > 1:
+                        try:
+                            curr_idx = profiles.index(current_profile)
+                            next_idx = (curr_idx + 1) % len(profiles)
+                        except ValueError:
+                            next_idx = 0
+                        next_profile = profiles[next_idx]
+                        self.log(f"🔄 التبديل من حساب {current_profile} إلى {next_profile}...")
+                        self._run_on_ui(lambda p=next_profile: self._on_profile_change(p))
+                        
+                        try:
+                            if self.bot:
+                                self.bot.close()
+                        except Exception:
+                            pass
+                        
+                        if self.stop_event.wait(2.0):
+                            break
+                        if self.stop_event.wait(1.0):
+                            break
+
+                        proxy_config = self.config.get("profile_proxies", {}).get(next_profile)
+                        from automation.whatsapp_bot import WhatsAppBot
+                        self.bot = WhatsAppBot(self.user_data_dir, proxy_config)
+                        self.bot.setup_driver(start_minimized=self.bg_mode_var.get())
+                        self.bot.open_whatsapp()
+                        self.log("⏳ انتظار تسجيل الدخول للحساب الجديد...")
+                        if not self.bot.wait_for_login():
+                            self.log("❌ فشل تسجيل الدخول للحساب الجديد. سيتم إيقاف سير العمل.")
+                            self.stop_event.set()
+                            break
+                        self.log("✅ تم الدخول بنجاح. استئناف سير العمل...")
+                    else:
+                        self.log("⚠️ إعداد التدوير مفعل، لكن لا يوجد حسابات أخرى محفوظة للتبديل إليها.")
+
+                phone = c.get("phone")
+                name = c.get("name", "عميل")
+
+                processed = i + 1
+                self._run_on_ui(lambda p=processed, t=total, n=name: self.status_label.configure(text=f"جاري الإرسال {p}/{t} إلى {n}..."))
+                self._run_on_ui(lambda p=processed, t=total: self.progress_bar.set(p / t))
+                elapsed = (datetime.datetime.now() - start_time).total_seconds()
+                eta = None
+                if processed > 0 and total > processed:
+                    eta = (elapsed / processed) * (total - processed)
+                self._update_progress_header_blind(processed, total, phone, name, eta)
+
+                if not phone:
+                    self.invalid += 1
+                    self.results_log.append({"phone": "N/A", "name": name, "status": "بدون واتساب", "error_code": "ERR-00", "timestamp": datetime.datetime.now()})
+                    self._add_progress_row_blind(["N/A", name, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "بدون رقم", "بيانات الرقم ناقصة"], tag="invalid")
+                    self._run_on_ui(self._update_stats)
+                    self._update_progress_header_blind(processed, total, phone, name, eta)
                     continue
 
-                msg_for_contact = self._apply_template(body, c)
-                atts_for_contact = self._format_attachments_for_contact(step_attachments, c)
-                segments = self._split_messages(msg_for_contact)
-                primary_msg = segments[0] if segments else msg_for_contact
-                extra_msgs = segments[1:] if segments else []
-
-                res = None
-                for attempt in range(max_retries + 1):
-                    res = self.bot.send_message(
-                        phone=phone,
-                        name=name,
-                        message_template=primary_msg,
-                        extra_messages=extra_msgs,
-                        attachments=atts_for_contact,
-                        stop_event=self.stop_event,
-                        send_text_with_image=self.send_text_var.get()
-                    )
-                    if res in ("SUCCESS", "INVALID", "STOPPED"):
-                        break
-                    is_retryable = res in retryable_errors or str(res).startswith("ERR_ATTACH_") or str(res).startswith("ERR_GENERAL")
-                    if attempt < max_retries and is_retryable:
-                        wait_s = random.uniform(retry_delay_min, retry_delay_max)
-                        self.log(f"🔁 إعادة محاولة خطوة ({attempt + 1}/{max_retries}) بعد {int(wait_s)}ث | {phone} | {res}")
-                        time.sleep(wait_s)
-                        continue
+                if not self.bot.is_logged_in():
+                    self.report_error("ERR-21", dialog=True, level="warning")
                     break
+
+                contact_status = "SUCCESS"
+                contact_error = "-"
+
+                for s_idx, step in enumerate(steps):
+                    if self.stop_event.is_set():
+                        contact_status = "STOPPED"
+                        break
+
+                    body = step.get("body", "")
+                    step_attachments = step.get("attachments") or []
+                    if not body and not step_attachments:
+                        continue
+
+                    msg_for_contact = self._apply_template(body, c)
+                    atts_for_contact = self._format_attachments_for_contact(step_attachments, c)
+                    segments = self._split_messages(msg_for_contact)
+                    primary_msg = segments[0] if segments else msg_for_contact
+                    extra_msgs = segments[1:] if segments else []
+
+                    res = None
+                    for attempt in range(max_retries + 1):
+                        res = self.bot.send_message(
+                            phone=phone,
+                            name=name,
+                            message_template=primary_msg,
+                            extra_messages=extra_msgs,
+                            attachments=atts_for_contact,
+                            stop_event=self.stop_event,
+                            send_text_with_image=self.send_text_var.get()
+                        )
+                        if res in ("SUCCESS", "INVALID", "STOPPED"):
+                            break
+                        is_retryable = res in retryable_errors or str(res).startswith("ERR_ATTACH_") or str(res).startswith("ERR_GENERAL")
+                        if attempt < max_retries and is_retryable:
+                            wait_s = random.uniform(retry_delay_min, retry_delay_max)
+                            self.log(f"🔁 إعادة محاولة خطوة ({attempt + 1}/{max_retries}) بعد {int(wait_s)}ث | {phone} | {res}")
+                            if self.stop_event.wait(wait_s):
+                                break
+                            continue
+                        break
+
+                    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    step_label = f"Step {s_idx + 1}"
+
+                    if res == "SUCCESS":
+                        self._add_progress_row_blind([phone, f"{name} / {step_label}", timestamp, "تم", "تم إرسال الخطوة"], tag="success")
+                    elif res == "INVALID":
+                        self._add_progress_row_blind([phone, f"{name} / {step_label}", timestamp, "بدون واتساب", "الرقم غير صالح أو لا يستخدم واتساب"], tag="invalid")
+                        contact_status = "INVALID"
+                        contact_error = "ERR-20"
+                        break
+                    elif res == "STOPPED":
+                        self._add_progress_row_blind([phone, f"{name} / {step_label}", timestamp, "توقف", "تم إيقاف العملية"], tag="stopped")
+                        contact_status = "STOPPED"
+                        break
+                    else:
+                        self._add_progress_row_blind([phone, f"{name} / {step_label}", timestamp, "فشل", str(res)], tag="failed")
+                        contact_status = "FAILED"
+                        contact_error = res
+                        break
+
+                    try:
+                        s_min = int(step.get("delay_min", 0) or 0)
+                        s_max = int(step.get("delay_max", 0) or 0)
+                    except ValueError:
+                        s_min, s_max = 0, 0
+                    if s_max > 0:
+                        if self.stop_event.wait(random.uniform(s_min, max(s_min, s_max))):
+                            contact_status = "STOPPED"
+                            break
 
                 timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                step_label = f"Step {s_idx + 1}"
-
-                if res == "SUCCESS":
-                    self._add_progress_row_blind([phone, f"{name} / {step_label}", timestamp, "تم", "تم إرسال الخطوة"], tag="success")
-                elif res == "INVALID":
-                    self._add_progress_row_blind([phone, f"{name} / {step_label}", timestamp, "بدون واتساب", "الرقم غير صالح أو لا يستخدم واتساب"], tag="invalid")
-                    contact_status = "INVALID"
-                    contact_error = "ERR-20"
-                    break
-                elif res == "STOPPED":
-                    self._add_progress_row_blind([phone, f"{name} / {step_label}", timestamp, "توقف", "تم إيقاف العملية"], tag="stopped")
-                    contact_status = "STOPPED"
+                if contact_status == "SUCCESS":
+                    self.sent += 1
+                    self.results_log.append({"phone": phone, "name": name, "status": "نجاح", "error_code": "-", "timestamp": timestamp})
+                    consecutive_failures = 0
+                elif contact_status == "INVALID":
+                    self.invalid += 1
+                    self.results_log.append({"phone": phone, "name": name, "status": "بدون واتساب", "error_code": "ERR-20", "timestamp": timestamp})
+                    consecutive_failures = 0
+                elif contact_status == "STOPPED":
+                    self.results_log.append({"phone": phone, "name": name, "status": "توقف", "error_code": "-", "timestamp": timestamp})
                     break
                 else:
-                    self._add_progress_row_blind([phone, f"{name} / {step_label}", timestamp, "فشل", str(res)], tag="failed")
-                    contact_status = "FAILED"
-                    contact_error = res
+                    self.failed += 1
+                    err_code = contact_error if str(contact_error).startswith("ERR") else "ERR-UNKNOWN"
+                    self.results_log.append({"phone": phone, "name": name, "status": "فشل", "error_code": err_code, "timestamp": timestamp})
+                    consecutive_failures += 1
+                    if consecutive_failures >= max_consecutive_failures:
+                        self.log(f"⛔ تم الإيقاف تلقائيًا بعد {consecutive_failures} فشل متتالي لتقليل المخاطر.")
+                        self.stop_event.set()
+                        break
+
+                self._run_on_ui(self._update_stats)
+                self._update_progress_header_blind(processed, total, phone, name, eta)
+                if self.stop_event.wait(random.uniform(delay_min, delay_max)):
                     break
 
-                try:
-                    s_min = int(step.get("delay_min", 0) or 0)
-                    s_max = int(step.get("delay_max", 0) or 0)
-                except ValueError:
-                    s_min, s_max = 0, 0
-                if s_max > 0:
-                    time.sleep(random.uniform(s_min, max(s_min, s_max)))
+            end_time = datetime.datetime.now()
+            duration = end_time - start_time
+            csv_path = self._generate_final_report(duration)
+            self.last_report_path = csv_path
 
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            if contact_status == "SUCCESS":
-                self.sent += 1
-                self.results_log.append({"phone": phone, "name": name, "status": "نجاح", "error_code": "-", "timestamp": timestamp})
-                consecutive_failures = 0
-            elif contact_status == "INVALID":
-                self.invalid += 1
-                self.results_log.append({"phone": phone, "name": name, "status": "بدون واتساب", "error_code": "ERR-20", "timestamp": timestamp})
-                consecutive_failures = 0
-            elif contact_status == "STOPPED":
-                self.results_log.append({"phone": phone, "name": name, "status": "توقف", "error_code": "-", "timestamp": timestamp})
-                break
-            else:
-                self.failed += 1
-                err_code = contact_error if str(contact_error).startswith("ERR") else "ERR-UNKNOWN"
-                self.results_log.append({"phone": phone, "name": name, "status": "فشل", "error_code": err_code, "timestamp": timestamp})
-                consecutive_failures += 1
-                if consecutive_failures >= max_consecutive_failures:
-                    self.log(f"⛔ تم الإيقاف تلقائيًا بعد {consecutive_failures} فشل متتالي لتقليل المخاطر.")
-                    self.stop_event.set()
-                    break
+            self.campaign_manager.add_campaign(
+                name=f"Workflow {workflow.get('name','')} | {start_time.strftime('%Y-%m-%d %H:%M')}",
+                total=total,
+                sent=self.sent,
+                failed=self.failed,
+                invalid=self.invalid,
+                duration_seconds=int(duration.total_seconds()),
+                results_log=self.results_log,
+                csv_path=csv_path
+            )
+            self._run_on_ui(self._refresh_analytics)
 
-            self._run_on_ui(self._update_stats)
-            self._update_progress_header_blind(processed, total, phone, name, eta)
-            time.sleep(random.uniform(delay_min, delay_max))
-
-        end_time = datetime.datetime.now()
-        duration = end_time - start_time
-        csv_path = self._generate_final_report(duration)
-        self.last_report_path = csv_path
-
-        self.campaign_manager.add_campaign(
-            name=f"Workflow {workflow.get('name','')} | {start_time.strftime('%Y-%m-%d %H:%M')}",
-            total=total,
-            sent=self.sent,
-            failed=self.failed,
-            invalid=self.invalid,
-            duration_seconds=int(duration.total_seconds()),
-            results_log=self.results_log,
-            csv_path=csv_path
-        )
-        self._run_on_ui(self._refresh_analytics)
-
-        try:
-            if self.bg_mode_var.get():
-                self.bot.minimize()
-            else:
-                self.bot.bring_to_front()
+            try:
+                if self.bg_mode_var.get():
+                    self.bot.minimize()
+                else:
+                    self.bot.bring_to_front()
+            except Exception:
+                pass
 
             if self.stop_event.is_set():
                 self.log("🛑 تم إيقاف العملية.")
@@ -3591,7 +4008,7 @@ class ModernWhatsAppApp(ctk.CTk):
                 self._run_on_ui(lambda: self.progress_bar.set(1.0))
 
         except Exception as e:
-            self.report_error("ERR-99", "حدث خطأ عام أثناء الإرسال.", detail=str(e), dialog=True)
+            self.log(f"⚠️ [ERR-99] خطأ غير متوقع في خيط سير العمل: {e}")
         finally:
             self.is_running = False
             self.pause_event.clear()
@@ -3616,180 +4033,236 @@ class ModernWhatsAppApp(ctk.CTk):
         total = len(contacts)
         start_time = datetime.datetime.now()
 
-        # Batch settings
         try:
-            batch_size = int(self.batch_size_entry.get())
-            pause_min = int(self.batch_min_entry.get())
-            pause_max = int(self.batch_max_entry.get())
-            delay_min = int(self.delay_min_entry.get())
-            delay_max = int(self.delay_max_entry.get())
-            max_retries = int(self.config.get("max_retries", 2))
-            retry_delay_min = int(self.config.get("retry_delay_min", 3))
-            retry_delay_max = int(self.config.get("retry_delay_max", 6))
-            max_consecutive_failures = int(self.config.get("max_consecutive_failures", 5))
-        except ValueError:
-            batch_size, pause_min, pause_max, delay_min, delay_max = 50, 300, 600, 10, 20
-            max_retries, retry_delay_min, retry_delay_max, max_consecutive_failures = 2, 3, 6, 5
+            # Batch settings
+            try:
+                batch_size = int(self.batch_size_entry.get())
+                pause_min = int(self.batch_min_entry.get())
+                pause_max = int(self.batch_max_entry.get())
+                delay_min = int(self.delay_min_entry.get())
+                delay_max = int(self.delay_max_entry.get())
+                max_retries = int(self.config.get("max_retries", 2))
+                retry_delay_min = int(self.config.get("retry_delay_min", 3))
+                retry_delay_max = int(self.config.get("retry_delay_max", 6))
+                max_consecutive_failures = int(self.config.get("max_consecutive_failures", 5))
+            except ValueError:
+                batch_size, pause_min, pause_max, delay_min, delay_max = 50, 300, 600, 10, 20
+                max_retries, retry_delay_min, retry_delay_max, max_consecutive_failures = 2, 3, 6, 5
 
-        self.log(f"🚀 بدء إرسال {total} رسالة...")
-        consecutive_failures = 0
-        retryable_errors = {
-            "ERR_TIMEOUT",
-            "ERR_CHAT_INPUT_NOT_FOUND",
-            "ERR_ATTACH_BTN_NOT_FOUND",
-            "ERR_FILE_INPUT_NOT_FOUND",
-            "ERR_SEND_BTN_NOT_FOUND",
-            "ERR_SEND_BTN_TIMEOUT",
-            "ERR_TEXT_SEND",
-        }
+            self.log(f"🚀 بدء إرسال {total} رسالة...")
+            consecutive_failures = 0
+            retryable_errors = {
+                "ERR_TIMEOUT",
+                "ERR_CHAT_INPUT_NOT_FOUND",
+                "ERR_ATTACH_BTN_NOT_FOUND",
+                "ERR_FILE_INPUT_NOT_FOUND",
+                "ERR_SEND_BTN_NOT_FOUND",
+                "ERR_SEND_BTN_TIMEOUT",
+                "ERR_TEXT_SEND",
+            }
 
-        for i, c in enumerate(contacts):
-            if self.stop_event.is_set():
-                break
-            while self.pause_event.is_set() and not self.stop_event.is_set():
-                time.sleep(0.3)
+            for i, c in enumerate(contacts):
+                if self.stop_event.is_set():
+                    break
+                while self.pause_event.is_set() and not self.stop_event.is_set():
+                    self.stop_event.wait(0.3)
 
-            # Batch pause
-            if i > 0 and i % batch_size == 0:
-                pause_time = random.uniform(pause_min, pause_max)
-                self.log(f"⏸ استراحة لمدة {int(pause_time)} ثانية...")
-                time.sleep(pause_time)
+                # Batch pause (interruptible)
+                if i > 0 and i % batch_size == 0:
+                    pause_time = random.uniform(pause_min, pause_max)
+                    self.log(f"⏸ استراحة لمدة {int(pause_time)} ثانية...")
+                    if self.stop_event.wait(pause_time):
+                        break
 
-            phone = c.get("phone")
-            name = c.get("name", "عميل")
-            
-            processed = i + 1
-            self._run_on_ui(lambda p=processed, t=total, n=name: self.status_label.configure(text=f"جاري إرسال {p}/{t} إلى {n}..."))
-            self._run_on_ui(lambda p=processed, t=total: self.progress_bar.set(p / t))
-            elapsed = (datetime.datetime.now() - start_time).total_seconds()
-            eta = None
-            if processed > 0 and total > processed:
-                eta = (elapsed / processed) * (total - processed)
-            self._update_progress_header_blind(processed, total, phone, name, eta)
+                # Account Rotation Logic
+                rotation_enabled = self.config.get("rotation_enabled", False)
+                try:
+                    rotation_interval = int(self.config.get("rotation_interval", 50))
+                except ValueError:
+                    rotation_interval = 50
 
-            # Mark row as sending in the Treeview table live!
-            tree_item_id = c.get("tree_item_id")
-            if tree_item_id:
-                self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "🔄 إرسال..."), tags=("sending",)))
+                if rotation_enabled and i > 0 and i % rotation_interval == 0:
+                    self.log("🔄 التبديل التلقائي للحساب التالي (تدوير الحسابات)...")
+                    profiles = self._get_profiles()
+                    current_profile = self.config.get("profile_name", "Default")
+                    if profiles and len(profiles) > 1:
+                        try:
+                            curr_idx = profiles.index(current_profile)
+                            next_idx = (curr_idx + 1) % len(profiles)
+                        except ValueError:
+                            next_idx = 0
+                        next_profile = profiles[next_idx]
+                        self.log(f"🔄 التبديل من حساب {current_profile} إلى {next_profile}...")
+                        self._run_on_ui(lambda p=next_profile: self._on_profile_change(p))
+                        
+                        try:
+                            if self.bot:
+                                self.bot.close()
+                        except Exception:
+                            pass
+                        
+                        # Wait a bit before opening the new one
+                        if self.stop_event.wait(2.0):
+                            break
 
-            if not phone:
-                self.invalid += 1
-                self.results_log.append({"phone": "N/A", "name": name, "status": "INVALID", "error_code": "ERR-00", "timestamp": datetime.datetime.now()})
-                self._add_progress_row_blind(["N/A", name, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "بدون رقم", "بيانات الرقم ناقصة"], tag="invalid")
+                        # We need to wait for _on_profile_change to actually execute on UI thread
+                        if self.stop_event.wait(1.0):
+                            break
+
+                        # Start new bot
+                        proxy_config = self.config.get("profile_proxies", {}).get(next_profile)
+                        from automation.whatsapp_bot import WhatsAppBot
+                        self.bot = WhatsAppBot(self.user_data_dir, proxy_config)
+                        self.bot.setup_driver(start_minimized=self.bg_mode_var.get())
+                        self.bot.open_whatsapp()
+                        self.log("⏳ انتظار تسجيل الدخول للحساب الجديد...")
+                        if not self.bot.wait_for_login():
+                            self.log("❌ فشل تسجيل الدخول للحساب الجديد. سيتم إيقاف الإرسال.")
+                            self.stop_event.set()
+                            break
+                        self.log("✅ تم الدخول بنجاح. استئناف الإرسال...")
+                    else:
+                        self.log("⚠️ إعداد التدوير مفعل، لكن لا يوجد حسابات أخرى محفوظة للتبديل إليها.")
+
+                phone = c.get("phone")
+                name = c.get("name", "عميل")
+                
+                processed = i + 1
+                self._run_on_ui(lambda p=processed, t=total, n=name: self.status_label.configure(text=f"جاري إرسال {p}/{t} إلى {n}..."))
+                self._run_on_ui(lambda p=processed, t=total: self.progress_bar.set(p / t))
+                elapsed = (datetime.datetime.now() - start_time).total_seconds()
+                eta = None
+                if processed > 0 and total > processed:
+                    eta = (elapsed / processed) * (total - processed)
+                self._update_progress_header_blind(processed, total, phone, name, eta)
+
+                # Mark row as sending in the Treeview table live!
+                tree_item_id = c.get("tree_item_id")
+                if tree_item_id:
+                    self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "🔄 إرسال..."), tags=("sending",)))
+
+                if not phone:
+                    self.invalid += 1
+                    self.results_log.append({"phone": "N/A", "name": name, "status": "INVALID", "error_code": "ERR-00", "timestamp": datetime.datetime.now()})
+                    self._add_progress_row_blind(["N/A", name, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "بدون رقم", "بيانات الرقم ناقصة"], tag="invalid")
+                    self._run_on_ui(self._update_stats)
+                    self._update_progress_header_blind(processed, total, phone, name, eta)
+                    if tree_item_id:
+                        self._run_on_ui(lambda item=tree_item_id, n=name, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, "N/A", v, "🚫 بدون رقم"), tags=("invalid",)))
+                    continue
+
+                # Ensure still logged in
+                if not self.bot.is_logged_in():
+                    self.report_error("ERR-21", dialog=True, level="warning")
+                    if tree_item_id:
+                        self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "⏳ معلق"), tags=("pending",)))
+                    break
+
+                # Prepare personalized content
+                msg_for_contact = self._apply_template(msg_template, c)
+                atts_for_contact = self._format_attachments_for_contact(attachments, c)
+                segments = self._split_messages(msg_for_contact)
+                primary_msg = segments[0] if segments else msg_for_contact
+                extra_msgs = segments[1:] if segments else []
+
+                # Send Message + Attachments with retries
+                res = None
+                for attempt in range(max_retries + 1):
+                    res = self.bot.send_message(
+                        phone=phone,
+                        name=name,
+                        message_template=primary_msg,
+                        extra_messages=extra_msgs,
+                        attachments=atts_for_contact,
+                        stop_event=self.stop_event,
+                        send_text_with_image=self.send_text_var.get()
+                    )
+                    if res in ("SUCCESS", "INVALID", "STOPPED"):
+                        break
+                    is_retryable = res in retryable_errors or str(res).startswith("ERR_ATTACH_") or str(res).startswith("ERR_GENERAL")
+                    if attempt < max_retries and is_retryable:
+                        wait_s = random.uniform(retry_delay_min, retry_delay_max)
+                        self.log(f"🔁 إعادة محاولة ({attempt + 1}/{max_retries}) بعد {int(wait_s)}ث | {phone} | {res}")
+                        if self.stop_event.wait(wait_s):
+                            break
+                        continue
+                    break
+                
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                if res == "SUCCESS":
+                    self.sent += 1
+                    self.log(f"✅ تم الإرسال لـ {name}")
+                    self.results_log.append({"phone": phone, "name": name, "status": "نجاح", "error_code": "-", "timestamp": timestamp})
+                    self._add_progress_row_blind([phone, name, timestamp, "تم", "تم الإرسال"], tag="success")
+                    consecutive_failures = 0
+                    if tree_item_id:
+                        self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "✅ نجاح"), tags=("success",)))
+                elif res == "INVALID":
+                    self.invalid += 1
+                    self.log(f"🚫 [ERR-20] الرقم {phone} غير صحيح.")
+                    self.results_log.append({"phone": phone, "name": name, "status": "بدون واتساب", "error_code": "ERR-20", "timestamp": timestamp})
+                    self._add_progress_row_blind([phone, name, timestamp, "بدون واتساب", "الرقم غير صالح أو لا يستخدم واتساب"], tag="invalid")
+                    consecutive_failures = 0
+                    if tree_item_id:
+                        self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "🚫 غير صالح"), tags=("invalid",)))
+                elif res == "STOPPED":
+                    self.results_log.append({"phone": phone, "name": name, "status": "توقف", "error_code": "-", "timestamp": timestamp})
+                    self._add_progress_row_blind([phone, name, timestamp, "توقف", "تم إيقاف العملية"], tag="stopped")
+                    if tree_item_id:
+                        self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "⚠️ توقف"), tags=("pending",)))
+                    break
+                else:
+                    self.failed += 1
+                    err_code = res if res.startswith("ERR") else "ERR-UNKNOWN"
+                    self.log(f"❌ فشل: {phone} | {res}")
+                    self.results_log.append({"phone": phone, "name": name, "status": "فشل", "error_code": err_code, "timestamp": timestamp})
+                    self._add_progress_row_blind([phone, name, timestamp, "فشل", str(res)], tag="failed")
+                    consecutive_failures += 1
+                    if tree_item_id:
+                        self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "❌ فشل"), tags=("failed",)))
+                    if consecutive_failures >= max_consecutive_failures:
+                        self.log(f"⛔ تم الإيقاف تلقائياً بعد {consecutive_failures} فشل متتالي لتقليل المخاطر.")
+                        self.stop_event.set()
+                        break
+
                 self._run_on_ui(self._update_stats)
                 self._update_progress_header_blind(processed, total, phone, name, eta)
-                if tree_item_id:
-                    self._run_on_ui(lambda item=tree_item_id, n=name, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, "N/A", v, "🚫 بدون رقم"), tags=("invalid",)))
-                continue
-
-            # Ensure still logged in
-            if not self.bot.is_logged_in():
-                self.report_error("ERR-21", dialog=True, level="warning")
-                if tree_item_id:
-                    self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "⏳ معلق"), tags=("pending",)))
-                break
-
-            # Prepare personalized content
-            msg_for_contact = self._apply_template(msg_template, c)
-            atts_for_contact = self._format_attachments_for_contact(attachments, c)
-            segments = self._split_messages(msg_for_contact)
-            primary_msg = segments[0] if segments else msg_for_contact
-            extra_msgs = segments[1:] if segments else []
-
-            # Send Message + Attachments with retries
-            res = None
-            for attempt in range(max_retries + 1):
-                res = self.bot.send_message(
-                    phone=phone,
-                    name=name,
-                    message_template=primary_msg,
-                    extra_messages=extra_msgs,
-                    attachments=atts_for_contact,
-                    stop_event=self.stop_event,
-                    send_text_with_image=self.send_text_var.get()
-                )
-                if res in ("SUCCESS", "INVALID", "STOPPED"):
-                    break
-                is_retryable = res in retryable_errors or str(res).startswith("ERR_ATTACH_") or str(res).startswith("ERR_GENERAL")
-                if attempt < max_retries and is_retryable:
-                    wait_s = random.uniform(retry_delay_min, retry_delay_max)
-                    self.log(f"🔁 إعادة محاولة ({attempt + 1}/{max_retries}) بعد {int(wait_s)}ث | {phone} | {res}")
-                    time.sleep(wait_s)
-                    continue
-                break
-            
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            if res == "SUCCESS":
-                self.sent += 1
-                self.log(f"✅ تم الإرسال لـ {name}")
-                self.results_log.append({"phone": phone, "name": name, "status": "نجاح", "error_code": "-", "timestamp": timestamp})
-                self._add_progress_row_blind([phone, name, timestamp, "تم", "تم الإرسال"], tag="success")
-                consecutive_failures = 0
-                if tree_item_id:
-                    self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "✅ نجاح"), tags=("success",)))
-            elif res == "INVALID":
-                self.invalid += 1
-                self.log(f"🚫 [ERR-20] الرقم {phone} غير صحيح.")
-                self.results_log.append({"phone": phone, "name": name, "status": "بدون واتساب", "error_code": "ERR-20", "timestamp": timestamp})
-                self._add_progress_row_blind([phone, name, timestamp, "بدون واتساب", "الرقم غير صالح أو لا يستخدم واتساب"], tag="invalid")
-                consecutive_failures = 0
-                if tree_item_id:
-                    self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "🚫 غير صالح"), tags=("invalid",)))
-            elif res == "STOPPED":
-                self.results_log.append({"phone": phone, "name": name, "status": "توقف", "error_code": "-", "timestamp": timestamp})
-                self._add_progress_row_blind([phone, name, timestamp, "توقف", "تم إيقاف العملية"], tag="stopped")
-                if tree_item_id:
-                    self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "⚠️ توقف"), tags=("pending",)))
-                break
-            else:
-                self.failed += 1
-                err_code = res if res.startswith("ERR") else "ERR-UNKNOWN"
-                self.log(f"❌ فشل: {phone} | {res}")
-                self.results_log.append({"phone": phone, "name": name, "status": "فشل", "error_code": err_code, "timestamp": timestamp})
-                self._add_progress_row_blind([phone, name, timestamp, "فشل", str(res)], tag="failed")
-                consecutive_failures += 1
-                if tree_item_id:
-                    self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "❌ فشل"), tags=("failed",)))
-                if consecutive_failures >= max_consecutive_failures:
-                    self.log(f"⛔ تم الإيقاف تلقائياً بعد {consecutive_failures} فشل متتالي لتقليل المخاطر.")
-                    self.stop_event.set()
+                
+                # Delay (interruptible)
+                if self.stop_event.wait(random.uniform(delay_min, delay_max)):
                     break
 
-            self._run_on_ui(self._update_stats)
-            self._update_progress_header_blind(processed, total, phone, name, eta)
+            end_time = datetime.datetime.now()
+            duration = end_time - start_time
             
-            # Delay
-            time.sleep(random.uniform(delay_min, delay_max))
+            # Save Campaign
+            csv_path = self._generate_final_report(duration)
+            self.last_report_path = csv_path
+            
+            # Determine status
+            c_status = "Completed" if not self.stop_event.is_set() else "Stopped"
+            
+            # Save to history
+            self.campaign_manager.add_campaign(
+                name=f"Campaign {start_time.strftime('%Y-%m-%d %H:%M')}",
+                total=total,
+                sent=self.sent,
+                failed=self.failed,
+                invalid=self.invalid,
+                duration_seconds=int(duration.total_seconds()),
+                results_log=self.results_log,
+                csv_path=csv_path
+            )
+            self._run_on_ui(self._refresh_analytics)
 
-        end_time = datetime.datetime.now()
-        duration = end_time - start_time
-        
-        # Save Campaign
-        csv_path = self._generate_final_report(duration)
-        self.last_report_path = csv_path
-        
-        # Determine status
-        c_status = "Completed" if not self.stop_event.is_set() else "Stopped"
-        
-        # Save to history
-        self.campaign_manager.add_campaign(
-            name=f"Campaign {start_time.strftime('%Y-%m-%d %H:%M')}",
-            total=total,
-            sent=self.sent,
-            failed=self.failed,
-            invalid=self.invalid,
-            duration_seconds=int(duration.total_seconds()),
-            results_log=self.results_log,
-            csv_path=csv_path
-        )
-        self._run_on_ui(self._refresh_analytics)
-
-        try:
-            if self.bg_mode_var.get():
-                self.bot.minimize()
-            else:
-                self.bot.bring_to_front()
+            try:
+                if self.bg_mode_var.get():
+                    self.bot.minimize()
+                else:
+                    self.bot.bring_to_front()
+            except Exception:
+                pass
 
             if self.stop_event.is_set():
                 self.log("🛑 تم إيقاف العملية.")
@@ -3798,7 +4271,7 @@ class ModernWhatsAppApp(ctk.CTk):
                 self._run_on_ui(lambda: self.progress_bar.set(1.0))
 
         except Exception as e:
-            self.report_error("ERR-99", "حدث خطأ عام أثناء الإرسال.", detail=str(e), dialog=True)
+            self.log(f"⚠️ [ERR-99] خطأ غير متوقع في خيط الإرسال: {e}")
         finally:
             self.is_running = False
             self.pause_event.clear()
@@ -3821,81 +4294,87 @@ class ModernWhatsAppApp(ctk.CTk):
 
         total = len(contacts)
         start_time = datetime.datetime.now()
-        self.log(f"🔍 بدء فحص {total} رقم...")
 
-        for i, c in enumerate(contacts):
-            if self.stop_event.is_set():
-                break
-            phone = c.get("phone")
-            name = c.get("name", "عميل")
+        try:
+            self.log(f"🔍 بدء فحص {total} رقم...")
 
-            processed = i + 1
-            self._run_on_ui(lambda p=processed, t=total, n=name: self.status_label.configure(text=f"فحص {p}/{t} - {n}"))
-            self._run_on_ui(lambda p=processed, t=total: self.progress_bar.set(p / t))
-            elapsed = (datetime.datetime.now() - start_time).total_seconds()
-            eta = None
-            if processed > 0 and total > processed:
-                eta = (elapsed / processed) * (total - processed)
-            self._update_progress_header_blind(processed, total, phone, name, eta)
+            for i, c in enumerate(contacts):
+                if self.stop_event.is_set():
+                    break
+                phone = c.get("phone")
+                name = c.get("name", "عميل")
 
-            if not phone:
-                self.invalid += 1
-                self.results_log.append({"phone": "N/A", "name": name, "status": "غير صالح", "error_code": "ERR-00", "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
-                self._add_progress_row_blind(["N/A", name, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "بدون رقم", "بيانات الرقم ناقصة"], tag="invalid")
+                processed = i + 1
+                self._run_on_ui(lambda p=processed, t=total, n=name: self.status_label.configure(text=f"فحص {p}/{t} - {n}"))
+                self._run_on_ui(lambda p=processed, t=total: self.progress_bar.set(p / t))
+                elapsed = (datetime.datetime.now() - start_time).total_seconds()
+                eta = None
+                if processed > 0 and total > processed:
+                    eta = (elapsed / processed) * (total - processed)
+                self._update_progress_header_blind(processed, total, phone, name, eta)
+
+                if not phone:
+                    self.invalid += 1
+                    self.results_log.append({"phone": "N/A", "name": name, "status": "غير صالح", "error_code": "ERR-00", "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+                    self._add_progress_row_blind(["N/A", name, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "بدون رقم", "بيانات الرقم ناقصة"], tag="invalid")
+                    self._run_on_ui(self._update_stats)
+                    self._update_progress_header_blind(processed, total, phone, name, eta)
+                    continue
+
+                res = self.bot.check_number(phone=phone, stop_event=self.stop_event)
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                if res == "VALID":
+                    self.sent += 1
+                    self.log(f"✅ صالح: {phone} | {name}")
+                    self.results_log.append({"phone": phone, "name": name, "status": "صالح", "error_code": "-", "timestamp": timestamp})
+                    self._add_progress_row_blind([phone, name, timestamp, "عنده واتساب", "صالح للإرسال"], tag="success")
+                elif res == "INVALID":
+                    self.invalid += 1
+                    self.log(f"🚫 غير صالح: {phone}")
+                    self.results_log.append({"phone": phone, "name": name, "status": "غير صالح", "error_code": "ERR-20", "timestamp": timestamp})
+                    self._add_progress_row_blind([phone, name, timestamp, "بدون واتساب", "الرقم غير صالح أو لا يستخدم واتساب"], tag="invalid")
+                elif res == "STOPPED":
+                    self.results_log.append({"phone": phone, "name": name, "status": "توقف", "error_code": "-", "timestamp": timestamp})
+                    self._add_progress_row_blind([phone, name, timestamp, "توقف", "تم إيقاف الفحص"], tag="stopped")
+                    break
+                else:
+                    self.failed += 1
+                    self.log(f"⚠️ تعذر الفحص: {phone} | {res}")
+                    self.results_log.append({"phone": phone, "name": name, "status": "فشل", "error_code": res, "timestamp": timestamp})
+                    self._add_progress_row_blind([phone, name, timestamp, "فشل", str(res)], tag="failed")
+
                 self._run_on_ui(self._update_stats)
                 self._update_progress_header_blind(processed, total, phone, name, eta)
-                continue
+                if self.stop_event.wait(random.uniform(1.5, 3.0)):
+                    break
 
-            res = self.bot.check_number(phone=phone, stop_event=self.stop_event)
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            if res == "VALID":
-                self.sent += 1
-                self.log(f"✅ صالح: {phone} | {name}")
-                self.results_log.append({"phone": phone, "name": name, "status": "صالح", "error_code": "-", "timestamp": timestamp})
-                self._add_progress_row_blind([phone, name, timestamp, "عنده واتساب", "صالح للإرسال"], tag="success")
-            elif res == "INVALID":
-                self.invalid += 1
-                self.log(f"🚫 غير صالح: {phone}")
-                self.results_log.append({"phone": phone, "name": name, "status": "غير صالح", "error_code": "ERR-20", "timestamp": timestamp})
-                self._add_progress_row_blind([phone, name, timestamp, "بدون واتساب", "الرقم غير صالح أو لا يستخدم واتساب"], tag="invalid")
-            elif res == "STOPPED":
-                self.results_log.append({"phone": phone, "name": name, "status": "توقف", "error_code": "-", "timestamp": timestamp})
-                self._add_progress_row_blind([phone, name, timestamp, "توقف", "تم إيقاف الفحص"], tag="stopped")
-                break
+            report_path, valid_path, invalid_path = self._save_number_check_report()
+            if self.stop_event.is_set():
+                self.log("🛑 تم إيقاف الفحص.")
             else:
-                self.failed += 1
-                self.log(f"⚠️ تعذر الفحص: {phone} | {res}")
-                self.results_log.append({"phone": phone, "name": name, "status": "فشل", "error_code": res, "timestamp": timestamp})
-                self._add_progress_row_blind([phone, name, timestamp, "فشل", str(res)], tag="failed")
+                self.log("🏁 انتهى فحص الأرقام.")
+                if report_path:
+                    self.log(f"📄 تقرير الفحص: {report_path}")
+                if valid_path:
+                    self.log(f"✅ ملف الأرقام الصالحة: {valid_path}")
+                if invalid_path:
+                    self.log(f"🚫 ملف الأرقام غير الصالحة: {invalid_path}")
+                if valid_path and hasattr(self, "use_valid_after_check_var") and self.use_valid_after_check_var.get():
+                    self.contacts_entry.delete(0, "end")
+                    self.contacts_entry.insert(0, valid_path)
+                    self._update_total_counts(total=self.sent, contacts_count=self.sent, groups_count=0)
+                    self.log("✨ تم تعيين ملف الأرقام الصالحة كملف الإرسال الحالي.")
 
-            self._run_on_ui(self._update_stats)
-            self._update_progress_header_blind(processed, total, phone, name, eta)
-            time.sleep(random.uniform(1.5, 3.0))
-
-        report_path, valid_path, invalid_path = self._save_number_check_report()
-        if self.stop_event.is_set():
-            self.log("🛑 تم إيقاف الفحص.")
-        else:
-            self.log("🏁 انتهى فحص الأرقام.")
-            if report_path:
-                self.log(f"📄 تقرير الفحص: {report_path}")
-            if valid_path:
-                self.log(f"✅ ملف الأرقام الصالحة: {valid_path}")
-            if invalid_path:
-                self.log(f"🚫 ملف الأرقام غير الصالحة: {invalid_path}")
-            if valid_path and hasattr(self, "use_valid_after_check_var") and self.use_valid_after_check_var.get():
-                self.contacts_entry.delete(0, "end")
-                self.contacts_entry.insert(0, valid_path)
-                self._update_total_counts(total=self.sent, contacts_count=self.sent, groups_count=0)
-                self.log("✨ تم تعيين ملف الأرقام الصالحة كملف الإرسال الحالي.")
-
-        self.is_checking = False
-        self.stop_event.clear()
-        self._run_on_ui(lambda: self.btn_start.configure(state="normal"))
-        self._run_on_ui(lambda: self.btn_check.configure(state="normal"))
-        self._run_on_ui(lambda: self.btn_stop.configure(state="disabled"))
-        self._run_on_ui(lambda: self.status_label.configure(text="جاهز..."))
+        except Exception as e:
+            self.log(f"⚠️ [ERR-99] خطأ غير متوقع في خيط فحص الأرقام: {e}")
+        finally:
+            self.is_checking = False
+            self.stop_event.clear()
+            self._run_on_ui(lambda: self.btn_start.configure(state="normal"))
+            self._run_on_ui(lambda: self.btn_check.configure(state="normal"))
+            self._run_on_ui(lambda: self.btn_stop.configure(state="disabled"))
+            self._run_on_ui(lambda: self.status_label.configure(text="جاهز..."))
 
     def _save_number_check_report(self):
         if not self.results_log:
@@ -4038,6 +4517,7 @@ class ModernWhatsAppApp(ctk.CTk):
             self.progress_win.geometry("1080x720")
             self.progress_win.minsize(980, 600)
             self.progress_win.grab_set()
+            self.progress_win.protocol("WM_DELETE_WINDOW", self._close_progress_window)
             
             # Focus
             self.progress_win.after(100, self.progress_win.lift)
@@ -4194,40 +4674,46 @@ class ModernWhatsAppApp(ctk.CTk):
         new_values[0] = f"{icon}{new_values[0]}"
         
         def _do():
-            if self.popup_progress_tree:
-                self.popup_progress_tree.insert("", "0", values=new_values, tags=(tag,))
+            try:
+                if self.popup_progress_tree and self.popup_progress_tree.winfo_exists():
+                    self.popup_progress_tree.insert("", "0", values=new_values, tags=(tag,))
+            except Exception:
+                pass
         self._run_on_ui(_do)
 
     def _update_progress_header_blind(self, processed, total, current_phone=None, current_name=None, eta=None, status_text=None):
         def _do():
-            remaining = max(total - processed, 0)
-            title_text = getattr(self, "progress_title_text", "متابعة العملية")
-            if self.progress_count_label:
-                self.progress_count_label.configure(text=f"{title_text} ({processed}/{total})")
-            if self.progress_bar_small:
-                self.progress_bar_small.set(processed / total if total else 0)
-            metric_values = {
-                "processed": processed,
-                "sent": self.sent,
-                "failed": self.failed,
-                "invalid": self.invalid,
-                "remaining": remaining,
-                "eta": self._format_progress_eta(eta),
-            }
-            for key, value in metric_values.items():
-                label = self.progress_metric_labels.get(key)
-                if label:
-                    label.configure(text=str(value))
-            if self.progress_status_label:
-                if status_text:
-                    text = status_text
-                elif current_phone and current_name:
-                    text = f"جاري العمل على: {current_name} - {current_phone}"
-                elif current_phone:
-                    text = f"جاري العمل على: {current_phone}"
-                else:
-                    text = "جاري العمل..."
-                self.progress_status_label.configure(text=text)
+            try:
+                remaining = max(total - processed, 0)
+                title_text = getattr(self, "progress_title_text", "متابعة العملية")
+                if self.progress_count_label and self.progress_count_label.winfo_exists():
+                    self.progress_count_label.configure(text=f"{title_text} ({processed}/{total})")
+                if self.progress_bar_small and self.progress_bar_small.winfo_exists():
+                    self.progress_bar_small.set(processed / total if total else 0)
+                metric_values = {
+                    "processed": processed,
+                    "sent": self.sent,
+                    "failed": self.failed,
+                    "invalid": self.invalid,
+                    "remaining": remaining,
+                    "eta": self._format_progress_eta(eta),
+                }
+                for key, value in metric_values.items():
+                    label = self.progress_metric_labels.get(key)
+                    if label and label.winfo_exists():
+                        label.configure(text=str(value))
+                if self.progress_status_label and self.progress_status_label.winfo_exists():
+                    if status_text:
+                        text = status_text
+                    elif current_phone and current_name:
+                        text = f"جاري العمل على: {current_name} - {current_phone}"
+                    elif current_phone:
+                        text = f"جاري العمل على: {current_phone}"
+                    else:
+                        text = "جاري العمل..."
+                    self.progress_status_label.configure(text=text)
+            except Exception:
+                pass
         self._run_on_ui(_do)
 
     def _load_profile_proxy_settings(self, profile_name):
@@ -4678,6 +5164,40 @@ class ModernWhatsAppApp(ctk.CTk):
         textbox = ctk.CTkTextbox(frm, height=130, font=("Consolas", 11))
         textbox.pack(fill="x", pady=(0, 2))
 
+        # Enable undo
+        try:
+            textbox._textbox.configure(undo=True)
+        except Exception:
+            pass
+
+        # Right-click context menu
+        import tkinter as tk
+        ctx_menu = tk.Menu(dialog, tearoff=0, font=("Segoe UI", 11))
+        ctx_menu.add_command(label="تراجع (Undo)", command=lambda: _ctx_undo())
+        ctx_menu.add_command(label="إعادة (Redo)", command=lambda: _ctx_redo())
+        ctx_menu.add_separator()
+        ctx_menu.add_command(label="قص (Cut)", command=lambda: textbox._textbox.event_generate("<<Cut>>"))
+        ctx_menu.add_command(label="نسخ (Copy)", command=lambda: textbox._textbox.event_generate("<<Copy>>"))
+        ctx_menu.add_command(label="لصق (Paste)", command=lambda: textbox._textbox.event_generate("<<Paste>>"))
+        ctx_menu.add_command(label="حذف (Delete)", command=lambda: _ctx_delete())
+        ctx_menu.add_separator()
+        ctx_menu.add_command(label="تحديد الكل (Select All)", command=lambda: textbox._textbox.tag_add("sel", "1.0", "end"))
+
+        def _ctx_undo():
+            try: textbox._textbox.edit_undo()
+            except: pass
+        def _ctx_redo():
+            try: textbox._textbox.edit_redo()
+            except: pass
+        def _ctx_delete():
+            try: textbox._textbox.delete("sel.first", "sel.last")
+            except: pass
+        def _show_ctx(event):
+            try: ctx_menu.tk_popup(event.x_root, event.y_root)
+            finally: ctx_menu.grab_release()
+
+        textbox.bind("<Button-3>", _show_ctx)
+
         # Help Label
         lbl_help = ctk.CTkLabel(
             frm, 
@@ -4858,3 +5378,642 @@ class ModernWhatsAppApp(ctk.CTk):
         self._apply_palette(new_mode)
         self._refresh_theme()
 
+    # â”€â”€â”€ GMaps Scraper Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    def _start_gmaps_scraper(self):
+        query = self.gmaps_query_entry.get().strip()
+        if not query:
+            messagebox.showerror("Ø®Ø·Ø£", "Ø§Ù„Ø±Ø¬Ø§Ø¡ Ø¥Ø¯Ø®Ø§Ù„ Ø§Ù„ÙƒÙ„Ù…Ø© Ø§Ù„Ù…ÙØªØ§Ø­ÙŠØ© Ù„Ù„Ø¨Ø­Ø«.")
+            return
+
+        if not self.bot:
+            messagebox.showerror("Ø®Ø·Ø£", "Ø§Ù„Ø±Ø¬Ø§Ø¡ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ø¥Ù„Ù‰ Ù…ØªØµÙØ­ ÙˆØ§ØªØ³Ø§Ø¨ Ø£ÙˆÙ„Ø§Ù‹ Ù„ÙŠØªÙ…ÙƒÙ† Ø§Ù„Ø¨Ø±Ù†Ø§Ù…Ø¬ Ù…Ù† Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ù…ØªØµÙØ­ Ù„Ù„Ø³Ø­Ø¨ØŒ Ø£Ùˆ ÙŠÙ…ÙƒÙ†Ùƒ ÙØªØ­ Ù…ØªØµÙØ­ Ø¬Ø¯ÙŠØ¯.")
+            # Actually, let's just create a new bot if it doesn't exist, but we need the user_data_dir
+            # Wait, WhatsAppBot is fine. We can use `self.bot.driver` if `self.bot` is initialized.
+            # But let's handle this in the thread.
+
+        self.btn_gmaps_start.configure(state="disabled")
+        self.btn_gmaps_stop.configure(state="normal")
+        self.gmaps_status_lbl.configure(text="Ø¬Ø§Ø±ÙŠ Ø¨Ø¯Ø¡ Ù…ØªØµÙØ­ Ø§Ù„Ø³Ø­Ø¨...", text_color=COLORS["warning"])
+        
+        # Clear old results
+        self._clear_gmaps_results()
+
+        self.gmaps_stop_event = threading.Event()
+        
+        t = threading.Thread(target=self._run_gmaps_scraper_thread, args=(query,), daemon=True)
+        t.start()
+
+    def _run_gmaps_scraper_thread(self, query):
+        try:
+            from automation.gmaps_scraper import GMapsScraper
+            from automation.whatsapp_bot import WhatsAppBot
+            
+            # Need a driver. We can create a temporary invisible one or use the current one.
+            # Let's create a temporary hidden Chrome driver using WhatsAppBot's setup logic but without loading a heavy profile if we don't want to.
+            # However, reusing our proxy_config is good.
+            temp_bot = WhatsAppBot(user_data_dir=None, proxy_config=None)
+            temp_bot.setup_driver(start_minimized=True)
+            
+            scraper = GMapsScraper(temp_bot.driver)
+            
+            def on_update(status, data):
+                if status == "FOUND":
+                    self._run_on_ui(lambda: self.gmaps_tree.insert("", "end", values=(data["name"], data["phone"])))
+                    self._run_on_ui(lambda: self.gmaps_status_lbl.configure(text=f"ØªÙ… Ø§Ø³ØªØ®Ø±Ø§Ø¬ {data['count']} Ù†ØªÙŠØ¬Ø©...", text_color=COLORS["success"]))
+                elif status == "ERROR":
+                    self._run_on_ui(lambda: self.gmaps_status_lbl.configure(text=data, text_color=COLORS["danger"]))
+
+            self._run_on_ui(lambda: self.gmaps_status_lbl.configure(text="Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø¨Ø­Ø« ÙˆØ³Ø­Ø¨ Ø§Ù„Ù†ØªØ§Ø¦Ø¬...", text_color=COLORS["warning"]))
+            self.log(f"ðŸ—ºï¸ Ø¨Ø¯Ø¡ Ø³Ø­Ø¨ Ø®Ø±Ø§Ø¦Ø· Ø¬ÙˆØ¬Ù„ Ù„Ù„Ø¨Ø­Ø«: {query}")
+            
+            results = scraper.scrape(query, self.gmaps_stop_event, max_results=1000, update_callback=on_update)
+            
+            temp_bot.close()
+            
+            if self.gmaps_stop_event.is_set():
+                self._run_on_ui(lambda: self.gmaps_status_lbl.configure(text=f"ØªÙ… Ø§Ù„Ø¥ÙŠÙ‚Ø§Ù ÙŠØ¯ÙˆÙŠØ§Ù‹. Ø§Ø³ØªØ®Ø±Ø¬Ù†Ø§ {len(results)} Ø±Ù‚Ù….", text_color=COLORS["info"]))
+                self.log(f"ðŸ—ºï¸ ØªÙ… Ø¥ÙŠÙ‚Ø§Ù Ø³Ø­Ø¨ Ø§Ù„Ø®Ø±Ø§Ø¦Ø·. Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹: {len(results)}")
+            else:
+                self._run_on_ui(lambda: self.gmaps_status_lbl.configure(text=f"Ø§Ù†ØªÙ‡Ù‰ Ø§Ù„Ø¨Ø­Ø«. Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹: {len(results)} Ø±Ù‚Ù….", text_color=COLORS["success"]))
+                self.log(f"ðŸ—ºï¸ Ø§ÙƒØªÙ…Ù„ Ø³Ø­Ø¨ Ø®Ø±Ø§Ø¦Ø· Ø¬ÙˆØ¬Ù„. Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹: {len(results)}")
+
+        except Exception as e:
+            self._run_on_ui(lambda: self.gmaps_status_lbl.configure(text=f"Ø­Ø¯Ø« Ø®Ø·Ø£ ØºÙŠØ± Ù…ØªÙˆÙ‚Ø¹", text_color=COLORS["danger"]))
+            self.log(f"âŒ Ø®Ø·Ø£ ÙÙŠ Ø³Ø­Ø¨ Ø§Ù„Ø®Ø±Ø§Ø¦Ø·: {str(e)}")
+        finally:
+            self._run_on_ui(lambda: self.btn_gmaps_start.configure(state="normal"))
+            self._run_on_ui(lambda: self.btn_gmaps_stop.configure(state="disabled"))
+
+    def _stop_gmaps_scraper(self):
+        if hasattr(self, "gmaps_stop_event"):
+            self.gmaps_stop_event.set()
+        self.btn_gmaps_stop.configure(state="disabled")
+        self.gmaps_status_lbl.configure(text="Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø¥ÙŠÙ‚Ø§Ù...", text_color=COLORS["warning"])
+
+    def _clear_gmaps_results(self):
+        for item in self.gmaps_tree.get_children():
+            self.gmaps_tree.delete(item)
+        self.gmaps_status_lbl.configure(text="")
+
+    def _export_gmaps_to_campaign(self):
+        items = self.gmaps_tree.get_children()
+        if not items:
+            messagebox.showwarning("ØªÙ†Ø¨ÙŠÙ‡", "Ù„Ø§ ØªÙˆØ¬Ø¯ Ù†ØªØ§Ø¦Ø¬ Ù„Ù†Ù‚Ù„Ù‡Ø§.")
+            return
+
+        imported_count = 0
+        from utils.helpers import normalize_phone
+        default_cc = self.config.get("default_country_code", "20")
+
+        # Get existing numbers to avoid duplicates if needed
+        existing_numbers = set()
+        for child in self.progress_tree.get_children():
+            existing_numbers.add(self.progress_tree.item(child, "values")[1])
+
+        for item in items:
+            vals = self.gmaps_tree.item(item, "values")
+            name = vals[0]
+            phone = vals[1]
+            cleaned_phone = normalize_phone(phone, default_cc)
+            if cleaned_phone and cleaned_phone not in existing_numbers:
+                self.progress_tree.insert("", "end", values=(name, cleaned_phone, "", "â³ Ù…Ø¹Ù„Ù‚"), tags=("pending",))
+                existing_numbers.add(cleaned_phone)
+                imported_count += 1
+
+        self._update_contacts_count_from_tree()
+        self.log(f"ðŸ—ºï¸ ØªÙ… Ù†Ù‚Ù„ {imported_count} Ø±Ù‚Ù… Ù…Ù† Ø®Ø±Ø§Ø¦Ø· Ø¬ÙˆØ¬Ù„ Ø¥Ù„Ù‰ Ø§Ù„Ø­Ù…Ù„Ø© Ø§Ù„Ø­Ø§Ù„ÙŠØ©.")
+        messagebox.showinfo("ØªÙ…", f"ØªÙ… Ù†Ù‚Ù„ {imported_count} Ø±Ù‚Ù… Ø¨Ù†Ø¬Ø§Ø­.")
+        self._switch_tab("main")
+
+    def _export_gmaps_to_csv(self):
+        items = self.gmaps_tree.get_children()
+        if not items:
+            messagebox.showwarning("ØªÙ†Ø¨ÙŠÙ‡", "Ù„Ø§ ØªÙˆØ¬Ø¯ Ù†ØªØ§Ø¦Ø¬ Ù„ØªØµØ¯ÙŠØ±Ù‡Ø§.")
+            return
+
+        import csv
+        from tkinter import filedialog
+        path = filedialog.asksaveasfilename(
+            title="Ø­ÙØ¸ ÙƒÙ…Ù„Ù CSV",
+            defaultextension=".csv",
+            filetypes=[("CSV Files", "*.csv")]
+        )
+        if not path:
+            return
+
+        try:
+            with open(path, "w", encoding="utf-8-sig", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(["Ø§Ù„Ø§Ø³Ù…", "Ø±Ù‚Ù… Ø§Ù„Ù‡Ø§ØªÙ"])
+                for item in items:
+                    writer.writerow(self.gmaps_tree.item(item, "values"))
+            messagebox.showinfo("ØªÙ…", "ØªÙ… Ø§Ù„Ø­ÙØ¸ Ø¨Ù†Ø¬Ø§Ø­.")
+            self.log(f"ðŸ’¾ ØªÙ… Ø­ÙØ¸ Ø£Ø±Ù‚Ø§Ù… Ø§Ù„Ø®Ø±Ø§Ø¦Ø· ÙÙŠ {path}")
+        except Exception as e:
+            messagebox.showerror("Ø®Ø·Ø£", f"ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸: {str(e)}")
+    # â”€â”€â”€ Warmer Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    def _start_warmer(self):
+        if not self.bot or not self.bot.is_logged_in():
+            messagebox.showerror("Ø®Ø·Ø£", "Ø§Ù„Ø±Ø¬Ø§Ø¡ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ø£ÙˆÙ„Ø§Ù‹ Ù„Ù„Ù…ØªØµÙØ­ Ù„Ø¨Ø¯Ø¡ Ø§Ù„ØªØ³Ø®ÙŠÙ†.")
+            return
+
+        raw_targets = self.warmer_targets_textbox.get("1.0", "end-1c").strip().split('\n')
+        targets = [t.strip() for t in raw_targets if t.strip()]
+        if not targets:
+            messagebox.showerror("Ø®Ø·Ø£", "Ø§Ù„Ø±Ø¬Ø§Ø¡ Ø¥Ø¯Ø®Ø§Ù„ Ø±Ù‚Ù… ÙˆØ§Ø­Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„ Ù„Ù„ØªØ³Ø®ÙŠÙ†.")
+            return
+
+        try:
+            delay_min = float(self.warmer_delay_min.get())
+            delay_max = float(self.warmer_delay_max.get())
+            total_msgs = int(self.warmer_total_msgs.get())
+        except ValueError:
+            messagebox.showerror("Ø®Ø·Ø£", "Ø§Ù„Ø±Ø¬Ø§Ø¡ Ø¥Ø¯Ø®Ø§Ù„ Ø£Ø±Ù‚Ø§Ù… ØµØ­ÙŠØ­Ø© ÙÙŠ Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª.")
+            return
+
+        self.btn_warmer_start.configure(state="disabled")
+        self.btn_warmer_stop.configure(state="normal")
+        self.warmer_stop_event = threading.Event()
+
+        t = threading.Thread(target=self._run_warmer_automation, args=(targets, delay_min, delay_max, total_msgs), daemon=True)
+        t.start()
+
+    def _stop_warmer(self):
+        if hasattr(self, "warmer_stop_event"):
+            self.warmer_stop_event.set()
+        self.btn_warmer_stop.configure(state="disabled")
+        self.warmer_status_lbl.configure(text="Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø¥ÙŠÙ‚Ø§Ù...", text_color=COLORS["warning"])
+
+    def _run_warmer_automation(self, targets, delay_min, delay_max, total_msgs):
+        self.log("ðŸ”¥ Ø¨Ø¯Ø¡ Ø¹Ù…Ù„ÙŠØ© ØªØ³Ø®ÙŠÙ† Ø§Ù„Ø­Ø³Ø§Ø¨...")
+        self._run_on_ui(lambda: self.warmer_status_lbl.configure(text="Ø¬Ø§Ø±ÙŠ Ø¨Ø¯Ø¡ Ø§Ù„ØªØ³Ø®ÙŠÙ†...", text_color=COLORS["warning"]))
+        
+        warm_messages = [
+            "Ù…Ø±Ø­Ø¨Ø§Ù‹",
+            "ÙƒÙŠÙ Ø§Ù„Ø­Ø§Ù„ØŸ",
+            "Ø§Ù„Ø³Ù„Ø§Ù… Ø¹Ù„ÙŠÙƒÙ… ÙˆØ±Ø­Ù…Ø© Ø§Ù„Ù„Ù‡",
+            "Ù‡Ù„ ÙŠÙ…ÙƒÙ†Ùƒ Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„ØªÙØ§ØµÙŠÙ„ØŸ",
+            "Ø´ÙƒØ±Ø§Ù‹ Ø¬Ø²ÙŠÙ„Ø§Ù‹",
+            "Ø¨Ø®ÙŠØ± Ø§Ù„Ø­Ù…Ø¯ Ù„Ù„Ù‡",
+            "ØªÙ…Ø§Ù…",
+            "Ø£Ù‡Ù„Ø§Ù‹ Ø¨Ùƒ",
+            "ØµØ¨Ø§Ø­ Ø§Ù„Ø®ÙŠØ±",
+            "Ù…Ø³Ø§Ø¡ Ø§Ù„Ø®ÙŠØ±",
+            "Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ§Ø­ Ø§Ù„Ø¢Ù†ØŸ",
+            "Ø£Ù†ØªØ¸Ø± Ø±Ø¯Ùƒ",
+            "ÙŠØ¹Ø·ÙŠÙƒ Ø§Ù„Ø¹Ø§ÙÙŠØ©",
+            "ðŸ‘",
+            "ðŸ‘‹"
+        ]
+
+        sent = 0
+        from utils.helpers import normalize_phone
+
+        try:
+            for i in range(total_msgs):
+                if self.warmer_stop_event.is_set():
+                    break
+
+                target = random.choice(targets)
+                msg = random.choice(warm_messages)
+                
+                cc = self.config.get("default_country_code", "20")
+                cleaned = normalize_phone(target, cc)
+                if not cleaned:
+                    cleaned = target
+
+                self._run_on_ui(lambda s=sent, t=total_msgs: self.warmer_status_lbl.configure(text=f"ØªÙ… Ø¥Ø±Ø³Ø§Ù„ {s}/{t} Ø±Ø³Ø§Ù„Ø©...", text_color=COLORS["primary"]))
+                
+                # Send
+                res = self.bot.send_message(
+                    phone=cleaned,
+                    name="Warmer",
+                    message_template=msg,
+                    stop_event=self.warmer_stop_event
+                )
+
+                if res == "SUCCESS":
+                    sent += 1
+                    self.log(f"ðŸ”¥ [Ø§Ù„ØªØ³Ø®ÙŠÙ†] ØªÙ… Ø¥Ø±Ø³Ø§Ù„ '{msg}' Ø¥Ù„Ù‰ {cleaned}")
+                else:
+                    self.log(f"ðŸ”¥ [Ø§Ù„ØªØ³Ø®ÙŠÙ†] ÙØ´Ù„ Ø§Ù„Ø¥Ø±Ø³Ø§Ù„ Ø¥Ù„Ù‰ {cleaned}: {res}")
+
+                if sent >= total_msgs or self.warmer_stop_event.is_set():
+                    break
+
+                # Sleep
+                wait_m = random.uniform(delay_min, delay_max)
+                wait_s = wait_m * 60
+                self.log(f"ðŸ”¥ [Ø§Ù„ØªØ³Ø®ÙŠÙ†] Ø§Ù†ØªØ¸Ø§Ø± {int(wait_s)} Ø«Ø§Ù†ÙŠØ©...")
+                self._run_on_ui(lambda w=wait_m: self.warmer_status_lbl.configure(text=f"Ø§Ù†ØªØ¸Ø§Ø± {w:.1f} Ø¯Ù‚ÙŠÙ‚Ø© Ù„Ù„Ø±Ø³Ø§Ù„Ø© Ø§Ù„Ù‚Ø§Ø¯Ù…Ø©...", text_color=COLORS["warning"]))
+                
+                if self.warmer_stop_event.wait(wait_s):
+                    break
+
+            if self.warmer_stop_event.is_set():
+                self.log("ðŸ”¥ ØªÙ… Ø¥ÙŠÙ‚Ø§Ù Ø§Ù„ØªØ³Ø®ÙŠÙ† ÙŠØ¯ÙˆÙŠØ§Ù‹.")
+                self._run_on_ui(lambda: self.warmer_status_lbl.configure(text="ØªÙ… Ø¥ÙŠÙ‚Ø§Ù Ø§Ù„ØªØ³Ø®ÙŠÙ†.", text_color=COLORS["danger"]))
+            else:
+                self.log("ðŸ”¥ Ø§ÙƒØªÙ…Ù„Øª Ø¬Ù„Ø³Ø© Ø§Ù„ØªØ³Ø®ÙŠÙ† Ø¨Ù†Ø¬Ø§Ø­.")
+                self._run_on_ui(lambda: self.warmer_status_lbl.configure(text="Ø§ÙƒØªÙ…Ù„Øª Ø§Ù„Ø¬Ù„Ø³Ø© Ø¨Ù†Ø¬Ø§Ø­.", text_color=COLORS["success"]))
+
+        except Exception as e:
+            self.log(f"âŒ Ø®Ø·Ø£ Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„ØªØ³Ø®ÙŠÙ†: {str(e)}")
+            self._run_on_ui(lambda: self.warmer_status_lbl.configure(text="Ø­Ø¯Ø« Ø®Ø·Ø£ ØºÙŠØ± Ù…ØªÙˆÙ‚Ø¹.", text_color=COLORS["danger"]))
+        finally:
+            self._run_on_ui(lambda: self.btn_warmer_start.configure(state="normal"))
+            self._run_on_ui(lambda: self.btn_warmer_stop.configure(state="disabled"))
+    # â”€â”€â”€ Chatbot Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    def _build_tab_chatbot(self):
+        self.tab_chatbot = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.tab_frames["chatbot"] = self.tab_chatbot
+        
+        self.chatbot_rules = []
+        self.chatbot_running = False
+        self.chatbot_stop_event = threading.Event()
+
+        # Title
+        title_lbl = ctk.CTkLabel(self.tab_chatbot, text="Ù†Ø¸Ø§Ù… Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ (Chatbot) ðŸ¤–", font=("Segoe UI", 24, "bold"), text_color=COLORS["primary"])
+        title_lbl.pack(anchor="w", padx=20, pady=(20, 10))
+
+        # Instructions
+        inst_lbl = ctk.CTkLabel(self.tab_chatbot, text="Ø­Ø¯Ø¯ Ø§Ù„ÙƒÙ„Ù…Ø§Øª Ø§Ù„Ù…ÙØªØ§Ø­ÙŠØ© ÙˆØ§Ù„Ø±Ø¯ÙˆØ¯ Ø§Ù„Ù…Ù†Ø§Ø³Ø¨Ø© Ù„Ù‡Ø§. Ø³ÙŠÙ‚ÙˆÙ… Ø§Ù„Ø¨Ø±Ù†Ø§Ù…Ø¬ Ø¨Ù…Ø±Ø§Ù‚Ø¨Ø© Ø§Ù„Ù…Ø­Ø§Ø¯Ø«Ø§Øª ÙˆØ§Ù„Ø±Ø¯ ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹.", font=("Segoe UI", 12), text_color=COLORS["text_muted"])
+        inst_lbl.pack(anchor="w", padx=20, pady=(0, 20))
+
+        # Input Frame
+        input_frame = ctk.CTkFrame(self.tab_chatbot, fg_color=COLORS["card_bg"], corner_radius=10)
+        input_frame.pack(fill="x", padx=20, pady=10)
+
+        # Keyword
+        kw_lbl = ctk.CTkLabel(input_frame, text="Ø§Ù„ÙƒÙ„Ù…Ø© Ø§Ù„Ù…ÙØªØ§Ø­ÙŠØ©:", font=("Segoe UI", 12, "bold"))
+        kw_lbl.grid(row=0, column=0, padx=10, pady=10, sticky="w")
+        self.chatbot_kw_entry = ctk.CTkEntry(input_frame, width=200, font=("Segoe UI", 12))
+        self.chatbot_kw_entry.grid(row=0, column=1, padx=10, pady=10, sticky="w")
+
+        # Match Type
+        type_lbl = ctk.CTkLabel(input_frame, text="Ù†ÙˆØ¹ Ø§Ù„ØªØ·Ø§Ø¨Ù‚:", font=("Segoe UI", 12, "bold"))
+        type_lbl.grid(row=0, column=2, padx=10, pady=10, sticky="w")
+        self.chatbot_match_var = ctk.StringVar(value="ØªØ­ØªÙˆÙŠ Ø¹Ù„Ù‰")
+        self.chatbot_match_dropdown = ctk.CTkOptionMenu(
+            input_frame, variable=self.chatbot_match_var,
+            values=["ØªØ­ØªÙˆÙŠ Ø¹Ù„Ù‰", "Ù…Ø·Ø§Ø¨Ù‚Ø© ØªØ§Ù…Ø©"], font=("Segoe UI", 12)
+        )
+        self.chatbot_match_dropdown.grid(row=0, column=3, padx=10, pady=10, sticky="w")
+
+        # Reply
+        reply_lbl = ctk.CTkLabel(input_frame, text="Ù†Øµ Ø§Ù„Ø±Ø¯:", font=("Segoe UI", 12, "bold"))
+        reply_lbl.grid(row=1, column=0, padx=10, pady=10, sticky="nw")
+        self.chatbot_reply_entry = ctk.CTkTextbox(input_frame, width=450, height=80, font=("Segoe UI", 12))
+        self.chatbot_reply_entry.grid(row=1, column=1, columnspan=3, padx=10, pady=10, sticky="w")
+
+        # Add Button
+        btn_add_rule = ctk.CTkButton(
+            input_frame, text="Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ù‚Ø§Ø¹Ø¯Ø© âž•", font=("Segoe UI", 12, "bold"),
+            command=self._add_chatbot_rule
+        )
+        btn_add_rule.grid(row=2, column=1, columnspan=3, padx=10, pady=10, sticky="w")
+
+        # Rules Table
+        table_frame = ctk.CTkFrame(self.tab_chatbot, fg_color=COLORS["card_bg"], corner_radius=10)
+        table_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
+        columns = ("keyword", "match", "reply")
+        self.chatbot_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=8)
+        self.chatbot_tree.heading("keyword", text="Ø§Ù„ÙƒÙ„Ù…Ø© Ø§Ù„Ù…ÙØªØ§Ø­ÙŠØ©")
+        self.chatbot_tree.heading("match", text="Ø§Ù„ØªØ·Ø§Ø¨Ù‚")
+        self.chatbot_tree.heading("reply", text="Ø§Ù„Ø±Ø¯")
+        self.chatbot_tree.column("keyword", width=150)
+        self.chatbot_tree.column("match", width=100)
+        self.chatbot_tree.column("reply", width=400)
+        self.chatbot_tree.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Delete selected rule
+        btn_del_rule = ctk.CTkButton(
+            table_frame, text="Ø­Ø°Ù Ø§Ù„Ù…Ø­Ø¯Ø¯ ðŸ—‘ï¸", font=("Segoe UI", 12, "bold"),
+            fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+            command=self._delete_chatbot_rule
+        )
+        btn_del_rule.pack(anchor="e", padx=10, pady=(0, 10))
+
+        # Control Frame
+        ctrl_frame = ctk.CTkFrame(self.tab_chatbot, fg_color="transparent")
+        ctrl_frame.pack(fill="x", padx=20, pady=10)
+
+        self.btn_start_chatbot = ctk.CTkButton(
+            ctrl_frame, text="â–¶ï¸ ØªØ´ØºÙŠÙ„ Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ", font=("Segoe UI", 14, "bold"),
+            height=40, fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"], text_color="#000",
+            command=self._toggle_chatbot
+        )
+        self.btn_start_chatbot.pack(side="left", padx=5)
+
+        self.chatbot_status_lbl = ctk.CTkLabel(ctrl_frame, text="Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ Ù…ØªÙˆÙ‚Ù", font=("Segoe UI", 14, "bold"), text_color=COLORS["danger"])
+        self.chatbot_status_lbl.pack(side="left", padx=20)
+
+    def _add_chatbot_rule(self):
+        kw = self.chatbot_kw_entry.get().strip()
+        reply = self.chatbot_reply_entry.get("1.0", "end").strip()
+        match_type = self.chatbot_match_var.get()
+
+        if not kw or not reply:
+            messagebox.showerror("Ø®Ø·Ø£", "ÙŠØ¬Ø¨ Ø¥Ø¯Ø®Ø§Ù„ Ø§Ù„ÙƒÙ„Ù…Ø© Ø§Ù„Ù…ÙØªØ§Ø­ÙŠØ© ÙˆØ§Ù„Ø±Ø¯.")
+            return
+
+        rule = {"keyword": kw, "match": match_type, "reply": reply}
+        self.chatbot_rules.append(rule)
+        self.chatbot_tree.insert("", "end", values=(kw, match_type, reply))
+        
+        self.chatbot_kw_entry.delete(0, "end")
+        self.chatbot_reply_entry.delete("1.0", "end")
+        self.log(f"ðŸ¤– ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ù‚Ø§Ø¹Ø¯Ø© Ø±Ø¯ Ø¢Ù„ÙŠ Ù„Ù„ÙƒÙ„Ù…Ø©: {kw}")
+
+    def _delete_chatbot_rule(self):
+        selected = self.chatbot_tree.selection()
+        if not selected:
+            return
+        for item in selected:
+            idx = self.chatbot_tree.index(item)
+            self.chatbot_tree.delete(item)
+            if 0 <= idx < len(self.chatbot_rules):
+                del self.chatbot_rules[idx]
+
+    def _toggle_chatbot(self):
+        if not self.bot or not self.bot.driver:
+            messagebox.showerror("Ø®Ø·Ø£", "ÙŠØ¬Ø¨ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ ÙÙŠ ÙˆØ§ØªØ³Ø§Ø¨ Ø£ÙˆÙ„Ø§Ù‹.")
+            return
+            
+        if self.chatbot_running:
+            # Stop
+            self.chatbot_stop_event.set()
+            self.chatbot_running = False
+            self.btn_start_chatbot.configure(text="â–¶ï¸ ØªØ´ØºÙŠÙ„ Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ", fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"])
+            self.chatbot_status_lbl.configure(text="Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ Ù…ØªÙˆÙ‚Ù", text_color=COLORS["danger"])
+            self.log("ðŸ¤– ØªÙ… Ø¥ÙŠÙ‚Ø§Ù Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ.")
+        else:
+            # Start
+            if not self.chatbot_rules:
+                messagebox.showwarning("ØªÙ†Ø¨ÙŠÙ‡", "ÙŠØ¬Ø¨ Ø¥Ø¶Ø§ÙØ© Ù‚Ø§Ø¹Ø¯Ø© Ø±Ø¯ Ø¢Ù„ÙŠ ÙˆØ§Ø­Ø¯Ø© Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„ Ù‚Ø¨Ù„ Ø§Ù„ØªØ´ØºÙŠÙ„.")
+                return
+                
+            self.chatbot_stop_event.clear()
+            self.chatbot_running = True
+            self.btn_start_chatbot.configure(text="â¹ï¸ Ø¥ÙŠÙ‚Ø§Ù Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ", fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"])
+            self.chatbot_status_lbl.configure(text="Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ ÙŠØ¹Ù…Ù„ (ÙŠØ±Ø§Ù‚Ø¨ Ø§Ù„Ù…Ø­Ø§Ø¯Ø«Ø§Øª...)", text_color=COLORS["success"])
+            self.log("ðŸ¤– Ø¨Ø¯Ø¡ ØªØ´ØºÙŠÙ„ Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠØŒ Ø¬Ø§Ø±ÙŠ Ù…Ø±Ø§Ù‚Ø¨Ø© Ø§Ù„Ù…Ø­Ø§Ø¯Ø«Ø§Øª...")
+            
+            threading.Thread(target=self._run_chatbot_automation, daemon=True).start()
+
+    def _run_chatbot_automation(self):
+        while self.chatbot_running and not self.chatbot_stop_event.is_set():
+            if not self.bot or not self.bot.driver:
+                self.log("âŒ ÙÙ‚Ø¯Ø§Ù† Ø§Ù„Ø§ØªØµØ§Ù„ Ø¨Ø§Ù„ÙˆØ§ØªØ³Ø§Ø¨ Ø£Ø«Ù†Ø§Ø¡ ØªØ´ØºÙŠÙ„ Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ.")
+                self.after(0, self._toggle_chatbot)
+                break
+                
+            try:
+                # 1. Get unread chats
+                unread_chats = self.bot.get_unread_chats()
+                
+                if unread_chats:
+                    # 2. Open the first unread chat
+                    chat = unread_chats[0]
+                    if self.bot.open_chat(chat):
+                        # wait for messages to load
+                        time.sleep(1.5)
+                        
+                        # 3. Read last message
+                        last_message = self.bot.read_last_message()
+                        if last_message:
+                            # Add to Received Tab (Mini CRM)
+                            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            sender_name = "عميل" # We could extract name, but keeping simple
+                            self._run_on_ui(lambda n=now_str, s=sender_name, m=last_message: self.received_tree.insert("", 0, values=(n, s, m)))
+                            
+                            # 4. Check against rules
+                            matched_reply = None
+                            for rule in self.chatbot_rules:
+                                kw = rule["keyword"].lower()
+                                msg_lower = last_message.lower()
+                                
+                                if rule["match"] == "Ù…Ø·Ø§Ø¨Ù‚Ø© ØªØ§Ù…Ø©":
+                                    if kw == msg_lower:
+                                        matched_reply = rule["reply"]
+                                        break
+                                else:
+                                    if kw in msg_lower:
+                                        matched_reply = rule["reply"]
+                                        break
+                                        
+                            if matched_reply:
+                                # 5. Reply
+                                res = self.bot.reply_to_current_chat(matched_reply)
+                                if res == "SUCCESS":
+                                    self.log(f"ðŸ¤– ØªÙ… Ø¥Ø±Ø³Ø§Ù„ Ø±Ø¯ Ø¢Ù„ÙŠ Ù„Ù„Ø±Ø³Ø§Ù„Ø©: '{last_message[:20]}...'")
+                                else:
+                                    self.log(f"âš ï¸ ÙØ´Ù„ Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ: {res}")
+                            else:
+                                self.log(f"ðŸ’¬ Ø±Ø³Ø§Ù„Ø© Ø¬Ø¯ÙŠØ¯Ø© Ù„Ù… ØªØ·Ø§Ø¨Ù‚ Ø£ÙŠ Ù‚Ø§Ø¹Ø¯Ø©: '{last_message[:20]}...'")
+                
+            except Exception as e:
+                self.log(f"âš ï¸ Ø®Ø·Ø£ Ø£Ø«Ù†Ø§Ø¡ Ù…Ø±Ø§Ù‚Ø¨Ø© Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ: {str(e)[:50]}")
+                
+            # Wait a few seconds before polling again
+            time.sleep(5)
+    # â”€â”€â”€ Numbers Filter Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    def _build_tab_filter(self):
+        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.tab_frames["filter"] = frame
+
+        # Title
+        title_lbl = ctk.CTkLabel(frame, text="ÙÙ„ØªØ±Ø© Ø§Ù„Ø£Ø±Ù‚Ø§Ù… (Numbers Filter) ðŸ”", font=("Segoe UI", 24, "bold"), text_color=COLORS["primary"])
+        title_lbl.pack(anchor="w", padx=20, pady=(20, 10))
+        
+        inst_lbl = ctk.CTkLabel(frame, text="Ø£Ø¯Ø®Ù„ Ø§Ù„Ø£Ø±Ù‚Ø§Ù… Ù„Ù„ØªØ­Ù‚Ù‚ Ù…Ù† ÙˆØ¬ÙˆØ¯ Ø­Ø³Ø§Ø¨Ø§Øª ÙˆØ§ØªØ³Ø§Ø¨ Ù†Ø´Ø·Ø© Ù„Ù‡Ø§ Ù‚Ø¨Ù„ Ø¥Ø±Ø³Ø§Ù„ Ø­Ù…Ù„ØªÙƒ.", font=("Segoe UI", 12), text_color=COLORS["text_muted"])
+        inst_lbl.pack(anchor="w", padx=20, pady=(0, 20))
+
+        # Main Layout
+        content = ctk.CTkFrame(frame, fg_color="transparent")
+        content.pack(fill="both", expand=True, padx=20, pady=0)
+        
+        # Left side: Input
+        left = ctk.CTkFrame(content, fg_color=COLORS["card_bg"], corner_radius=10, width=300)
+        left.pack(side="left", fill="y", padx=(0, 10))
+        left.pack_propagate(False)
+        
+        lbl_in = ctk.CTkLabel(left, text="Ø£Ø¯Ø®Ù„ Ø§Ù„Ø£Ø±Ù‚Ø§Ù… (Ø±Ù‚Ù… ÙÙŠ ÙƒÙ„ Ø³Ø·Ø±):", font=("Segoe UI", 14, "bold"))
+        lbl_in.pack(anchor="w", padx=15, pady=15)
+        
+        self.filter_input_txt = ctk.CTkTextbox(left, font=("Consolas", 12))
+        self.filter_input_txt.pack(fill="both", expand=True, padx=15, pady=(0, 15))
+        
+        # Right-click menu for filter_input_txt
+        import tkinter as tk
+        ctx_menu = tk.Menu(self, tearoff=0, font=("Segoe UI", 11))
+        ctx_menu.add_command(label="Ù‚Øµ (Cut)", command=lambda: self.filter_input_txt._textbox.event_generate("<<Cut>>"))
+        ctx_menu.add_command(label="Ù†Ø³Ø® (Copy)", command=lambda: self.filter_input_txt._textbox.event_generate("<<Copy>>"))
+        ctx_menu.add_command(label="Ù„ØµÙ‚ (Paste)", command=lambda: self.filter_input_txt._textbox.event_generate("<<Paste>>"))
+        ctx_menu.add_separator()
+        ctx_menu.add_command(label="ØªØ­Ø¯ÙŠØ¯ Ø§Ù„ÙƒÙ„ (Select All)", command=lambda: self.filter_input_txt._textbox.tag_add("sel", "1.0", "end"))
+        def _show_ctx(event):
+            try: ctx_menu.tk_popup(event.x_root, event.y_root)
+            finally: ctx_menu.grab_release()
+        self.filter_input_txt.bind("<Button-3>", _show_ctx)
+
+        btn_start_filter = ctk.CTkButton(
+            left, text="Ø¨Ø¯Ø¡ Ø§Ù„ÙØ­Øµ ðŸ”", font=("Segoe UI", 14, "bold"), height=40,
+            fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"], text_color="#000",
+            command=self._start_number_filter
+        )
+        btn_start_filter.pack(fill="x", padx=15, pady=(0, 15))
+
+        # Right side: Results
+        right = ctk.CTkFrame(content, fg_color=COLORS["card_bg"], corner_radius=10)
+        right.pack(side="right", fill="both", expand=True)
+        
+        lbl_out = ctk.CTkLabel(right, text="Ù†ØªØ§Ø¦Ø¬ Ø§Ù„ÙØ­Øµ:", font=("Segoe UI", 14, "bold"))
+        lbl_out.pack(anchor="w", padx=15, pady=15)
+
+        self.filter_tree = ttk.Treeview(right, columns=("phone", "status"), show="headings")
+        self.filter_tree.heading("phone", text="Ø§Ù„Ø±Ù‚Ù…")
+        self.filter_tree.heading("status", text="Ø§Ù„Ø­Ø§Ù„Ø©")
+        self.filter_tree.column("phone", width=200, anchor="center")
+        self.filter_tree.column("status", width=150, anchor="center")
+        
+        scroll = ctk.CTkScrollbar(right, command=self.filter_tree.yview)
+        self.filter_tree.configure(yscrollcommand=scroll.set)
+        scroll.pack(side="right", fill="y", pady=(0, 15))
+        self.filter_tree.pack(fill="both", expand=True, padx=(15, 0), pady=(0, 15))
+        
+        # Tags for colors
+        self.filter_tree.tag_configure("valid", foreground="#16A34A")
+        self.filter_tree.tag_configure("invalid", foreground="#DC2626")
+        self.filter_tree.tag_configure("checking", foreground="#EAB308")
+        
+        # Stats & Export
+        bottom_right = ctk.CTkFrame(right, fg_color="transparent")
+        bottom_right.pack(fill="x", padx=15, pady=(0, 15))
+        
+        self.filter_stats_lbl = ctk.CTkLabel(bottom_right, text="Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ: 0 | ØµØ§Ù„Ø­: 0 | ØºÙŠØ± ØµØ§Ù„Ø­: 0", font=("Segoe UI", 12, "bold"))
+        self.filter_stats_lbl.pack(side="left")
+        
+        btn_export = ctk.CTkButton(
+            bottom_right, text="ØªØµØ¯ÙŠØ± Ø§Ù„ØµØ§Ù„Ø­ (Excel) ðŸ’¾", font=("Segoe UI", 12, "bold"),
+            fg_color="#3B82F6", hover_color="#2563EB", text_color="#FFF",
+            command=self._export_filtered_numbers
+        )
+        btn_export.pack(side="right")
+        
+    def _start_number_filter(self):
+        if not self.bot or not self.bot.driver:
+            messagebox.showerror("Ø®Ø·Ø£", "ÙŠØ¬Ø¨ ÙØªØ­ Ø§Ù„Ù…ØªØµÙØ­ (Open WhatsApp) Ø£ÙˆÙ„Ø§Ù‹.")
+            return
+        if not self.bot.is_logged_in():
+            messagebox.showerror("Ø®Ø·Ø£", "ÙŠØ¬Ø¨ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ ÙÙŠ ÙˆØ§ØªØ³Ø§Ø¨ Ø£ÙˆÙ„Ø§Ù‹.")
+            return
+
+        raw_text = self.filter_input_txt.get("1.0", "end").strip()
+        if not raw_text:
+            return
+        
+        numbers = [n.strip() for n in raw_text.split("\n") if n.strip()]
+        if not numbers:
+            return
+            
+        # Clear tree
+        for item in self.filter_tree.get_children():
+            self.filter_tree.delete(item)
+            
+        self.filter_stats = {"total": len(numbers), "valid": 0, "invalid": 0}
+        self.filter_stats_lbl.configure(text=f"Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ: {self.filter_stats['total']} | ØµØ§Ù„Ø­: 0 | ØºÙŠØ± ØµØ§Ù„Ø­: 0")
+        
+        # Insert all as checking
+        self.filter_tree_items = {}
+        for num in numbers:
+            item_id = self.filter_tree.insert("", "end", values=(num, "â³ ÙÙŠ Ø§Ù„Ø§Ù†ØªØ¸Ø§Ø±"), tags=("checking",))
+            self.filter_tree_items[num] = item_id
+            
+        self.log(f"ðŸ” Ø¨Ø¯Ø¡ ÙØ­Øµ {len(numbers)} Ø±Ù‚Ù…...")
+        threading.Thread(target=self._run_filter_thread, args=(numbers,), daemon=True).start()
+        
+    def _run_filter_thread(self, numbers):
+        for num in numbers:
+            if not self.bot or not self.bot.driver:
+                break
+            
+            # Format number simply
+            formatted = num.replace("+", "").replace(" ", "").replace("-", "")
+            
+            self._run_on_ui(lambda n=num: self.filter_tree.item(self.filter_tree_items[n], values=(n, "ðŸ”„ Ø¬Ø§Ø±ÙŠ Ø§Ù„ÙØ­Øµ...")))
+            
+            # Use WhatsApp's wa.me link check
+            is_valid = self.bot.check_number_validity(formatted)
+            
+            if is_valid:
+                self.filter_stats["valid"] += 1
+                self._run_on_ui(lambda n=num: self.filter_tree.item(self.filter_tree_items[n], values=(n, "âœ… Ù…ØªÙˆÙØ±"), tags=("valid",)))
+            else:
+                self.filter_stats["invalid"] += 1
+                self._run_on_ui(lambda n=num: self.filter_tree.item(self.filter_tree_items[n], values=(n, "âŒ ØºÙŠØ± Ù…ØªÙˆÙØ±"), tags=("invalid",)))
+                
+            self._run_on_ui(lambda: self.filter_stats_lbl.configure(text=f"Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ: {self.filter_stats['total']} | ØµØ§Ù„Ø­: {self.filter_stats['valid']} | ØºÙŠØ± ØµØ§Ù„Ø­: {self.filter_stats['invalid']}"))
+            time.sleep(1) # delay to prevent rate limit
+            
+        self.log("âœ… Ø§Ù†ØªÙ‡Øª Ø¹Ù…Ù„ÙŠØ© Ø§Ù„ÙØ­Øµ.")
+        
+    def _export_filtered_numbers(self):
+        valid_numbers = []
+        for item in self.filter_tree.get_children():
+            vals = self.filter_tree.item(item, "values")
+            if "Ù…ØªÙˆÙØ±" in vals[1] or "âœ…" in vals[1]:
+                valid_numbers.append(vals[0])
+                
+        if not valid_numbers:
+            messagebox.showwarning("ØªÙ†Ø¨ÙŠÙ‡", "Ù„Ø§ ØªÙˆØ¬Ø¯ Ø£Ø±Ù‚Ø§Ù… ØµØ§Ù„Ø­Ø© Ù„ØªØµØ¯ÙŠØ±Ù‡Ø§.")
+            return
+            
+        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
+        if not file_path:
+            return
+            
+        try:
+            import csv
+            with open(file_path, "w", newline="", encoding="utf-8-sig") as f:
+                writer = csv.writer(f)
+                writer.writerow(["Number"])
+                for n in valid_numbers:
+                    writer.writerow([n])
+            messagebox.showinfo("نجاح", f"تم تصدير {len(valid_numbers)} رقم بنجاح!")
+        except Exception as e:
+            messagebox.showerror("خطأ", f"حدث خطأ أثناء التصدير:\n{e}")
+
+    # â”€â”€â”€ Received Messages Tab (Mini CRM) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    def _build_tab_received(self):
+        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.tab_frames["received"] = frame
+
+        # Title
+        title_lbl = ctk.CTkLabel(frame, text="ØµÙ†Ø¯ÙˆÙ‚ Ø§Ù„ÙˆØ§Ø±Ø¯ (Received Messages) ðŸ“¥", font=("Segoe UI", 24, "bold"), text_color=COLORS["primary"])
+        title_lbl.pack(anchor="w", padx=20, pady=(20, 10))
+        
+        inst_lbl = ctk.CTkLabel(frame, text="Ù…Ø±Ø§Ù‚Ø¨Ø© Ø­ÙŠØ© Ù„Ù„Ø±Ø³Ø§Ø¦Ù„ Ø§Ù„ÙˆØ§Ø±Ø¯Ø© Ø£Ø«Ù†Ø§Ø¡ ØªØ´ØºÙŠÙ„ Ø§Ù„Ø¨Ø±Ù†Ø§Ù…Ø¬.", font=("Segoe UI", 12), text_color=COLORS["text_muted"])
+        inst_lbl.pack(anchor="w", padx=20, pady=(0, 20))
+
+        content = ctk.CTkFrame(frame, fg_color=COLORS["card_bg"], corner_radius=10)
+        content.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        
+        self.received_tree = ttk.Treeview(content, columns=("date", "sender", "message"), show="headings")
+        self.received_tree.heading("date", text="Ø§Ù„ÙˆÙ‚Øª ÙˆØ§Ù„ØªØ§Ø±ÙŠØ®")
+        self.received_tree.heading("sender", text="Ø§Ù„Ù…Ø±Ø³Ù„")
+        self.received_tree.heading("message", text="Ù†Øµ Ø§Ù„Ø±Ø³Ø§Ù„Ø©")
+        
+        self.received_tree.column("date", width=150, anchor="center")
+        self.received_tree.column("sender", width=150, anchor="center")
+        self.received_tree.column("message", width=500, anchor="w")
+        
+        scroll = ctk.CTkScrollbar(content, command=self.received_tree.yview)
+        self.received_tree.configure(yscrollcommand=scroll.set)
+        
+        scroll.pack(side="right", fill="y", pady=15)
+        self.received_tree.pack(fill="both", expand=True, padx=(15, 0), pady=15)
+        
+        # We will share the chatbot thread to update this list
+        # Whenever chatbot reads a message, it can append it here!
