@@ -18,7 +18,24 @@ Desktop bulk messaging for **WhatsApp Web** (Selenium automation). Not affiliate
 | الوضع الآمن عند البدء | **On** — validates numbers before sending |
 | التأخير بين الرسائل | 30–120 seconds for large lists |
 | إعادة المحاولة | 1 (default) |
-| وضع الخلفية | On for long campaigns |
+| وضع الخلفية | **Off** when sending images/video; On for text-only long campaigns |
+
+## Media send flow (images / video)
+
+1. Open chat → wait for footer (+) and message box.
+2. Attach via menu (+) → **Photos & videos** → file injected (no Windows file picker).
+3. Send preview → wait for preview to close.
+4. Send text as a **separate message** (merged caption mode off).
+
+## Common errors
+
+| Code | Meaning | What to do |
+|------|---------|------------|
+| `ERR_ATTACH_BTN_NOT_FOUND` | Attach (+) not visible in footer | Keep WhatsApp window visible; close search/preview; retry |
+| `ERR_TEXT_SEND` | Click blocked on text/send | Close media preview; disable background mode; bot auto-retries once |
+| `INVALID` / نافذة «غير موجود على واتساب» | Number has no WhatsApp | Auto-clicks **موافق** and skips to next contact |
+| `ERR_STICKER_PANEL_OPENED` | Wrong panel opened | Retry; do not click stickers manually during send |
+| `ERR_FILE_INPUT_NOT_FOUND` | Upload field missing | Update `automation/selectors.json` if WhatsApp UI changed |
 
 ## Features
 

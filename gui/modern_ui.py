@@ -3737,6 +3737,8 @@ class ModernWhatsAppApp(ctk.CTk):
             return
         if not self._check_campaign_safety(len(contacts), attachments):
             return
+        if not self._warn_media_send_settings(attachments):
+            return
 
         self._save_current_state()
 
@@ -3803,9 +3805,47 @@ class ModernWhatsAppApp(ctk.CTk):
                     self.pause_btn.configure(text="Pause")
             self.log("🛑 طلب إيقاف...")
 
+    def _warn_media_send_settings(self, attachments):
+        """Advise user before campaigns with media attachments."""
+        if not attachments:
+            return True
+        if getattr(self, "send_text_var", None) and self.send_text_var.get():
+            if not messagebox.askyesno(
+                "وضع مدمج مفعّل",
+                "الوضع المدمج (نص كوصف مع الصورة) غير موصى به وقد يسبب أخطاء.\n\n"
+                "يُفضّل إلغاء التفعيل لإرسال الصورة ثم النص منفصلين.\n\n"
+                "هل تريد المتابعة على أي حال؟",
+            ):
+                return False
+        if getattr(self, "bg_mode_var", None) and self.bg_mode_var.get():
+            messagebox.showwarning(
+                "وضع الخلفية",
+                "مع المرفقات (صور/فيديو) يُفضّل إيقاف «وضع الخلفية» "
+                "وإبقاء نافذة واتساب ظاهرة لتقليل فشل الإرفاق والنقر.",
+            )
+        return True
+
+    def _recover_bot_before_retry(self, attachments):
+        if not self.bot:
+            return
+        try:
+            if attachments and hasattr(self.bot, "recover_compose_state"):
+                self.bot.recover_compose_state(stop_event=self.stop_event)
+            if attachments and not self.bg_mode_var.get():
+                self.bot.bring_to_front()
+        except Exception:
+            pass
+
     def _map_bot_error(self, res):
         if not res:
             return "ERR-99", "خطأ غير معروف.", None
+        if str(res).startswith("ERR_TEXT_SEND"):
+            detail = res.split(":", 1)[1].strip() if ":" in res else ""
+            tip = (
+                "تأكد من إغلاق معاينة الصورة/قائمة الإرفاق، وإبقاء نافذة واتساب ظاهرة "
+                "(لا تستخدم وضع الخلفية مع الوسائط)."
+            )
+            return "ERR-07", "فشل إرسال النص بعد المرفق.", f"{detail} — {tip}" if detail else tip
         if res.startswith("ERR_IMAGE_FLOW:"):
             detail = res.split(":", 1)[1].strip()
             return "ERR-08", "فشل إرسال الصورة.", detail
@@ -3823,7 +3863,11 @@ class ModernWhatsAppApp(ctk.CTk):
             "ERR_NOT_READY":               ("ERR-01", "المتصفح غير جاهز.", None),
             "ERR_EMPTY_MESSAGE":           ("ERR-04", "لا يوجد نص للإرسال.", None),
             "ERR_CHAT_INPUT_NOT_FOUND":    ("ERR-07", "صندوق كتابة الرسالة غير موجود.", None),
-            "ERR_ATTACH_BTN_NOT_FOUND":    ("ERR-06", "زر الإرفاق غير موجود.", None),
+            "ERR_ATTACH_BTN_NOT_FOUND":    (
+                "ERR-06",
+                "زر الإرفاق (+) غير ظاهر في التذييل.",
+                "انتظر تحميل المحادثة، أغلق البحث/المعاينة، وأبقِ نافذة واتساب مفتوحة.",
+            ),
             "ERR_FILE_INPUT_NOT_FOUND":    ("ERR-08", "حقل رفع الصورة غير موجود.", None),
             "ERR_CAPTION_BOX_NOT_FOUND":   ("ERR-08", "صندوق كتابة الكابشن غير موجود.", None),
             "ERR_FINAL_SEND_BTN_NOT_FOUND":("ERR-07", "زر الإرسال النهائي لم يظهر.", None),
@@ -4006,10 +4050,16 @@ class ModernWhatsAppApp(ctk.CTk):
                         )
                         if res in ("SUCCESS", "INVALID", "STOPPED"):
                             break
-                        is_retryable = res in retryable_errors or str(res).startswith("ERR_ATTACH_") or str(res).startswith("ERR_GENERAL")
+                        is_retryable = (
+                            res in retryable_errors
+                            or str(res).startswith("ERR_ATTACH_")
+                            or str(res).startswith("ERR_TEXT_SEND")
+                            or str(res).startswith("ERR_GENERAL")
+                        )
                         if attempt < max_retries and is_retryable:
                             wait_s = random.uniform(retry_delay_min, retry_delay_max)
                             self.log(f"🔁 إعادة محاولة خطوة ({attempt + 1}/{max_retries}) بعد {int(wait_s)}ث | {phone} | {res}")
+                            self._recover_bot_before_retry(atts_for_contact)
                             if self.stop_event.wait(wait_s):
                                 break
                             continue
@@ -4296,11 +4346,17 @@ class ModernWhatsAppApp(ctk.CTk):
                     )
                     if res in ("SUCCESS", "INVALID", "STOPPED"):
                         break
-                    is_retryable = res in retryable_errors or str(res).startswith("ERR_ATTACH_") or str(res).startswith("ERR_GENERAL")
+                    is_retryable = (
+                        res in retryable_errors
+                        or str(res).startswith("ERR_ATTACH_")
+                        or str(res).startswith("ERR_TEXT_SEND")
+                        or str(res).startswith("ERR_GENERAL")
+                    )
                     if attempt < max_retries and is_retryable:
                         wait_s = random.uniform(retry_delay_min, retry_delay_max)
                         retry_mode = "مرفق فقط" if skip_nav else "كامل"
                         self.log(f"🔁 إعادة محاولة ({attempt + 1}/{max_retries}) [{retry_mode}] بعد {int(wait_s)}ث | {phone} | {res}")
+                        self._recover_bot_before_retry(atts_for_contact)
                         if self.stop_event.wait(wait_s):
                             break
                         continue
@@ -4318,9 +4374,9 @@ class ModernWhatsAppApp(ctk.CTk):
                         self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "✅ نجاح"), tags=("success",)))
                 elif res == "INVALID":
                     self.invalid += 1
-                    self.log(f"🚫 [ERR-20] الرقم {phone} غير صحيح.")
+                    self.log(f"⏭️ تخطي {phone} — الرقم غير مسجل على واتساب (تم إغلاق النافذة تلقائياً).")
                     self.results_log.append({"phone": phone, "name": name, "status": "بدون واتساب", "error_code": "ERR-20", "timestamp": timestamp})
-                    self._add_progress_row_blind([phone, name, timestamp, "بدون واتساب", "الرقم غير صالح أو لا يستخدم واتساب"], tag="invalid")
+                    self._add_progress_row_blind([phone, name, timestamp, "بدون واتساب", "غير موجود على واتساب — تم التخطي"], tag="invalid")
                     consecutive_failures = 0
                     if tree_item_id:
                         self._run_on_ui(lambda item=tree_item_id, n=name, ph=phone, v=c.get("var1", ""): self.progress_tree.item(item, values=(n, ph, v, "🚫 غير صالح"), tags=("invalid",)))

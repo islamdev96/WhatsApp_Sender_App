@@ -7,7 +7,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
 from webdriver_manager.chrome import ChromeDriverManager
 
 class WhatsAppBot:
@@ -18,6 +18,7 @@ class WhatsAppBot:
         self.background_mode = False
         self._just_launched = False
         self._last_opened_phone = None
+        self._force_url_next = False
 
         # Common locators (mix XPath + CSS for robustness)
         self.LOGGED_IN_LOCATORS = [
@@ -59,30 +60,28 @@ class WhatsAppBot:
             (By.XPATH, '//div[@role="dialog"]//div[@role="button" and @aria-label="Send"]'),
             (By.XPATH, '//div[@role="dialog"]//div[@role="button" and @aria-label="إرسال"]'),
         ]
-        self.SEND_BUTTON_LOCATORS = [
-            (By.XPATH, '//span[@data-icon="send"]'),
-            (By.XPATH, '//span[@data-icon="send-light"]'),
-            (By.XPATH, '//span[contains(@data-icon,"send")]'),
-            (By.XPATH, '//button[@data-testid="compose-btn-send"]'),
-            (By.XPATH, '//button[@aria-label="Send"]'),
-            (By.XPATH, '//button[@aria-label="إرسال"]'),
-            (By.XPATH, '//div[@role="button" and @aria-label="Send"]'),
-            (By.XPATH, '//div[@role="button" and @aria-label="إرسال"]'),
-            (By.XPATH, '//div[@role="button" and contains(@aria-label,"Send")]'),
-            (By.XPATH, '//div[@role="button" and contains(@aria-label,"إرسال")]'),
-            (By.XPATH, '//button[contains(@aria-label,"Send")]'),
-            (By.XPATH, '//button[contains(@aria-label,"إرسال")]'),
-            (By.XPATH, '//div[@role="dialog"]//span[contains(@data-icon,"send")]'),
-            (By.XPATH, '//div[@role="dialog"]//button[contains(@aria-label,"Send")]'),
-            (By.XPATH, '//div[@role="dialog"]//button[contains(@aria-label,"إرسال")]'),
-            (By.XPATH, '//div[@role="dialog"]//div[@role="button" and contains(@aria-label,"Send")]'),
-            (By.XPATH, '//div[@role="dialog"]//div[@role="button" and contains(@aria-label,"إرسال")]'),
-            (By.XPATH, '//div[@aria-label="Send"]'),
-            (By.XPATH, '//div[@aria-label="إرسال"]'),
+        self.FOOTER_SEND_BUTTON_LOCATORS = [
+            (By.XPATH, '//footer//span[@data-icon="send"]'),
+            (By.XPATH, '//footer//span[@data-icon="send-light"]'),
+            (By.XPATH, '//footer//span[contains(@data-icon,"send")]'),
+            (By.XPATH, '//footer//button[@data-testid="compose-btn-send"]'),
+            (By.XPATH, '//footer//button[@aria-label="Send"]'),
+            (By.XPATH, '//footer//button[@aria-label="إرسال"]'),
+            (By.XPATH, '//footer//div[@role="button" and @aria-label="Send"]'),
+            (By.XPATH, '//footer//div[@role="button" and @aria-label="إرسال"]'),
+            (By.XPATH, '//footer//div[@role="button" and contains(@aria-label,"Send")]'),
+            (By.XPATH, '//footer//div[@role="button" and contains(@aria-label,"إرسال")]'),
+            (By.XPATH, '//footer//button[contains(@aria-label,"Send")]'),
+            (By.XPATH, '//footer//button[contains(@aria-label,"إرسال")]'),
         ]
+        self.SEND_BUTTON_LOCATORS = list(self.FOOTER_SEND_BUTTON_LOCATORS)
         self.ATTACH_BUTTON_LOCATORS = [
             (By.CSS_SELECTOR, 'footer span[data-icon="attach-menu-plus"]'),
             (By.XPATH, '//footer//span[@data-icon="attach-menu-plus"]'),
+            (By.CSS_SELECTOR, 'footer span[data-icon*="attach"]'),
+            (By.XPATH, '//footer//span[contains(@data-icon,"attach")]'),
+            (By.XPATH, '//footer//span[@data-icon="wds-ic-attach"]'),
+            (By.XPATH, '//footer//span[@data-icon="plus"]'),
             (By.CSS_SELECTOR, 'footer span[data-icon*="clip"]'),
             (By.XPATH, '//footer//span[@data-icon="clip"]'),
             (By.XPATH, '//footer//span[@data-icon="clip-light"]'),
@@ -91,6 +90,8 @@ class WhatsAppBot:
             (By.XPATH, '//footer//div[@title="Attach"]'),
             (By.XPATH, '//footer//div[@title="إرفاق"]'),
             (By.CSS_SELECTOR, 'footer button[data-testid*="clip"]'),
+            (By.CSS_SELECTOR, 'footer button[aria-label*="Attach"]'),
+            (By.CSS_SELECTOR, 'footer button[aria-label*="إرفاق"]'),
         ]
         self.FILE_INPUT_LOCATORS = [
             (By.XPATH, '//input[@type="file" and @accept="*"]'),
@@ -117,10 +118,38 @@ class WhatsAppBot:
             (By.XPATH, '//*[contains(text(),"phone number shared via url is invalid")]'),
             (By.XPATH, '//*[contains(text(),"Phone number shared via url is invalid")]'),
             (By.XPATH, '//*[contains(text(),"Invalid phone number")]'),
+            (By.XPATH, '//*[contains(text(),"is not on WhatsApp")]'),
+            (By.XPATH, '//*[contains(text(),"not on WhatsApp")]'),
+            (By.XPATH, '//*[contains(text(),"غير موجود على واتساب")]'),
+            (By.XPATH, '//*[contains(text(),"غير موجود على WhatsApp")]'),
             (By.XPATH, '//*[contains(text(),"غير صحيح")]'),
+            (By.XPATH, '//*[contains(text(),"رقم الهاتف الذي تمت مشاركته")]'),
             (By.XPATH, '//*[contains(text(),"ليس لديه واتساب")]'),
             (By.XPATH, '//*[contains(text(),"ليس لديه WhatsApp")]'),
+            (By.XPATH, '//*[contains(text(),"doesn\'t have WhatsApp")]'),
         ]
+        self.INVALID_NUMBER_OK_LOCATORS = [
+            (By.XPATH, '//div[@data-animate-modal-popup="true"]//div[@role="button"]'),
+            (By.XPATH, '//div[@data-animate-modal-popup="true"]//button'),
+            (By.XPATH, '//div[@role="dialog"]//div[@role="button"]'),
+            (By.XPATH, '//div[@role="dialog"]//button'),
+            (By.XPATH, '//div[@role="button"]//span[normalize-space()="موافق"]/ancestor::div[@role="button"]'),
+            (By.XPATH, '//div[@role="button"]//span[normalize-space()="OK"]/ancestor::div[@role="button"]'),
+            (By.XPATH, '//button[.//span[normalize-space()="موافق"]]'),
+            (By.XPATH, '//button[.//span[normalize-space()="OK"]]'),
+            (By.XPATH, '//*[@role="button" and @aria-label="OK"]'),
+            (By.XPATH, '//*[@role="button" and @aria-label="موافق"]'),
+        ]
+        self._INVALID_PAGE_MARKERS = (
+            "غير موجود على واتساب",
+            "غير موجود على whatsapp",
+            "not on whatsapp",
+            "is not on whatsapp",
+            "phone number shared via url is invalid",
+            "رقم الهاتف الذي تمت مشاركته",
+            "ليس لديه واتساب",
+            "doesn't have whatsapp",
+        )
 
         self._load_selectors_from_file()
 
@@ -447,7 +476,7 @@ class WhatsAppBot:
 
     def _reset_compose_overlays(self):
         """Close sticker panel, media preview, and attach menu before a new upload."""
-        for _ in range(2):
+        for _ in range(3):
             if (
                 not self._sticker_panel_visible()
                 and not self._media_preview_visible()
@@ -458,6 +487,147 @@ class WhatsAppBot:
             except Exception:
                 pass
             time.sleep(0.35)
+
+    def recover_compose_state(self, stop_event=None):
+        """Dismiss overlays and wait until footer chat input is usable (for retries)."""
+        if stop_event and stop_event.is_set():
+            return False
+        self._reset_compose_overlays()
+        self._dismiss_attach_menu()
+        try:
+            self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+        except Exception:
+            pass
+        if stop_event:
+            stop_event.wait(0.4)
+        else:
+            time.sleep(0.4)
+        return self._wait_for_footer_compose_ready(timeout=15, stop_event=stop_event)
+
+    def _find_compose_footer(self):
+        """Footer of the open chat (not the side panel)."""
+        if not self.driver:
+            return None
+        for xpath in (
+            '//*[@id="main"]//footer',
+            '//div[contains(@class,"x1n2onr6")]//footer',
+            '//footer',
+        ):
+            try:
+                for el in self.driver.find_elements(By.XPATH, xpath):
+                    if el.is_displayed():
+                        return el
+            except Exception:
+                continue
+        return None
+
+    def _is_active_chat_ready(self):
+        """True when a conversation compose bar is open (not the empty landing screen)."""
+        if not self.driver:
+            return False
+        footer = self._find_compose_footer()
+        if not footer:
+            return False
+        try:
+            inputs = footer.find_elements(
+                By.XPATH,
+                './/div[@contenteditable="true"][@role="textbox"]'
+                ' | .//div[@contenteditable="true"][@data-tab="10"]'
+                ' | .//div[@contenteditable="true" and contains(@class,"copyable-text")]',
+            )
+            for inp in inputs:
+                if inp.is_displayed():
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _find_attach_button_js(self):
+        """Find attach (+) control inside the chat footer via JavaScript."""
+        if not self.driver:
+            return None
+        script = """
+        var footer = document.querySelector('#main footer') || document.querySelector('footer');
+        if (!footer) return null;
+        function visible(el) {
+            if (!el) return false;
+            var st = window.getComputedStyle(el);
+            return st.display !== 'none' && st.visibility !== 'hidden' && el.offsetParent !== null;
+        }
+        function pickClickable(span) {
+            return span.closest('[role="button"]')
+                || span.closest('button')
+                || span.closest('div[tabindex="0"]')
+                || span.parentElement
+                || span;
+        }
+        var icons = ['attach-menu-plus', 'wds-ic-attach', 'clip', 'clip-light', 'plus'];
+        for (var i = 0; i < icons.length; i++) {
+            var spans = footer.querySelectorAll('span[data-icon="' + icons[i] + '"]');
+            for (var j = 0; j < spans.length; j++) {
+                if (visible(spans[j])) return pickClickable(spans[j]);
+            }
+        }
+        var partial = footer.querySelectorAll('span[data-icon*="attach"], span[data-icon*="clip"]');
+        for (var k = 0; k < partial.length; k++) {
+            if (visible(partial[k])) return pickClickable(partial[k]);
+        }
+        var labeled = footer.querySelectorAll(
+            '[aria-label="Attach"], [aria-label="إرفاق"], [title="Attach"], [title="إرفاق"]'
+        );
+        for (var m = 0; m < labeled.length; m++) {
+            if (visible(labeled[m])) return labeled[m];
+        }
+        return null;
+        """
+        try:
+            return self.driver.execute_script(script)
+        except Exception:
+            return None
+
+    def _find_attach_button(self):
+        attach_btn = self._find_best_clickable(self.ATTACH_BUTTON_LOCATORS)
+        if attach_btn:
+            return attach_btn
+        return self._find_attach_button_js()
+
+    def _wait_for_footer_compose_ready(
+        self, timeout=20, stop_event=None, require_attach=False
+    ):
+        """Wait until the open-chat compose footer is visible; optionally wait for (+)."""
+        end_time = time.time() + timeout
+        while time.time() < end_time:
+            if stop_event and stop_event.is_set():
+                return False
+            if self._is_active_chat_ready():
+                if not require_attach or self._find_attach_button():
+                    return True
+            if stop_event:
+                stop_event.wait(0.35)
+            else:
+                time.sleep(0.35)
+        if not self._is_active_chat_ready():
+            return False
+        if require_attach:
+            return self._find_attach_button() is not None
+        return True
+
+    def _find_footer_send_button(self, stop_event=None):
+        send_btn = self._find_best_clickable(self.FOOTER_SEND_BUTTON_LOCATORS)
+        if send_btn:
+            return send_btn
+        return self._wait_for_any(
+            self.FOOTER_SEND_BUTTON_LOCATORS, timeout=8, stop_event=stop_event
+        )
+
+    def _focus_footer_chat_input(self, chat_input):
+        try:
+            self.driver.execute_script(
+                "arguments[0].scrollIntoView({block:'center'}); arguments[0].focus();",
+                chat_input,
+            )
+        except Exception:
+            pass
 
     def _find_photo_video_input(self):
         return self._find_file_input("media")
@@ -540,17 +710,68 @@ class WhatsAppBot:
 
         return True
 
-    def _send_attachment_via_attach_menu(self, path, input_kind, stop_event=None):
+    def _send_attachment_via_attach_menu(self, path, input_kind, stop_event=None, phone=None):
         """Single-path attach: reset overlays -> (+) -> JS menu row -> send_keys only."""
         if stop_event and stop_event.is_set():
             return "STOPPED"
+        if self._handle_invalid_if_present(stop_event=stop_event):
+            return "INVALID"
 
-        self._reset_compose_overlays()
+        max_attempts = 3
+        last_err = "ERR_ATTACH_BTN_NOT_FOUND"
 
+        for attempt in range(max_attempts):
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
+
+            if not self._is_active_chat_ready() and phone:
+                self._ensure_chat_open_for_send(phone, stop_event=stop_event)
+
+            self._reset_compose_overlays()
+            if not self._is_active_chat_ready():
+                last_err = "ERR_ATTACH_BTN_NOT_FOUND"
+                if attempt < max_attempts - 1:
+                    if phone:
+                        self._force_url_next = True
+                        self._ensure_chat_open_for_send(phone, stop_event=stop_event)
+                    if stop_event:
+                        stop_event.wait(0.6)
+                    else:
+                        time.sleep(0.6)
+                    continue
+                return last_err
+
+            self._wait_for_footer_compose_ready(
+                timeout=8, stop_event=stop_event, require_attach=False
+            )
+
+            try:
+                result = self._send_attachment_via_attach_menu_once(
+                    path, input_kind, stop_event=stop_event
+                )
+                if result == "SUCCESS":
+                    return "SUCCESS"
+                if result in ("STOPPED", "ERR_STICKER_PANEL_OPENED"):
+                    return result
+                last_err = result
+            except Exception as e:
+                last_err = f"ERR_ATTACH: {str(e)[:250]}"
+
+            if attempt < max_attempts - 1:
+                self._dismiss_attach_menu()
+                self._reset_compose_overlays()
+                if stop_event:
+                    stop_event.wait(0.8)
+                else:
+                    time.sleep(0.8)
+
+        return last_err
+
+    def _send_attachment_via_attach_menu_once(self, path, input_kind, stop_event=None):
         try:
             existing_signatures = self._snapshot_file_input_signatures()
 
-            attach_btn = self._find_best_clickable(self.ATTACH_BUTTON_LOCATORS)
+            attach_btn = self._find_attach_button()
             if not attach_btn:
                 return "ERR_ATTACH_BTN_NOT_FOUND"
 
@@ -621,33 +842,128 @@ class WhatsAppBot:
         """Wait for media preview to close and footer chat input before a follow-up text."""
         if stop_event and stop_event.is_set():
             return "STOPPED"
+        self._reset_compose_overlays()
         self._wait_for_preview_close(timeout=12, stop_event=stop_event)
         if stop_event and stop_event.is_set():
             return "STOPPED"
-        chat_input = self._wait_for_any(
-            self.CHAT_INPUT_LOCATORS, timeout=20, stop_event=stop_event
-        )
-        if not chat_input:
+        if not self._wait_for_footer_compose_ready(timeout=20, stop_event=stop_event):
             return "ERR_CHAT_INPUT_NOT_FOUND"
+        if stop_event:
+            stop_event.wait(0.8)
+        else:
+            time.sleep(0.8)
+        return "SUCCESS"
+
+    def _page_indicates_invalid_number(self):
+        if self._find_any(self.INVALID_NUMBER_LOCATORS):
+            return True
+        try:
+            src = (self.driver.page_source or "").lower()
+            return any(m.lower() in src for m in self._INVALID_PAGE_MARKERS)
+        except Exception:
+            return False
+
+    def _invalid_number_modal_visible(self):
+        return self._page_indicates_invalid_number()
+
+    def _dismiss_invalid_number_modal(self, stop_event=None):
+        """Click OK (موافق) on the 'number not on WhatsApp' dialog so automation can continue."""
+        if not self.driver:
+            return False
+        if not self._page_indicates_invalid_number():
+            return False
+
+        dismissed = False
+        ok_btn = self._find_best_clickable(self.INVALID_NUMBER_OK_LOCATORS)
+        if ok_btn:
+            dismissed = self._click_element(ok_btn)
+
+        if not dismissed:
+            try:
+                dismissed = bool(
+                    self.driver.execute_script(
+                        """
+                        var labels = ['موافق', 'OK', 'Ok', 'حسناً', 'حسنا'];
+                        var nodes = document.querySelectorAll(
+                            '[role="button"], button, div[tabindex="0"]'
+                        );
+                        for (var i = 0; i < nodes.length; i++) {
+                            var el = nodes[i];
+                            var t = (el.innerText || el.textContent || '').trim();
+                            if (labels.indexOf(t) >= 0) {
+                                el.click();
+                                return true;
+                            }
+                        }
+                        var modal = document.querySelector('[data-animate-modal-popup="true"]')
+                            || document.querySelector('[role="dialog"]');
+                        if (modal) {
+                            var btn = modal.querySelector('[role="button"], button');
+                            if (btn) { btn.click(); return true; }
+                        }
+                        return false;
+                        """
+                    )
+                )
+            except Exception:
+                pass
+
+        if not dismissed:
+            try:
+                self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+                dismissed = True
+            except Exception:
+                pass
+
         if stop_event:
             stop_event.wait(0.5)
         else:
             time.sleep(0.5)
-        return "SUCCESS"
+        return dismissed
+
+    def _handle_invalid_if_present(self, stop_event=None):
+        """If invalid-number modal is open: dismiss it and report invalid."""
+        if not self._page_indicates_invalid_number():
+            return False
+        self._dismiss_invalid_number_modal(stop_event=stop_event)
+        self._last_opened_phone = None
+        self._force_url_next = True
+        return True
+
+    def _ensure_chat_open_for_send(self, phone, stop_event=None):
+        """Re-open chat via URL when landing screen has no compose footer (after invalid skip)."""
+        if self._is_active_chat_ready():
+            return True
+        if not phone or (stop_event and stop_event.is_set()):
+            return False
+        self._force_url_next = True
+        state = self.open_chat(phone, stop_event=stop_event)
+        if state == "INVALID":
+            return False
+        if state != "READY":
+            return False
+        return self._wait_for_footer_compose_ready(
+            timeout=25, stop_event=stop_event, require_attach=False
+        )
 
     def _wait_for_chat_or_invalid(self, timeout=60, poll=0.5, stop_event=None):
         end_time = time.time() + timeout
         while time.time() < end_time:
             if stop_event and stop_event.is_set():
                 return "STOPPED"
-            if self._find_any(self.INVALID_NUMBER_LOCATORS):
+            if self._page_indicates_invalid_number():
+                self._dismiss_invalid_number_modal(stop_event=stop_event)
+                self._last_opened_phone = None
+                self._force_url_next = True
                 return "INVALID"
-            if self._find_any(self.CHAT_INPUT_LOCATORS):
+            if self._is_active_chat_ready():
                 return "READY"
             if stop_event:
                 stop_event.wait(poll)
             else:
                 time.sleep(poll)
+        if self._handle_invalid_if_present(stop_event=stop_event):
+            return "INVALID"
         return "TIMEOUT"
 
     def is_logged_in(self):
@@ -830,7 +1146,19 @@ class WhatsAppBot:
                 stop_event.wait(0.8)
             else:
                 time.sleep(0.8)
-            return self._find_any(self.CHAT_INPUT_LOCATORS) is not None
+            try:
+                self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+            except Exception:
+                pass
+            if stop_event:
+                stop_event.wait(0.4)
+            else:
+                time.sleep(0.4)
+            if stop_event:
+                stop_event.wait(0.5)
+            else:
+                time.sleep(0.5)
+            return self._is_active_chat_ready()
         except Exception:
             return False
 
@@ -845,8 +1173,13 @@ class WhatsAppBot:
         if not phone:
             return "TIMEOUT"
 
+        force_url = getattr(self, "_force_url_next", False)
+        if force_url:
+            self._force_url_next = False
+
         can_search = (
-            self._last_opened_phone
+            not force_url
+            and self._last_opened_phone
             and self.is_logged_in()
             and phone != self._last_opened_phone
         )
@@ -887,9 +1220,9 @@ class WhatsAppBot:
 
         try:
             if skip_open_chat:
-                if self._find_any(self.INVALID_NUMBER_LOCATORS):
+                if self._handle_invalid_if_present(stop_event=stop_event):
                     ready_state = "INVALID"
-                elif self._find_any(self.CHAT_INPUT_LOCATORS):
+                elif self._is_active_chat_ready():
                     ready_state = "READY"
                 else:
                     ready_state = "TIMEOUT"
@@ -901,7 +1234,16 @@ class WhatsAppBot:
             if ready_state == "INVALID":
                 return "INVALID"
             if ready_state == "TIMEOUT":
+                if self._handle_invalid_if_present(stop_event=stop_event):
+                    return "INVALID"
                 return "ERR_TIMEOUT"
+
+            if attachments and ready_state == "READY":
+                if not self._is_active_chat_ready():
+                    if not self._ensure_chat_open_for_send(phone, stop_event=stop_event):
+                        if self._handle_invalid_if_present(stop_event=stop_event):
+                            return "INVALID"
+                        return "ERR_ATTACH_BTN_NOT_FOUND"
 
             has_media = bool(attachments)
             if has_media:
@@ -926,6 +1268,7 @@ class WhatsAppBot:
                 extra_messages,
                 stop_event,
                 send_text_with_image,
+                phone=phone,
             )
         except Exception as e:
             return f"ERR_GENERAL: {str(e)[:250]}"
@@ -938,6 +1281,7 @@ class WhatsAppBot:
         extra_messages,
         stop_event,
         send_text_with_image,
+        phone=None,
     ):
         """Send attachments and/or text in an already-open chat."""
         if attachments:
@@ -957,7 +1301,12 @@ class WhatsAppBot:
                 elif use_caption_mode and i == 0:
                     caption = message
 
-                res = self._send_attachment(path, type_, caption, stop_event=stop_event)
+                if not self._is_active_chat_ready():
+                    self._ensure_chat_open_for_send(phone, stop_event=stop_event)
+
+                res = self._send_attachment(
+                    path, type_, caption, stop_event=stop_event, phone=phone
+                )
                 if res != "SUCCESS":
                     return res
 
@@ -1039,6 +1388,7 @@ class WhatsAppBot:
             self.driver.get(url)
             ready_state = self._wait_for_chat_or_invalid(timeout=45, stop_event=stop_event)
             if ready_state == "INVALID":
+                self._dismiss_invalid_number_modal(stop_event=stop_event)
                 return "INVALID"
             if ready_state == "READY":
                 return "VALID"
@@ -1140,10 +1490,12 @@ class WhatsAppBot:
             pass
         return False
 
-    def _send_attachment(self, path, media_type, caption=None, stop_event=None):
+    def _send_attachment(self, path, media_type, caption=None, stop_event=None, phone=None):
         """Upload file via attach menu; send preview/doc; never touch footer chat during media step."""
         if stop_event and stop_event.is_set():
             return "STOPPED"
+        if not self._is_active_chat_ready() and phone:
+            self._ensure_chat_open_for_send(phone, stop_event=stop_event)
 
         if not path:
             return "ERR_FILE_INPUT_NOT_FOUND"
@@ -1158,7 +1510,7 @@ class WhatsAppBot:
 
         if input_kind == "media":
             upload_result = self._send_attachment_via_attach_menu(
-                path, input_kind, stop_event=stop_event
+                path, input_kind, stop_event=stop_event, phone=phone
             )
         else:
             upload_result = self._try_direct_file_injection(
@@ -1166,7 +1518,7 @@ class WhatsAppBot:
             )
             if upload_result is False:
                 upload_result = self._send_attachment_via_attach_menu(
-                    path, input_kind, stop_event=stop_event
+                    path, input_kind, stop_event=stop_event, phone=phone
                 )
             elif upload_result is True:
                 upload_result = "SUCCESS"
@@ -1372,45 +1724,96 @@ class WhatsAppBot:
     def _send_text(self, message, stop_event=None):
         if stop_event and stop_event.is_set():
             return "STOPPED"
+
+        for attempt in range(2):
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
+            result = self._send_text_once(message, stop_event=stop_event)
+            if result == "SUCCESS":
+                return "SUCCESS"
+            if result == "INVALID":
+                return "INVALID"
+            if result != "ERR_TEXT_SEND_RETRY":
+                return result
+            self.recover_compose_state(stop_event=stop_event)
+
+        return f"ERR_TEXT_SEND: click intercepted after retry"
+
+    def _send_text_once(self, message, stop_event=None):
+        if self._handle_invalid_if_present(stop_event=stop_event):
+            return "INVALID"
+        self._reset_compose_overlays()
         if self._media_preview_visible():
             self._wait_for_preview_close(timeout=12, stop_event=stop_event)
             if stop_event and stop_event.is_set():
                 return "STOPPED"
         try:
-            chat_input = self._wait_for_any(self.CHAT_INPUT_LOCATORS, timeout=30, stop_event=stop_event)
+            if not self._wait_for_footer_compose_ready(timeout=25, stop_event=stop_event):
+                return "ERR_CHAT_INPUT_NOT_FOUND"
+
+            chat_input = self._find_footer_chat_input() or self._find_any(
+                self.CHAT_INPUT_LOCATORS
+            )
             if not chat_input:
                 return "ERR_CHAT_INPUT_NOT_FOUND"
-            
-            if stop_event and stop_event.is_set():
-                return "STOPPED"
-            chat_input.click()
-            if stop_event:
-                stop_event.wait(0.5)
-            else:
-                time.sleep(0.5)
-            
-            if stop_event and stop_event.is_set():
-                return "STOPPED"
-            self._enter_text(chat_input, message, stop_event=stop_event)
-                
-            if stop_event:
-                stop_event.wait(0.5)
-            else:
-                time.sleep(0.5)
 
             if stop_event and stop_event.is_set():
                 return "STOPPED"
 
-            send_btn = self._find_best_clickable(self.SEND_BUTTON_LOCATORS) or self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=10, stop_event=stop_event)
-            if send_btn:
+            self._focus_footer_chat_input(chat_input)
+            if not self._click_element(chat_input):
                 try:
-                    send_btn.click()
-                except:
-                    self.driver.execute_script("arguments[0].click();", send_btn)
+                    self.driver.execute_script("arguments[0].click();", chat_input)
+                except Exception as e:
+                    if "intercepted" in str(e).lower():
+                        return "ERR_TEXT_SEND_RETRY"
+                    raise
+
+            if stop_event:
+                stop_event.wait(0.4)
             else:
-                # Fallback Enter
+                time.sleep(0.4)
+
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
+
+            self._enter_text(chat_input, message, stop_event=stop_event)
+
+            if stop_event:
+                stop_event.wait(0.4)
+            else:
+                time.sleep(0.4)
+
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
+
+            sent = False
+            try:
                 chat_input.send_keys(Keys.ENTER)
-                
+                sent = True
+            except ElementClickInterceptedException:
+                return "ERR_TEXT_SEND_RETRY"
+            except Exception:
+                pass
+
+            if not sent:
+                send_btn = self._find_footer_send_button(stop_event=stop_event)
+                if send_btn:
+                    if not self._click_element(send_btn):
+                        try:
+                            self.driver.execute_script(
+                                "arguments[0].click();", send_btn
+                            )
+                        except Exception as e:
+                            if "intercepted" in str(e).lower():
+                                return "ERR_TEXT_SEND_RETRY"
+                            raise
+                else:
+                    try:
+                        chat_input.send_keys(Keys.ENTER)
+                    except ElementClickInterceptedException:
+                        return "ERR_TEXT_SEND_RETRY"
+
             if stop_event:
                 stop_event.wait(1.0)
             else:
@@ -1418,8 +1821,13 @@ class WhatsAppBot:
             if random.random() < 0.25:
                 self._random_scroll(stop_event=stop_event)
             return "SUCCESS"
+        except ElementClickInterceptedException:
+            return "ERR_TEXT_SEND_RETRY"
         except Exception as e:
-            return f"ERR_TEXT_SEND: {str(e)[:250]}"
+            err = str(e)
+            if "intercepted" in err.lower():
+                return "ERR_TEXT_SEND_RETRY"
+            return f"ERR_TEXT_SEND: {err[:250]}"
 
     def close(self):
         """Safely close the browser, ensuring session data is saved."""
@@ -1514,13 +1922,8 @@ class WhatsAppBot:
             time.sleep(1) # Give it a moment to render
             
             # If we find the invalid text anywhere in the page source, it's invalid
-            if "invalid" in self.driver.page_source.lower() or "غير صحيح" in self.driver.page_source:
-                # Click OK button to close modal if exists
-                try:
-                    btn = self.driver.find_element(By.XPATH, '//div[@data-animate-modal-popup="true"]//button')
-                    btn.click()
-                except:
-                    pass
+            if self._page_indicates_invalid_number():
+                self._dismiss_invalid_number_modal()
                 return False
                 
             # Otherwise, assume valid (chat input is probably visible)

@@ -27,28 +27,37 @@
     { "by": "xpath", "value": "//div[@role=\"dialog\"]//button[@aria-label=\"إرسال\"]" }
   ],
   "SEND_BUTTON_LOCATORS": [
-    { "by": "xpath", "value": "//span[@data-icon=\"send\"]" },
-    { "by": "xpath", "value": "//span[@data-icon=\"send-light\"]" },
-    { "by": "xpath", "value": "//span[contains(@data-icon,\"send\")]" },
-    { "by": "xpath", "value": "//button[@data-testid=\"compose-btn-send\"]" },
-    { "by": "xpath", "value": "//button[@aria-label=\"Send\"]" },
-    { "by": "xpath", "value": "//div[@role=\"button\" and @aria-label=\"Send\"]" },
-    { "by": "xpath", "value": "//div[@role=\"button\" and contains(@aria-label,\"Send\")]" },
-    { "by": "xpath", "value": "//button[contains(@aria-label,\"Send\")]" },
-    { "by": "xpath", "value": "//div[@role=\"dialog\"]//span[contains(@data-icon,\"send\")]" },
-    { "by": "xpath", "value": "//div[@role=\"dialog\"]//button[contains(@aria-label,\"Send\")]" },
-    { "by": "xpath", "value": "//div[@role=\"dialog\"]//div[@role=\"button\" and contains(@aria-label,\"Send\")]" }
+    { "by": "xpath", "value": "//footer//span[@data-icon=\"send\"]" },
+    { "by": "xpath", "value": "//footer//span[@data-icon=\"send-light\"]" },
+    { "by": "xpath", "value": "//footer//span[contains(@data-icon,\"send\")]" },
+    { "by": "xpath", "value": "//footer//button[@data-testid=\"compose-btn-send\"]" },
+    { "by": "xpath", "value": "//footer//button[@aria-label=\"Send\"]" },
+    { "by": "xpath", "value": "//footer//button[@aria-label=\"إرسال\"]" },
+    { "by": "xpath", "value": "//footer//div[@role=\"button\" and @aria-label=\"Send\"]" },
+    { "by": "xpath", "value": "//footer//div[@role=\"button\" and contains(@aria-label,\"Send\")]" },
+    { "by": "xpath", "value": "//footer//button[contains(@aria-label,\"Send\")]" },
+    { "by": "xpath", "value": "//footer//button[contains(@aria-label,\"إرسال\")]" }
+  ],
+  "FOOTER_SEND_BUTTON_LOCATORS": [
+    { "by": "xpath", "value": "//footer//span[@data-icon=\"send\"]" },
+    { "by": "xpath", "value": "//footer//button[@aria-label=\"إرسال\"]" }
   ],
   "ATTACH_BUTTON_LOCATORS": [
     { "by": "css", "value": "footer span[data-icon=\"attach-menu-plus\"]" },
     { "by": "xpath", "value": "//footer//span[@data-icon=\"attach-menu-plus\"]" },
+    { "by": "css", "value": "footer span[data-icon*=\"attach\"]" },
+    { "by": "xpath", "value": "//footer//span[contains(@data-icon,\"attach\")]" },
+    { "by": "xpath", "value": "//footer//span[@data-icon=\"wds-ic-attach\"]" },
+    { "by": "xpath", "value": "//footer//span[@data-icon=\"plus\"]" },
     { "by": "css", "value": "footer span[data-icon*=\"clip\"]" },
     { "by": "xpath", "value": "//footer//span[@data-icon=\"clip\"]" },
     { "by": "xpath", "value": "//footer//span[@data-icon=\"clip-light\"]" },
     { "by": "xpath", "value": "//footer//div[@title=\"Attach\"]" },
     { "by": "xpath", "value": "//footer//div[@title=\"إرفاق\"]" },
     { "by": "xpath", "value": "//footer//*[@aria-label=\"Attach\"]" },
-    { "by": "xpath", "value": "//footer//*[@aria-label=\"إرفاق\"]" }
+    { "by": "xpath", "value": "//footer//*[@aria-label=\"إرفاق\"]" },
+    { "by": "css", "value": "footer button[aria-label*=\"Attach\"]" },
+    { "by": "css", "value": "footer button[aria-label*=\"إرفاق\"]" }
   ],
   "FILE_INPUT_LOCATORS": [
     { "by": "xpath", "value": "//input[@type=\"file\" and @accept=\"*\"]" },
@@ -72,9 +81,15 @@
   "INVALID_NUMBER_LOCATORS": [
     { "by": "xpath", "value": "//*[contains(text(),\"phone number shared via url is invalid\")]" },
     { "by": "xpath", "value": "//*[contains(text(),\"Phone number shared via url is invalid\")]" },
-    { "by": "xpath", "value": "//*[contains(text(),\"Invalid phone number\")]" },
+    { "by": "xpath", "value": "//*[contains(text(),\"is not on WhatsApp\")]" },
+    { "by": "xpath", "value": "//*[contains(text(),\"غير موجود على واتساب\")]" },
     { "by": "xpath", "value": "//*[contains(text(),\"غير صحيح\")]" },
     { "by": "xpath", "value": "//*[contains(text(),\"ليس لديه واتساب\")]" },
     { "by": "xpath", "value": "//*[contains(text(),\"ليس لديه WhatsApp\")]" }
+  ],
+  "INVALID_NUMBER_OK_LOCATORS": [
+    { "by": "xpath", "value": "//div[@data-animate-modal-popup=\"true\"]//div[@role=\"button\"]" },
+    { "by": "xpath", "value": "//div[@role=\"button\"]//span[normalize-space()=\"موافق\"]/ancestor::div[@role=\"button\"]" },
+    { "by": "xpath", "value": "//button[.//span[normalize-space()=\"موافق\"]]" }
   ]
 }
