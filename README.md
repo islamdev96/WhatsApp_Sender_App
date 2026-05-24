@@ -37,15 +37,16 @@ Desktop bulk messaging for **WhatsApp Web** (Selenium automation). Not affiliate
 | `ERR_STICKER_PANEL_OPENED` | Wrong panel opened | Retry; do not click stickers manually during send |
 | `ERR_FILE_INPUT_NOT_FOUND` | Upload field missing | Update `automation/selectors.json` if WhatsApp UI changed |
 
-## Features
+## Features (current UI)
 
 - Bulk send with `{name}`, `{phone}`, `{var1}`–`{var5}`, Spintax `{a|b|c}`
-- Multi-attachment (image / video / document) with per-file captions
-- Contact groups, templates, workflows (multi-step sequences)
-- Campaign history + CSV reports (`reports/`)
-- Number checker, Google Maps scraper, account warmer
-- Keyword auto-reply (main tab) + chatbot tab
-- Multi Chrome profiles, proxy, fingerprint options
+- Multi-attachment (image / video / document)
+- Contact groups and message templates
+- Safe mode (validate numbers before send)
+- Settings: delays, batch pause, retries, proxy/fingerprint
+- Operation log tab + CSV reports (`reports/`)
+- Number check (menu: أدوات → فحص الأرقام)
+- Multi Chrome profiles
 
 ## Anti-ban / policy (Arabic)
 

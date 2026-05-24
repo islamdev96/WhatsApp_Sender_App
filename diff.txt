@@ -1,0 +1,223 @@
+diff --git a/automation/whatsapp_bot.py b/automation/whatsapp_bot.py
+index a400a97..22cdb22 100644
+--- a/automation/whatsapp_bot.py
++++ b/automation/whatsapp_bot.py
+@@ -333,9 +333,9 @@ class WhatsAppBot:
+         """Locate file input nested under the matching attach-menu row."""
+         icon = "attach-document" if kind == "document" else "attach-image"
+         xpaths = [
+-            f'//footer//li[.//span[@data-icon="{icon}"]]//input[@type="file"]',
+             f'//li[.//span[@data-icon="{icon}"]]//input[@type="file"]',
+             f'//*[.//span[@data-icon="{icon}"]]//input[@type="file"]',
++            f'//footer//li[.//span[@data-icon="{icon}"]]//input[@type="file"]',
+         ]
+         for xpath in xpaths:
+             try:
+@@ -382,10 +382,9 @@ class WhatsAppBot:
+             inp.addEventListener('click', block, true);
+             inp.addEventListener('mousedown', block, true);
+         }
+-        var roots = [];
+-        var footer = document.querySelector('footer');
+-        if (footer) roots.push(footer);
+-        roots.push(document.body);
++        var roots = [document.body];
++        var footer = document.querySelector('#main footer') || document.querySelector('footer');
++        if (footer) roots.unshift(footer);
+         for (var r = 0; r < roots.length; r++) {
+             var spans = roots[r].querySelectorAll('span[data-icon="' + icon + '"]');
+             for (var i = 0; i < spans.length; i++) {
+@@ -414,24 +413,134 @@ class WhatsAppBot:
+         except Exception:
+             return False
+ 
++    def _js_click_attach_menu_by_text(self, labels):
++        """Click attach-menu row by visible label (Arabic/English WhatsApp Web)."""
++        if not self.driver:
++            return False
++        script = """
++        var labels = arguments[0];
++        function isVisible(el) {
++            if (!el) return false;
++            var st = window.getComputedStyle(el);
++            return st.display !== 'none' && st.visibility !== 'hidden' && el.offsetParent !== null;
++        }
++        function norm(s) {
++            return (s || '').replace(/\\s+/g, ' ').trim().toLowerCase();
++        }
++        var want = labels.map(norm);
++        var candidates = document.querySelectorAll(
++            'li, div[role="button"], div[tabindex="0"], span[dir="auto"]'
++        );
++        for (var i = 0; i < candidates.length; i++) {
++            var el = candidates[i];
++            if (!isVisible(el)) continue;
++            var t = norm(el.innerText || el.textContent);
++            if (!t) continue;
++            for (var j = 0; j < want.length; j++) {
++                if (t === want[j] || t.indexOf(want[j]) >= 0 || want[j].indexOf(t) >= 0) {
++                    var row = el.closest('li')
++                        || el.closest('[role="button"]')
++                        || el.closest('div[tabindex]')
++                        || el;
++                    if (!isVisible(row)) continue;
++                    row.click();
++                    return true;
++                }
++            }
++        }
++        return false;
++        """
++        try:
++            return bool(self.driver.execute_script(script, labels))
++        except Exception:
++            return False
++
++    def _find_file_input_for_kind(self, kind, exclude_signatures=None):
++        """Scan all file inputs on page (attach menu is often outside footer)."""
++        exclude_signatures = exclude_signatures or set()
++        try:
++            inputs = self.driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
++        except Exception:
++            return None
++        for el in inputs:
++            sig = self._file_input_signature(el)
++            if sig and sig in exclude_signatures:
++                continue
++            if self._classify_file_input(el) == kind:
++                return el
++        return None
++
++    def _activate_attach_menu_option(self, input_kind, stop_event=None):
++        """Open Photos/Videos or Document row in the (+) menu."""
++        if input_kind == "document":
++            icons = ["attach-document"]
++            labels = ["Document", "مستند", "Documents"]
++        else:
++            icons = ["attach-image", "attach-gallery", "media", "gallery"]
++            labels = [
++                "Photos & videos",
++                "Photos and videos",
++                "Photos & Videos",
++                "الصور ومقاطع الفيديو",
++                "الصور والفيديو",
++                "صور وفيديو",
++            ]
++
++        for icon in icons:
++            if self._js_activate_attach_menu_option(icon):
++                if stop_event:
++                    stop_event.wait(0.4)
++                else:
++                    time.sleep(0.4)
++                return True
++
++        if self._js_click_attach_menu_by_text(labels):
++            if stop_event:
++                stop_event.wait(0.4)
++            else:
++                time.sleep(0.4)
++            return True
++
++        for label in labels:
++            try:
++                xpath = (
++                    f'//*[contains(normalize-space(.),"{label}")]/'
++                    f'ancestor::li[1] | '
++                    f'//*[contains(normalize-space(.),"{label}")]/'
++                    f'ancestor::div[@role="button"][1]'
++                )
++                for el in self.driver.find_elements(By.XPATH, xpath):
++                    if el.is_displayed():
++                        self._click_element(el)
++                        if stop_event:
++                            stop_event.wait(0.4)
++                        else:
++                            time.sleep(0.4)
++                        return True
++            except Exception:
++                continue
++        return False
++
+     def _expose_attach_file_input(self, input_kind, existing_signatures, stop_event=None):
+         """After attach (+) is open: find or activate the correct hidden file input."""
+-        data_icon = "attach-document" if input_kind == "document" else "attach-image"
++        input_el = self._find_file_input_for_kind(input_kind, existing_signatures)
++        if input_el:
++            return input_el
+ 
+         input_el = self._wait_for_file_input_in_attach_menu(
+-            input_kind, timeout=1.2, stop_event=stop_event
++            input_kind, timeout=1.5, stop_event=stop_event
+         )
+         if input_el:
+             return input_el
+ 
+-        if self._js_activate_attach_menu_option(data_icon):
+-            if stop_event:
+-                stop_event.wait(0.5)
+-            else:
+-                time.sleep(0.5)
++        self._activate_attach_menu_option(input_kind, stop_event=stop_event)
++
++        input_el = self._find_file_input_for_kind(input_kind, existing_signatures)
++        if input_el:
++            return input_el
+ 
+         input_el = self._wait_for_file_input_in_attach_menu(
+-            input_kind, timeout=2.5, stop_event=stop_event
++            input_kind, timeout=3, stop_event=stop_event
+         )
+         if input_el:
+             return input_el
+@@ -439,7 +548,7 @@ class WhatsAppBot:
+         input_el = self._wait_for_new_file_input(
+             input_kind,
+             existing_signatures,
+-            timeout=5,
++            timeout=6,
+             stop_event=stop_event,
+         )
+         if input_el:
+@@ -777,9 +886,9 @@ class WhatsAppBot:
+ 
+             self._click_element(attach_btn)
+             if stop_event:
+-                stop_event.wait(0.8)
++                stop_event.wait(1.0)
+             else:
+-                time.sleep(0.8)
++                time.sleep(1.0)
+ 
+             input_el = self._expose_attach_file_input(
+                 input_kind,
+@@ -787,6 +896,12 @@ class WhatsAppBot:
+                 stop_event=stop_event,
+             )
+ 
++            if not input_el or self._classify_file_input(input_el) != input_kind:
++                self._activate_attach_menu_option(input_kind, stop_event=stop_event)
++                input_el = self._find_file_input_for_kind(
++                    input_kind, existing_signatures
++                )
++
+             if not input_el or self._classify_file_input(input_el) != input_kind:
+                 self._dismiss_attach_menu()
+                 return "ERR_FILE_INPUT_NOT_FOUND"
+@@ -814,11 +929,12 @@ class WhatsAppBot:
+                 preview = self._find_any(self.MEDIA_PREVIEW_LOCATORS)
+                 if not preview:
+                     preview = self._wait_for_any(
+-                        self.MEDIA_PREVIEW_LOCATORS, timeout=8, stop_event=stop_event
++                        self.MEDIA_PREVIEW_LOCATORS, timeout=12, stop_event=stop_event
+                     )
+                 if not preview:
+                     self._dismiss_attach_menu()
+                     return "ERR_FILE_INPUT_NOT_FOUND"
++                self._dismiss_attach_menu()
+ 
+             return "SUCCESS"
+         except Exception as e:
+diff --git a/data/whatsapp_sender.db-wal b/data/whatsapp_sender.db-wal
+index e0b920c..b828b33 100644
+Binary files a/data/whatsapp_sender.db-wal and b/data/whatsapp_sender.db-wal differ

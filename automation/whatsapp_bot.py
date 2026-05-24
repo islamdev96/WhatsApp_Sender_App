@@ -330,20 +330,65 @@ class WhatsAppBot:
         return None
 
     def _find_file_input_in_attach_menu(self, kind):
-        """Locate file input nested under the matching attach-menu row."""
-        icon = "attach-document" if kind == "document" else "attach-image"
-        xpaths = [
-            f'//footer//li[.//span[@data-icon="{icon}"]]//input[@type="file"]',
-            f'//li[.//span[@data-icon="{icon}"]]//input[@type="file"]',
-            f'//*[.//span[@data-icon="{icon}"]]//input[@type="file"]',
-        ]
-        for xpath in xpaths:
-            try:
-                for el in self.driver.find_elements(By.XPATH, xpath):
-                    if self._classify_file_input(el) == kind:
-                        return el
-            except Exception:
-                continue
+        """Locate file input nested under the matching attach-menu row using labels or icons."""
+        if kind == "document":
+            labels = ["document", "مستند", "documents"]
+            icons = ["attach-document"]
+        else:
+            labels = [
+                "photos & videos",
+                "photos and videos",
+                "photos & videos",
+                "الصور ومقاطع الفيديو",
+                "الصور والفيديو",
+                "صور وفيديو",
+                "gallery",
+                "معرض",
+            ]
+            icons = ["attach-image", "attach-gallery", "media", "gallery"]
+
+        # 1. Try finding by text labels first (most robust)
+        try:
+            script = """
+            var labels = arguments[0];
+            function norm(s) {
+                return (s || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+            }
+            var want = labels.map(norm);
+            var candidates = document.querySelectorAll('li, div[role="button"], div[tabindex="0"]');
+            for (var i = 0; i < candidates.length; i++) {
+                var el = candidates[i];
+                var text = norm(el.innerText || el.textContent);
+                if (!text) continue;
+                for (var j = 0; j < want.length; j++) {
+                    if (text === want[j] || text.indexOf(want[j]) >= 0 || want[j].indexOf(text) >= 0) {
+                        var inp = el.querySelector('input[type="file"]');
+                        if (inp) return inp;
+                    }
+                }
+            }
+            return null;
+            """
+            el = self.driver.execute_script(script, labels)
+            if el:
+                return el
+        except Exception:
+            pass
+
+        # 2. Fallback to icons/xpaths if text search fails
+        for icon in icons:
+            xpaths = [
+                f'//li[.//span[@data-icon="{icon}"]]//input[@type="file"]',
+                f'//*[.//span[@data-icon="{icon}"]]//input[@type="file"]',
+                f'//footer//li[.//span[@data-icon="{icon}"]]//input[@type="file"]',
+            ]
+            for xpath in xpaths:
+                try:
+                    for el in self.driver.find_elements(By.XPATH, xpath):
+                        if self._classify_file_input(el) == kind:
+                            return el
+                except Exception:
+                    continue
         return None
 
     def _wait_for_file_input_in_attach_menu(self, kind, timeout=3, stop_event=None):
@@ -382,10 +427,9 @@ class WhatsAppBot:
             inp.addEventListener('click', block, true);
             inp.addEventListener('mousedown', block, true);
         }
-        var roots = [];
-        var footer = document.querySelector('footer');
-        if (footer) roots.push(footer);
-        roots.push(document.body);
+        var roots = [document.body];
+        var footer = document.querySelector('#main footer') || document.querySelector('footer');
+        if (footer) roots.unshift(footer);
         for (var r = 0; r < roots.length; r++) {
             var spans = roots[r].querySelectorAll('span[data-icon="' + icon + '"]');
             for (var i = 0; i < spans.length; i++) {
@@ -414,24 +458,138 @@ class WhatsAppBot:
         except Exception:
             return False
 
+    def _js_activate_attach_menu_option_by_text(self, labels):
+        """Finds row by text, blocks its nested file input click/mousedown, and dispatch click events on the row."""
+        if not self.driver:
+            return False
+        script = """
+        var labels = arguments[0];
+        function isVisible(el) {
+            if (!el) return false;
+            var st = window.getComputedStyle(el);
+            return st.display !== 'none' && st.visibility !== 'hidden' && el.offsetParent !== null;
+        }
+        function norm(s) {
+            return (s || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+        }
+        function blockInputPicker(inp) {
+            if (!inp) return;
+            var block = function(e) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                return false;
+            };
+            inp.addEventListener('click', block, true);
+            inp.addEventListener('mousedown', block, true);
+        }
+        var want = labels.map(norm);
+        var candidates = document.querySelectorAll(
+            'li, div[role="button"], div[tabindex="0"], span[dir="auto"]'
+        );
+        for (var i = 0; i < candidates.length; i++) {
+            var el = candidates[i];
+            if (!isVisible(el)) continue;
+            var t = norm(el.innerText || el.textContent);
+            if (!t) continue;
+            for (var j = 0; j < want.length; j++) {
+                if (t === want[j] || t.indexOf(want[j]) >= 0 || want[j].indexOf(t) >= 0) {
+                    var row = el.closest('li')
+                        || el.closest('[role="button"]')
+                        || el.closest('div[tabindex]')
+                        || el;
+                    if (!isVisible(row)) continue;
+                    
+                    var inp = row.querySelector('input[type="file"]');
+                    if (inp) {
+                        blockInputPicker(inp);
+                    }
+                    
+                    ['mousedown', 'mouseup', 'click'].forEach(function(type) {
+                        row.dispatchEvent(new MouseEvent(type, {
+                            bubbles: true,
+                            cancelable: true,
+                            view: window
+                        }));
+                    });
+                    return true;
+                }
+            }
+        }
+        return false;
+        """
+        try:
+            return bool(self.driver.execute_script(script, labels))
+        except Exception:
+            return False
+
+    def _find_file_input_for_kind(self, kind, exclude_signatures=None):
+        """Scan all file inputs on page (attach menu is often outside footer)."""
+        exclude_signatures = exclude_signatures or set()
+        try:
+            inputs = self.driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
+        except Exception:
+            return None
+        for el in inputs:
+            sig = self._file_input_signature(el)
+            if sig and sig in exclude_signatures:
+                continue
+            if self._classify_file_input(el) == kind:
+                return el
+        return None
+
+    def _activate_attach_menu_option(self, input_kind, stop_event=None):
+        """Open Photos/Videos or Document row in the (+) menu."""
+        if input_kind == "document":
+            icons = ["attach-document"]
+            labels = ["Document", "مستند", "Documents"]
+        else:
+            icons = ["attach-image", "attach-gallery", "media", "gallery"]
+            labels = [
+                "Photos & videos",
+                "Photos and videos",
+                "Photos & Videos",
+                "الصور ومقاطع الفيديو",
+                "الصور والفيديو",
+                "صور وفيديو",
+            ]
+
+        for icon in icons:
+            if self._js_activate_attach_menu_option(icon):
+                if stop_event:
+                    stop_event.wait(0.4)
+                else:
+                    time.sleep(0.4)
+                return True
+
+        if self._js_activate_attach_menu_option_by_text(labels):
+            if stop_event:
+                stop_event.wait(0.4)
+            else:
+                time.sleep(0.4)
+            return True
+
+        return False
+
     def _expose_attach_file_input(self, input_kind, existing_signatures, stop_event=None):
         """After attach (+) is open: find or activate the correct hidden file input."""
-        data_icon = "attach-document" if input_kind == "document" else "attach-image"
+        input_el = self._find_file_input_for_kind(input_kind, existing_signatures)
+        if input_el:
+            return input_el
 
         input_el = self._wait_for_file_input_in_attach_menu(
-            input_kind, timeout=1.2, stop_event=stop_event
+            input_kind, timeout=1.5, stop_event=stop_event
         )
         if input_el:
             return input_el
 
-        if self._js_activate_attach_menu_option(data_icon):
-            if stop_event:
-                stop_event.wait(0.5)
-            else:
-                time.sleep(0.5)
+        self._activate_attach_menu_option(input_kind, stop_event=stop_event)
+
+        input_el = self._find_file_input_for_kind(input_kind, existing_signatures)
+        if input_el:
+            return input_el
 
         input_el = self._wait_for_file_input_in_attach_menu(
-            input_kind, timeout=2.5, stop_event=stop_event
+            input_kind, timeout=3, stop_event=stop_event
         )
         if input_el:
             return input_el
@@ -439,7 +597,7 @@ class WhatsAppBot:
         input_el = self._wait_for_new_file_input(
             input_kind,
             existing_signatures,
-            timeout=5,
+            timeout=6,
             stop_event=stop_event,
         )
         if input_el:
@@ -777,15 +935,21 @@ class WhatsAppBot:
 
             self._click_element(attach_btn)
             if stop_event:
-                stop_event.wait(0.8)
+                stop_event.wait(1.0)
             else:
-                time.sleep(0.8)
+                time.sleep(1.0)
 
             input_el = self._expose_attach_file_input(
                 input_kind,
                 existing_signatures,
                 stop_event=stop_event,
             )
+
+            if not input_el or self._classify_file_input(input_el) != input_kind:
+                self._activate_attach_menu_option(input_kind, stop_event=stop_event)
+                input_el = self._find_file_input_for_kind(
+                    input_kind, existing_signatures
+                )
 
             if not input_el or self._classify_file_input(input_el) != input_kind:
                 self._dismiss_attach_menu()
@@ -814,7 +978,7 @@ class WhatsAppBot:
                 preview = self._find_any(self.MEDIA_PREVIEW_LOCATORS)
                 if not preview:
                     preview = self._wait_for_any(
-                        self.MEDIA_PREVIEW_LOCATORS, timeout=8, stop_event=stop_event
+                        self.MEDIA_PREVIEW_LOCATORS, timeout=12, stop_event=stop_event
                     )
                 if not preview:
                     self._dismiss_attach_menu()

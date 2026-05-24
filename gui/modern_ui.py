@@ -21,9 +21,7 @@ from utils.helpers import read_contacts, read_contacts_auto
 from utils.config_manager import ConfigManager
 from utils.templates_manager import TemplatesManager
 from utils.contacts_manager import ContactsManager
-from utils.scheduler import Scheduler
 from utils.campaign_manager import CampaignManager
-from utils.workflow_manager import WorkflowManager
 
 # ─── Color Palette (Premium) ────────────────────────────────────────────────
 PALETTE_DARK = {
@@ -119,9 +117,7 @@ class ModernWhatsAppApp(ctk.CTk):
         self.config = ConfigManager()
         self.templates = TemplatesManager()
         self.contacts_mgr = ContactsManager()
-        self.scheduler = Scheduler()
         self.campaign_manager = CampaignManager()
-        self.workflow_manager = WorkflowManager()
 
         # ── Appearance ──
         mode = self.config.get("appearance_mode", "dark")
@@ -273,14 +269,6 @@ class ModernWhatsAppApp(ctk.CTk):
         # Instantiate backward compatibility state variables
         self.bg_mode_var = ctk.BooleanVar(value=self.config.get("background_mode", False))
         self.use_valid_after_check_var = ctk.BooleanVar(value=self.config.get("use_valid_after_check", False))
-        self.use_workflow_var = ctk.BooleanVar(value=self.config.get("use_workflow", False))
-        self.workflow_var = ctk.StringVar(value=self.config.get("last_workflow", ""))
-        self.sched_date_entry = ctk.CTkEntry(self, width=1)
-        self.sched_time_entry = ctk.CTkEntry(self, width=1)
-        
-        # Load Auto-Responder rules
-        self._load_ar_rules()
-
         # Configure Main Grid Rows (Toolbar -> Main Area -> Bottom Bar)
         self.grid_rowconfigure(0, weight=0)  # Top Toolbar
         self.grid_rowconfigure(1, weight=1)  # Main Content
@@ -306,16 +294,9 @@ class ModernWhatsAppApp(ctk.CTk):
         self.tab_frames = {}
         self._build_tab_main()
         self._build_tab_groups()
-        self._build_tab_gmaps()
-        self._build_tab_warmer()
-        self._build_tab_chatbot()
-        self._build_tab_workflows()
         self._build_tab_templates()
         self._build_tab_settings()
-        self._build_tab_analytics()
         self._build_tab_log()
-        self._build_tab_filter()
-        self._build_tab_received()
 
         # Show main tab by default
         self._switch_tab("main")
@@ -357,9 +338,8 @@ class ModernWhatsAppApp(ctk.CTk):
 
         # 5. Tools Menu (أدوات)
         tools_menu = tk.Menu(menu_bar, tearoff=0)
-        tools_menu.add_command(label="🧭 إدارة سير العمل (Workflows)", command=lambda: self._switch_tab("workflows"))
-        tools_menu.add_command(label="👥 سحب المجموعات (Groups Grabber)", command=lambda: self._switch_tab("groups"))
-        tools_menu.add_command(label="🔍 فحص الأرقام الفوري", command=lambda: self._check_numbers_action())
+        tools_menu.add_command(label="👥 مجموعات جهات الاتصال", command=lambda: self._switch_tab("groups"))
+        tools_menu.add_command(label="🔍 فحص الأرقام", command=lambda: self._check_numbers_action())
         menu_bar.add_cascade(label="أدوات", menu=tools_menu)
 
         # 6. Help Menu (مساعدة)
@@ -396,14 +376,7 @@ class ModernWhatsAppApp(ctk.CTk):
         # 2. Tabs Navigation Buttons
         nav_items = [
             (self.tr("new_campaign"), "main"),
-            (self.tr("sent_campaigns"), "analytics"),
-            (self.tr("auto_reply"), "chatbot"),
-            (self.tr("received"), "received"),
-            (self.tr("filter_numbers"), "filter"),
             (self.tr("groups_grabber"), "groups"),
-            (self.tr("gmaps"), "gmaps"),
-            (self.tr("warmer"), "warmer"),
-            (self.tr("workflows"), "workflows"),
             (self.tr("templates"), "templates"),
             (self.tr("settings"), "settings"),
             (self.tr("log"), "log"),
@@ -506,36 +479,11 @@ class ModernWhatsAppApp(ctk.CTk):
         self.session_status_label.pack(side="left", padx=5)
 
         # Live scheduled campaign indicator
-        self.sched_status_label = ctk.CTkLabel(status_frame, text="", font=("Segoe UI", 12), text_color=COLORS["accent"])
-        self.sched_status_label.pack(side="left", padx=15)
-
         # Right Action Buttons
         actions_frame = ctk.CTkFrame(self.bottom_bar, fg_color="transparent")
         actions_frame.pack(side="right", fill="y", padx=15, pady=2)
 
-        # 1. Cancel schedule sending (hidden/disabled by default)
-        self.btn_cancel_sched = ctk.CTkButton(
-            actions_frame, text="❌ Cancel",
-            font=("Segoe UI", 11),
-            width=90, height=32, corner_radius=6,
-            fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
-            state="disabled",
-            command=self._cancel_schedule
-        )
-        self.btn_cancel_sched.pack(side="right", padx=5)
-
-        # 2. Schedule button
-        self.btn_tb_schedule = ctk.CTkButton(
-            actions_frame, text="📅 " + self.tr("btn_schedule_send"),
-            font=("Segoe UI", 12, "bold"),
-            width=125, height=32, corner_radius=6,
-            fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
-            text_color="#000000",
-            command=self._schedule_action
-        )
-        self.btn_tb_schedule.pack(side="right", padx=5)
-
-        # 3. Send Now Button
+        # Send Now Button
         self.btn_start = ctk.CTkButton(
             actions_frame, text="✈️ " + self.tr("btn_send_now"),
             font=("Segoe UI", 13, "bold"),
@@ -576,120 +524,16 @@ class ModernWhatsAppApp(ctk.CTk):
         frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.tab_frames["main"] = frame
 
-        # Use 3 columns layout (Left 25%, Middle 35%, Right 40%)
-        frame.grid_columnconfigure(0, weight=1, minsize=260)  # Column 0: Left Pane
-        frame.grid_columnconfigure(1, weight=2, minsize=330)  # Column 1: Middle Pane
-        frame.grid_columnconfigure(2, weight=2, minsize=390)  # Column 2: Right Pane
+        # Two columns: numbers | message + attachments
+        frame.grid_columnconfigure(0, weight=2, minsize=360)
+        frame.grid_columnconfigure(1, weight=2, minsize=400)
         frame.grid_rowconfigure(0, weight=1)
 
         # =======================================================================
-        # COLUMN 0: Left Pane (Auto-Responder & Received Messages)
-        # =======================================================================
-        col_left = ctk.CTkFrame(frame, corner_radius=8, border_width=1, border_color=COLORS["border"])
-        col_left.grid(row=0, column=0, sticky="nsew", padx=3, pady=5)
-        col_left.grid_rowconfigure(0, weight=1)  # Top: Auto-reply
-        col_left.grid_rowconfigure(1, weight=1)  # Bottom: Received messages
-        col_left.grid_columnconfigure(0, weight=1)
-
-        # --- Top sub-pane: Auto Responder Rules ---
-        pane_ar = ctk.CTkFrame(col_left, corner_radius=0, fg_color="transparent")
-        pane_ar.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
-        pane_ar.grid_rowconfigure(2, weight=1)
-        pane_ar.grid_columnconfigure(0, weight=1)
-
-        # Header for Auto Responder
-        hdr_ar = ctk.CTkFrame(pane_ar, fg_color="transparent", height=32)
-        hdr_ar.grid(row=0, column=0, sticky="ew", pady=(5, 5))
-        
-        lbl_ar = ctk.CTkLabel(hdr_ar, text="🤖 " + self.tr("tab_auto_reply_rules"), font=("Segoe UI", 13, "bold"), text_color=COLORS["primary"])
-        lbl_ar.pack(side="right", padx=5)
-
-        # Toggle Switch
-        self.ar_switch_var = ctk.BooleanVar(value=self.config.get("enable_auto_responder", False))
-        self.ar_switch = ctk.CTkSwitch(
-            hdr_ar, text="", width=40, height=20,
-            variable=self.ar_switch_var,
-            command=self._toggle_auto_responder,
-            progress_color=COLORS["primary"]
-        )
-        self.ar_switch.pack(side="left", padx=10)
-
-        # Rules treeview table
-        ar_table_frame = ctk.CTkFrame(pane_ar, fg_color="transparent")
-        ar_table_frame.grid(row=2, column=0, sticky="nsew", pady=2)
-        
-        ar_columns = ("rule_name", "keywords", "status")
-        self.ar_rules_tree = ttk.Treeview(ar_table_frame, columns=ar_columns, show="headings", height=6)
-        self.ar_rules_tree.heading("rule_name", text=self.tr("lbl_rules_name"))
-        self.ar_rules_tree.heading("keywords", text=self.tr("lbl_keywords"))
-        self.ar_rules_tree.heading("status", text=self.tr("lbl_status"))
-        
-        self.ar_rules_tree.column("rule_name", width=80, anchor="e")
-        self.ar_rules_tree.column("keywords", width=120, anchor="e")
-        self.ar_rules_tree.column("status", width=50, anchor="center")
-        
-        ar_scroll = ctk.CTkScrollbar(ar_table_frame, command=self.ar_rules_tree.yview)
-        self.ar_rules_tree.configure(yscrollcommand=ar_scroll.set)
-        self.ar_rules_tree.pack(side="left", fill="both", expand=True)
-        ar_scroll.pack(side="right", fill="y")
-        
-        self._populate_ar_rules_table()
-
-        # Rules editing buttons
-        btns_ar = ctk.CTkFrame(pane_ar, fg_color="transparent", height=30)
-        btns_ar.grid(row=3, column=0, sticky="ew", pady=(4, 2))
-        
-        ctk.CTkButton(
-            btns_ar, text="+ " + self.tr("btn_add_rule"), font=("Segoe UI", 11, "bold"),
-            width=85, height=25, fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
-            text_color=COLORS["secondary_text"],
-            command=self._add_ar_rule_dialog
-        ).pack(side="right", padx=3)
-
-        ctk.CTkButton(
-            btns_ar, text="- " + self.tr("btn_delete_rule"), font=("Segoe UI", 11),
-            width=50, height=25, fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
-            command=self._delete_ar_rule
-        ).pack(side="left", padx=3)
-
-        # --- Bottom sub-pane: Received Messages ---
-        pane_recv = ctk.CTkFrame(col_left, corner_radius=0, fg_color="transparent")
-        pane_recv.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-        pane_recv.grid_rowconfigure(1, weight=1)
-        pane_recv.grid_columnconfigure(0, weight=1)
-
-        # Header for Received Messages
-        hdr_recv = ctk.CTkFrame(pane_recv, fg_color="transparent", height=32)
-        hdr_recv.grid(row=0, column=0, sticky="ew", pady=(5, 2))
-        
-        lbl_recv = ctk.CTkLabel(hdr_recv, text="📥 " + self.tr("tab_received_messages"), font=("Segoe UI", 13, "bold"), text_color=COLORS["primary"])
-        lbl_recv.pack(side="right", padx=5)
-
-        # Received Messages Treeview Table
-        recv_table_frame = ctk.CTkFrame(pane_recv, fg_color="transparent")
-        recv_table_frame.grid(row=1, column=0, sticky="nsew", pady=2)
-        
-        recv_columns = ("date", "sender", "message")
-        self.recv_tree = ttk.Treeview(recv_table_frame, columns=recv_columns, show="headings", height=6)
-        self.recv_tree.heading("date", text=self.tr("lbl_date"))
-        self.recv_tree.heading("sender", text=self.tr("lbl_sender"))
-        self.recv_tree.heading("message", text=self.tr("lbl_message"))
-        
-        self.recv_tree.column("date", width=80, anchor="center")
-        self.recv_tree.column("sender", width=80, anchor="e")
-        self.recv_tree.column("message", width=120, anchor="e")
-        
-        recv_scroll = ctk.CTkScrollbar(recv_table_frame, command=self.recv_tree.yview)
-        self.recv_tree.configure(yscrollcommand=recv_scroll.set)
-        self.recv_tree.pack(side="left", fill="both", expand=True)
-        recv_scroll.pack(side="right", fill="y")
-
-
-        # =======================================================================
-        # COLUMN 1: Middle Pane (WhatsApp Numbers)
+        # COLUMN 0: Numbers list
         # =======================================================================
         col_mid = ctk.CTkFrame(frame, corner_radius=8, border_width=1, border_color=COLORS["border"])
-        col_mid.grid(row=0, column=1, sticky="nsew", padx=3, pady=5)
+        col_mid.grid(row=0, column=0, sticky="nsew", padx=3, pady=5)
         col_mid.grid_rowconfigure(2, weight=1)
         col_mid.grid_columnconfigure(0, weight=1)
 
@@ -705,6 +549,15 @@ class ModernWhatsAppApp(ctk.CTk):
         tbl_toolbar.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 5))
 
         # Import shortcut button
+        self.btn_check = ctk.CTkButton(
+            tbl_toolbar, text="🔍 فحص الأرقام", font=("Segoe UI", 11, "bold"),
+            width=100, height=28, corner_radius=6,
+            fg_color=COLORS["info"], hover_color=COLORS["accent_hover"],
+            text_color="#000000",
+            command=self._check_numbers_action,
+        )
+        self.btn_check.pack(side="right", padx=5)
+
         self.btn_import_shortcut = ctk.CTkButton(
             tbl_toolbar, text="📥 استيراد الأرقام", font=("Segoe UI", 11, "bold"),
             width=110, height=28, corner_radius=6,
@@ -826,10 +679,10 @@ class ModernWhatsAppApp(ctk.CTk):
 
 
         # =======================================================================
-        # COLUMN 2: Right Pane (Message Editor & Attachments)
+        # COLUMN 1: Message editor & attachments
         # =======================================================================
         col_right = ctk.CTkFrame(frame, corner_radius=8, border_width=1, border_color=COLORS["border"])
-        col_right.grid(row=0, column=2, sticky="nsew", padx=3, pady=5)
+        col_right.grid(row=0, column=1, sticky="nsew", padx=3, pady=5)
         col_right.grid_rowconfigure(0, weight=3)  # Message Editor
         col_right.grid_rowconfigure(1, weight=2)  # Attachments
         col_right.grid_columnconfigure(0, weight=1)
@@ -993,159 +846,8 @@ class ModernWhatsAppApp(ctk.CTk):
         self._refresh_groups_list()
 
     # ─── GMaps Scraper Tab ────────────────────────────────────────────────
-    def _build_tab_gmaps(self):
-        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        self.tab_frames["gmaps"] = frame
-
-        header = ctk.CTkLabel(frame, text="🗺️ سحب أرقام خرائط جوجل",
-                              font=ctk.CTkFont(size=20, weight="bold"))
-        header.pack(anchor="e", padx=25, pady=(20, 10))
-
-        # Search Controls
-        controls = ctk.CTkFrame(frame, corner_radius=10)
-        controls.pack(fill="x", padx=20, pady=10)
-
-        ctk.CTkLabel(controls, text="الكلمة المفتاحية (مثال: صيدليات في الرياض):", 
-                     font=ctk.CTkFont(size=13)).pack(side="right", padx=10, pady=10)
-
-        self.gmaps_query_entry = ctk.CTkEntry(controls, width=250, height=36, corner_radius=8)
-        self.gmaps_query_entry.pack(side="right", padx=10, pady=10)
-
-        self.btn_gmaps_start = ctk.CTkButton(
-            controls, text="▶️ بدء السحب", width=120, height=36,
-            fg_color=COLORS["success"], hover_color=COLORS["success_hover"],
-            font=ctk.CTkFont(size=13, weight="bold"),
-            command=self._start_gmaps_scraper
-        )
-        self.btn_gmaps_start.pack(side="right", padx=10, pady=10)
-
-        self.btn_gmaps_stop = ctk.CTkButton(
-            controls, text="⏹️ إيقاف", width=100, height=36,
-            fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
-            font=ctk.CTkFont(size=13, weight="bold"),
-            state="disabled",
-            command=self._stop_gmaps_scraper
-        )
-        self.btn_gmaps_stop.pack(side="right", padx=10, pady=10)
-        
-        self.gmaps_status_lbl = ctk.CTkLabel(controls, text="", text_color=COLORS["text_muted"], font=ctk.CTkFont(size=12))
-        self.gmaps_status_lbl.pack(side="left", padx=10, pady=10)
-
-        # Results Table
-        table_frame = ctk.CTkFrame(frame, corner_radius=10)
-        table_frame.pack(fill="both", expand=True, padx=20, pady=(0, 15))
-
-        columns = ("name", "phone")
-        self.gmaps_tree = ttk.Treeview(table_frame, columns=columns, show="headings")
-        self.gmaps_tree.heading("name", text="الاسم")
-        self.gmaps_tree.heading("phone", text="رقم الهاتف")
-        self.gmaps_tree.column("name", width=300, anchor="e")
-        self.gmaps_tree.column("phone", width=150, anchor="center")
-
-        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.gmaps_tree.yview)
-        self.gmaps_tree.configure(yscrollcommand=scrollbar.set)
-        scrollbar.pack(side="left", fill="y", padx=2, pady=2)
-        self.gmaps_tree.pack(side="right", fill="both", expand=True, padx=2, pady=2)
-
-        # Actions
-        actions = ctk.CTkFrame(frame, fg_color="transparent")
-        actions.pack(fill="x", padx=20, pady=(0, 20))
-
-        ctk.CTkButton(actions, text="📤 نقل الأرقام إلى حملة الإرسال", height=38,
-                      fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
-                      font=ctk.CTkFont(size=13, weight="bold"),
-                      command=self._export_gmaps_to_campaign).pack(side="right", padx=(0, 10))
-
-        ctk.CTkButton(actions, text="💾 حفظ في ملف CSV", height=38,
-                      fg_color=COLORS["info"], hover_color=COLORS["secondary_hover"],
-                      font=ctk.CTkFont(size=13, weight="bold"),
-                      command=self._export_gmaps_to_csv).pack(side="right", padx=10)
-
-        ctk.CTkButton(actions, text="🗑️ مسح النتائج", height=38,
-                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
-                      text_color=COLORS["secondary_text"],
-                      font=ctk.CTkFont(size=13),
-                      command=self._clear_gmaps_results).pack(side="left", padx=10)
 
     # ─── Warmer Tab ───────────────────────────────────────────────────────
-    def _build_tab_warmer(self):
-        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        self.tab_frames["warmer"] = frame
-
-        header = ctk.CTkLabel(frame, text="🔥 نظام تسخين وتقوية الحسابات (Auto-Warmer)",
-                              font=ctk.CTkFont(size=20, weight="bold"))
-        header.pack(anchor="e", padx=25, pady=(20, 10))
-
-        desc = ctk.CTkLabel(frame, text="أضف أرقامك الأخرى أو أصدقائك. سيقوم البرنامج بتبادل رسائل طبيعية بشكل عشوائي معهم لحماية حسابك من الحظر.",
-                            font=ctk.CTkFont(size=12), text_color=COLORS["text_muted"])
-        desc.pack(anchor="e", padx=25, pady=(0, 15))
-
-        content_row = ctk.CTkFrame(frame, fg_color="transparent")
-        content_row.pack(fill="both", expand=True, padx=20, pady=5)
-
-        # Left: Settings & Actions
-        left_panel = ctk.CTkFrame(content_row, corner_radius=10)
-        left_panel.pack(side="left", fill="both", expand=True, padx=(0, 10))
-
-        ctk.CTkLabel(left_panel, text="⚙️ إعدادات التسخين", font=ctk.CTkFont(size=15, weight="bold")).pack(anchor="e", padx=15, pady=15)
-
-        # Delay min/max
-        delay_row = ctk.CTkFrame(left_panel, fg_color="transparent")
-        delay_row.pack(fill="x", padx=15, pady=10)
-        
-        ctk.CTkLabel(delay_row, text="تأخير (بالدقائق) من:", font=ctk.CTkFont(size=12)).pack(side="right", padx=5)
-        self.warmer_delay_min = ctk.CTkEntry(delay_row, width=60, justify="center")
-        self.warmer_delay_min.pack(side="right", padx=5)
-        self.warmer_delay_min.insert(0, "2")
-
-        ctk.CTkLabel(delay_row, text="إلى:", font=ctk.CTkFont(size=12)).pack(side="right", padx=5)
-        self.warmer_delay_max = ctk.CTkEntry(delay_row, width=60, justify="center")
-        self.warmer_delay_max.pack(side="right", padx=5)
-        self.warmer_delay_max.insert(0, "7")
-
-        # Total messages
-        msg_count_row = ctk.CTkFrame(left_panel, fg_color="transparent")
-        msg_count_row.pack(fill="x", padx=15, pady=10)
-        
-        ctk.CTkLabel(msg_count_row, text="إجمالي الرسائل المطلوبة:", font=ctk.CTkFont(size=12)).pack(side="right", padx=5)
-        self.warmer_total_msgs = ctk.CTkEntry(msg_count_row, width=80, justify="center")
-        self.warmer_total_msgs.pack(side="right", padx=5)
-        self.warmer_total_msgs.insert(0, "50")
-
-        # Start / Stop
-        btn_row = ctk.CTkFrame(left_panel, fg_color="transparent")
-        btn_row.pack(fill="x", padx=15, pady=30)
-
-        self.btn_warmer_start = ctk.CTkButton(
-            btn_row, text="▶️ بدء التسخين", height=40,
-            fg_color=COLORS["success"], hover_color=COLORS["success_hover"],
-            font=ctk.CTkFont(size=13, weight="bold"),
-            command=self._start_warmer
-        )
-        self.btn_warmer_start.pack(side="right", fill="x", expand=True, padx=5)
-
-        self.btn_warmer_stop = ctk.CTkButton(
-            btn_row, text="⏹️ إيقاف", height=40,
-            fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
-            font=ctk.CTkFont(size=13, weight="bold"),
-            state="disabled",
-            command=self._stop_warmer
-        )
-        self.btn_warmer_stop.pack(side="left", fill="x", expand=True, padx=5)
-        
-        self.warmer_status_lbl = ctk.CTkLabel(left_panel, text="", font=ctk.CTkFont(size=13))
-        self.warmer_status_lbl.pack(pady=10)
-
-        # Right: Targets List
-        right_panel = ctk.CTkFrame(content_row, corner_radius=10, width=300)
-        right_panel.pack(side="right", fill="y")
-        right_panel.pack_propagate(False)
-
-        ctk.CTkLabel(right_panel, text="📱 الأرقام المستهدفة (أصدقاء)", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="e", padx=15, pady=(15, 5))
-        
-        self.warmer_targets_textbox = ctk.CTkTextbox(right_panel, font=ctk.CTkFont(size=13))
-        self.warmer_targets_textbox.pack(fill="both", expand=True, padx=15, pady=10)
-        self.warmer_targets_textbox.insert("0.0", "+20100000000\n+96650000000\n")
 
     # ─── Templates Tab ────────────────────────────────────────────────────
     def _build_tab_templates(self):
@@ -2353,542 +2055,35 @@ class ModernWhatsAppApp(ctk.CTk):
     # ════════════════════════════════════════════════════════════
     #  WORKFLOWS
     # ════════════════════════════════════════════════════════════
-    def _build_tab_workflows(self):
-        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        self.tab_frames["workflows"] = frame
 
-        header = ctk.CTkLabel(frame, text="🧭 سير العمل (Workflows)",
-                              font=ctk.CTkFont(size=20, weight="bold"))
-        header.pack(anchor="e", padx=25, pady=(20, 10))
 
-        body = ctk.CTkFrame(frame, fg_color="transparent")
-        body.pack(fill="both", expand=True, padx=20, pady=10)
-        body.grid_columnconfigure(0, weight=1)
-        body.grid_columnconfigure(1, weight=2)
-        body.grid_rowconfigure(0, weight=1)
 
-        # Left: Workflows list
-        left = ctk.CTkFrame(body, corner_radius=12, fg_color=COLORS["card_bg"])
-        left.grid(row=0, column=0, sticky="nsew", padx=(0, 8), pady=5)
-        ctk.CTkLabel(left, text="القائمة", font=ctk.CTkFont(size=13, weight="bold"),
-                     text_color=COLORS["text_main"]).pack(anchor="e", padx=12, pady=(10, 8))
 
-        self.workflows_list_frame = ctk.CTkScrollableFrame(left, fg_color="transparent")
-        self.workflows_list_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
-        # Right: Editor
-        right = ctk.CTkFrame(body, corner_radius=12, fg_color=COLORS["card_bg"])
-        right.grid(row=0, column=1, sticky="nsew", padx=(8, 0), pady=5)
-        right.grid_columnconfigure(0, weight=1)
 
-        name_row = ctk.CTkFrame(right, fg_color="transparent")
-        name_row.pack(fill="x", padx=12, pady=(10, 6))
-        ctk.CTkLabel(name_row, text="اسم سير العمل:", font=ctk.CTkFont(size=12)).pack(side="right", padx=4)
-        self.workflow_name_entry = ctk.CTkEntry(name_row, height=30, corner_radius=6,
-                                                fg_color=COLORS["bg_dark"], text_color=COLORS["text_main"],
-                                                border_color=COLORS["border"])
-        self.workflow_name_entry.pack(side="right", fill="x", expand=True, padx=4)
 
-        # Steps list
-        ctk.CTkLabel(right, text="الخطوات", font=ctk.CTkFont(size=12, weight="bold"),
-                     text_color=COLORS["text_main"]).pack(anchor="e", padx=12, pady=(4, 4))
-        self.workflow_steps_frame = ctk.CTkScrollableFrame(right, height=140, fg_color="transparent")
-        self.workflow_steps_frame.pack(fill="x", padx=12, pady=(0, 6))
 
-        # Step editor
-        ctk.CTkLabel(right, text="محرر الخطوة", font=ctk.CTkFont(size=12, weight="bold"),
-                     text_color=COLORS["text_main"]).pack(anchor="e", padx=12, pady=(6, 4))
-        self.workflow_step_editor = RichTextFrame(right, colors=COLORS, fg_color=COLORS["bg_dark"], corner_radius=10)
-        self.workflow_step_editor.pack(fill="x", padx=12, pady=(0, 6))
 
-        self.workflow_step_attachments = AttachmentManager(right, colors=COLORS, fg_color=COLORS["bg_dark"], corner_radius=10)
-        self.workflow_step_attachments.pack(fill="x", padx=12, pady=(0, 6))
 
-        delay_row = ctk.CTkFrame(right, fg_color="transparent")
-        delay_row.pack(fill="x", padx=12, pady=(0, 6))
-        ctk.CTkLabel(delay_row, text="تأخير الخطوة (ثواني):", font=ctk.CTkFont(size=11)).pack(side="right", padx=4)
-        self.step_delay_min_entry = ctk.CTkEntry(delay_row, width=60, height=28, corner_radius=6,
-                                                 fg_color=COLORS["bg_dark"], text_color=COLORS["text_main"],
-                                                 border_color=COLORS["border"], placeholder_text="min")
-        self.step_delay_min_entry.pack(side="right", padx=4)
-        self.step_delay_max_entry = ctk.CTkEntry(delay_row, width=60, height=28, corner_radius=6,
-                                                 fg_color=COLORS["bg_dark"], text_color=COLORS["text_main"],
-                                                 border_color=COLORS["border"], placeholder_text="max")
-        self.step_delay_max_entry.pack(side="right", padx=4)
 
-        step_btn_row = ctk.CTkFrame(right, fg_color="transparent")
-        step_btn_row.pack(fill="x", padx=12, pady=(0, 6))
-        ctk.CTkButton(step_btn_row, text="➕ إضافة/تحديث خطوة", height=30,
-                      fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
-                      font=ctk.CTkFont(size=12, weight="bold"),
-                      command=self._add_or_update_step).pack(side="right", padx=4)
-        ctk.CTkButton(step_btn_row, text="مسح الخطوة", height=30,
-                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
-                      text_color=COLORS["secondary_text"],
-                      font=ctk.CTkFont(size=12),
-                      command=self._clear_step_editor).pack(side="right", padx=4)
 
-        wf_btn_row = ctk.CTkFrame(right, fg_color="transparent")
-        wf_btn_row.pack(fill="x", padx=12, pady=(0, 10))
-        ctk.CTkButton(wf_btn_row, text="💾 حفظ سير العمل", height=34,
-                      fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
-                      font=ctk.CTkFont(size=12, weight="bold"),
-                      command=self._save_workflow).pack(side="right", padx=4)
-        ctk.CTkButton(wf_btn_row, text="🆕 جديد", height=34,
-                      fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
-                      text_color=COLORS["secondary_text"],
-                      font=ctk.CTkFont(size=12, weight="bold"),
-                      command=self._new_workflow).pack(side="right", padx=4)
-        ctk.CTkButton(wf_btn_row, text="✅ استخدام في الإرسال", height=34,
-                      fg_color=COLORS["success"], hover_color=COLORS["primary_hover"],
-                      font=ctk.CTkFont(size=12, weight="bold"),
-                      command=self._use_workflow_in_main).pack(side="left", padx=4)
 
-        self.workflow_steps = []
-        self.workflow_edit_id = None
-        self.workflow_step_edit_index = None
-        self._refresh_workflow_list()
-        self._render_workflow_steps()
 
-    def _get_workflow_names(self):
-        workflows = self.workflow_manager.get_all()
-        self.workflow_cache = {w["name"]: w["id"] for w in workflows}
-        names = list(self.workflow_cache.keys())
-        return names if names else ["—"]
-
-    def _refresh_workflow_menu(self):
-        if not hasattr(self, "workflow_menu"):
-            return
-        names = self._get_workflow_names()
-        self.workflow_menu.configure(values=names)
-        cur = self.workflow_var.get().strip()
-        if cur not in names:
-            self.workflow_var.set(names[0])
-
-    def _refresh_workflow_list(self):
-        if not hasattr(self, "workflows_list_frame"):
-            return
-        for w in self.workflows_list_frame.winfo_children():
-            w.destroy()
-        workflows = self.workflow_manager.get_all()
-        if not workflows:
-            ctk.CTkLabel(self.workflows_list_frame, text="لا يوجد سير عمل محفوظ.",
-                         font=("Segoe UI", 12), text_color=COLORS["text_muted"]).pack(pady=20)
-            self._refresh_workflow_menu()
-            return
-        for wf in workflows:
-            card = ctk.CTkFrame(self.workflows_list_frame, fg_color=COLORS["bg_dark"], corner_radius=10)
-            card.pack(fill="x", pady=5, padx=5)
-
-            head = ctk.CTkFrame(card, fg_color="transparent")
-            head.pack(fill="x", padx=8, pady=(6, 0))
-            ctk.CTkLabel(head, text=wf["name"], font=("Segoe UI", 12, "bold"),
-                         text_color=COLORS["primary"]).pack(side="right")
-            ctk.CTkLabel(head, text=f"خطوات: {wf['steps_count']}", font=("Segoe UI", 10),
-                         text_color=COLORS["text_muted"]).pack(side="left")
-
-            actions = ctk.CTkFrame(card, fg_color="transparent")
-            actions.pack(fill="x", padx=8, pady=(4, 8))
-            ctk.CTkButton(actions, text="فتح", width=50, height=24,
-                          fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
-                          text_color=COLORS["secondary_text"],
-                          command=lambda i=wf["id"]: self._load_workflow_into_editor(i)).pack(side="left", padx=2)
-            ctk.CTkButton(actions, text="حذف", width=50, height=24,
-                          fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
-                          text_color="#FFFFFF",
-                          command=lambda i=wf["id"]: self._delete_workflow(i)).pack(side="left", padx=2)
-        self._refresh_workflow_menu()
-
-    def _render_workflow_steps(self):
-        if not hasattr(self, "workflow_steps_frame"):
-            return
-        for w in self.workflow_steps_frame.winfo_children():
-            w.destroy()
-        if not self.workflow_steps:
-            ctk.CTkLabel(self.workflow_steps_frame, text="لا توجد خطوات بعد.",
-                         font=("Segoe UI", 11), text_color=COLORS["text_muted"]).pack(pady=10)
-            return
-        for idx, step in enumerate(self.workflow_steps):
-            row = ctk.CTkFrame(self.workflow_steps_frame, fg_color="transparent")
-            row.pack(fill="x", pady=2)
-            preview = (step.get("body") or "").strip().replace("\n", " ")
-            if len(preview) > 45:
-                preview = preview[:42] + "..."
-            att_count = len(step.get("attachments") or [])
-            delay_txt = f"{step.get('delay_min', 0)}-{step.get('delay_max', 0)}s"
-            ctk.CTkLabel(row, text=f"خطوة {idx+1}: {preview}",
-                         font=("Segoe UI", 11), anchor="e").pack(side="right", padx=4)
-            ctk.CTkLabel(row, text=f"مرفقات:{att_count} | تأخير:{delay_txt}",
-                         font=("Segoe UI", 10), text_color=COLORS["text_muted"]).pack(side="left", padx=4)
-            ctk.CTkButton(row, text="تعديل", width=50, height=24,
-                          fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
-                          text_color=COLORS["secondary_text"],
-                          command=lambda i=idx: self._edit_step(i)).pack(side="left", padx=2)
-            ctk.CTkButton(row, text="حذف", width=50, height=24,
-                          fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
-                          text_color="#FFFFFF",
-                          command=lambda i=idx: self._delete_step(i)).pack(side="left", padx=2)
-
-    def _load_workflow_into_editor(self, workflow_id):
-        wf = self.workflow_manager.get(workflow_id)
-        if not wf:
-            return
-        self.workflow_edit_id = wf["id"]
-        self.workflow_name_entry.delete(0, "end")
-        self.workflow_name_entry.insert(0, wf["name"])
-        self.workflow_steps = wf.get("steps") or []
-        self.workflow_step_edit_index = None
-        self._clear_step_editor()
-        self._render_workflow_steps()
-
-    def _new_workflow(self):
-        self.workflow_edit_id = None
-        self.workflow_name_entry.delete(0, "end")
-        self.workflow_steps = []
-        self.workflow_step_edit_index = None
-        self._clear_step_editor()
-        self._render_workflow_steps()
-
-    def _save_workflow(self):
-        name = self.workflow_name_entry.get().strip()
-        steps = self.workflow_steps or []
-        if not name:
-            messagebox.showwarning("تنبيه", "يرجى إدخال اسم سير العمل.")
-            return
-        if not steps:
-            messagebox.showwarning("تنبيه", "يرجى إضافة خطوة واحدة على الأقل.")
-            return
-        ok, wf_id_or_msg = self.workflow_manager.save(name, steps, self.workflow_edit_id)
-        if not ok:
-            messagebox.showerror("خطأ", str(wf_id_or_msg))
-            return
-        self.workflow_edit_id = wf_id_or_msg
-        self._refresh_workflow_list()
-        self._refresh_workflow_menu()
-        messagebox.showinfo("تم", "تم حفظ سير العمل.")
-
-    def _delete_workflow(self, workflow_id):
-        if messagebox.askyesno("تأكيد", "هل تريد حذف سير العمل؟"):
-            self.workflow_manager.delete(workflow_id)
-            if self.workflow_edit_id == workflow_id:
-                self._new_workflow()
-            self._refresh_workflow_list()
-            self._refresh_workflow_menu()
-
-    def _add_or_update_step(self):
-        body = self.workflow_step_editor.get_text()
-        attachments = self.workflow_step_attachments.get_attachments()
-        delay_min = self.step_delay_min_entry.get().strip()
-        delay_max = self.step_delay_max_entry.get().strip()
-        try:
-            delay_min = int(delay_min) if delay_min else 0
-            delay_max = int(delay_max) if delay_max else 0
-        except ValueError:
-            messagebox.showerror("خطأ", "يرجى إدخال تأخير صحيح بالأرقام.")
-            return
-        if not body and not attachments:
-            messagebox.showwarning("تنبيه", "الخطوة فارغة. أضف رسالة أو مرفقات.")
-            return
-        step_data = {
-            "body": body,
-            "attachments": attachments,
-            "delay_min": delay_min,
-            "delay_max": delay_max,
-        }
-        if self.workflow_step_edit_index is None:
-            self.workflow_steps.append(step_data)
-        else:
-            self.workflow_steps[self.workflow_step_edit_index] = step_data
-        self.workflow_step_edit_index = None
-        self._clear_step_editor()
-        self._render_workflow_steps()
-
-    def _edit_step(self, index):
-        if index < 0 or index >= len(self.workflow_steps):
-            return
-        step = self.workflow_steps[index]
-        self.workflow_step_edit_index = index
-        self.workflow_step_editor.set_text(step.get("body", ""))
-        self.workflow_step_attachments.clear()
-        for att in step.get("attachments") or []:
-            path = att.get("path")
-            type_ = att.get("type", "document")
-            caption = att.get("caption", "")
-            if path:
-                self.workflow_step_attachments._add_item(path, type_)
-                # set caption if exists
-                try:
-                    self.workflow_step_attachments.attachments[-1].caption_entry.delete(0, "end")
-                    self.workflow_step_attachments.attachments[-1].caption_entry.insert(0, caption)
-                except Exception:
-                    pass
-        self.step_delay_min_entry.delete(0, "end")
-        self.step_delay_min_entry.insert(0, str(step.get("delay_min", 0)))
-        self.step_delay_max_entry.delete(0, "end")
-        self.step_delay_max_entry.insert(0, str(step.get("delay_max", 0)))
-
-    def _delete_step(self, index):
-        if index < 0 or index >= len(self.workflow_steps):
-            return
-        self.workflow_steps.pop(index)
-        self._render_workflow_steps()
-
-    def _clear_step_editor(self):
-        self.workflow_step_editor.set_text("")
-        self.workflow_step_attachments.clear()
-        self.step_delay_min_entry.delete(0, "end")
-        self.step_delay_max_entry.delete(0, "end")
-
-    def _use_workflow_in_main(self):
-        name = self.workflow_name_entry.get().strip()
-        if not name:
-            messagebox.showwarning("تنبيه", "اختر سير عمل أولاً.")
-            return
-        self.use_workflow_var.set(True)
-        self.workflow_var.set(name)
-        self._switch_tab("main")
-
-    def _get_selected_workflow(self):
-        if not hasattr(self, "workflow_var"):
-            return None
-        name = self.workflow_var.get().strip()
-        if not name or name == "—":
-            return None
-        return self.workflow_manager.get_by_name(name)
 
     # ═══════════════════════════════════════════════════════════════════════
     #  SCHEDULING
     # ═══════════════════════════════════════════════════════════════════════
-    def _schedule_action(self):
-        import tkinter as tk
-        # Open a beautiful modern top-level dialog to select Date and Time
-        dialog = ctk.CTkToplevel(self)
-        dialog.title("جدولة الإرسال")
-        dialog.geometry("340x260")
-        dialog.resizable(False, False)
-        dialog.transient(self)
-        dialog.grab_set()
 
-        # Center dialog
-        dialog.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() - 340) // 2
-        y = self.winfo_y() + (self.winfo_height() - 260) // 2
-        dialog.geometry(f"+{x}+{y}")
 
-        # Set appearance of dialog
-        dialog.configure(fg_color=COLORS["bg_dark"])
 
-        lbl_title = ctk.CTkLabel(dialog, text="📅 جدولة حملة إرسال جديدة", font=("Segoe UI", 14, "bold"), text_color=COLORS["primary"])
-        lbl_title.pack(pady=(15, 10))
 
-        lbl_desc = ctk.CTkLabel(dialog, text="يرجى تحديد تاريخ ووقت بدء الحملة بالصيغة الموضحة:", font=("Segoe UI", 11), text_color=COLORS["text_muted"])
-        lbl_desc.pack(pady=(0, 15))
 
-        # Fields frame
-        fields_frame = ctk.CTkFrame(dialog, fg_color="transparent")
-        fields_frame.pack(padx=20, fill="x")
-
-        # Date Entry
-        date_frame = ctk.CTkFrame(fields_frame, fg_color="transparent")
-        date_frame.pack(fill="x", pady=4)
-        ctk.CTkLabel(date_frame, text="التاريخ (YYYY-MM-DD):", font=("Segoe UI", 11, "bold"), width=120, anchor="w").pack(side="left")
-        
-        today_str = datetime.date.today().strftime("%Y-%m-%d")
-        date_entry = ctk.CTkEntry(date_frame, placeholder_text="YYYY-MM-DD", width=140, height=28)
-        date_entry.insert(0, today_str)
-        date_entry.pack(side="right")
-
-        # Time Entry
-        time_frame = ctk.CTkFrame(fields_frame, fg_color="transparent")
-        time_frame.pack(fill="x", pady=4)
-        ctk.CTkLabel(time_frame, text="الوقت (HH:MM):", font=("Segoe UI", 11, "bold"), width=120, anchor="w").pack(side="left")
-        
-        now_plus_hour = (datetime.datetime.now() + datetime.timedelta(hours=1)).strftime("%H:%M")
-        time_entry = ctk.CTkEntry(time_frame, placeholder_text="HH:MM", width=140, height=28)
-        time_entry.insert(0, now_plus_hour)
-        time_entry.pack(side="right")
-
-        def on_schedule():
-            date_val = date_entry.get().strip()
-            time_val = time_entry.get().strip()
-            if not date_val or not time_val:
-                messagebox.showwarning("تنبيه", "يرجى ملء جميع الحقول.", parent=dialog)
-                return
-            try:
-                target = datetime.datetime.strptime(f"{date_val} {time_val}", "%Y-%m-%d %H:%M")
-                if target <= datetime.datetime.now():
-                    messagebox.showwarning("تنبيه", "يرجى تحديد وقت وتاريخ في المستقبل.", parent=dialog)
-                    return
-            except ValueError:
-                messagebox.showerror("خطأ", "صيغة التاريخ أو الوقت غير صحيحة.\nمثال: 2026-05-21 15:30", parent=dialog)
-                return
-
-            # Set the values in our backward compatibility entries
-            self.sched_date_entry.delete(0, "end")
-            self.sched_date_entry.insert(0, date_val)
-            self.sched_time_entry.delete(0, "end")
-            self.sched_time_entry.insert(0, time_val)
-
-            # Close dialog and trigger scheduling
-            dialog.destroy()
-            self._schedule_send()
-
-        # Buttons
-        btns_frame = ctk.CTkFrame(dialog, fg_color="transparent")
-        btns_frame.pack(pady=20, fill="x", padx=20)
-
-        ctk.CTkButton(btns_frame, text="إلغاء", width=80, fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"], text_color=COLORS["text_main"], command=dialog.destroy).pack(side="left")
-        ctk.CTkButton(btns_frame, text="✅ تأكيد الجدولة", width=140, fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"], text_color="#000000", font=("Segoe UI", 11, "bold"), command=on_schedule).pack(side="right")
-
-    def _schedule_send(self):
-        date_str = self.sched_date_entry.get().strip()
-        time_str = self.sched_time_entry.get().strip()
-        if not date_str or not time_str:
-            messagebox.showwarning("تنبيه", "يرجى إدخال التاريخ (YYYY-MM-DD) والوقت (HH:MM).")
-            return
-        try:
-            target = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
-        except ValueError:
-            messagebox.showerror("خطأ", "صيغة التاريخ أو الوقت غير صحيحة.\nاستخدم: YYYY-MM-DD HH:MM")
-            return
-
-        success, msg = self.scheduler.schedule(target, self._scheduled_start_callback)
-        if success:
-            self.log(f"⏰ {msg}")
-            self.btn_schedule.configure(state="disabled")
-            self.btn_cancel_sched.configure(state="normal")
-            self.sched_status_label.configure(text=f"⏰ مجدول: {date_str} {time_str}")
-            # Start countdown updater
-            self._update_schedule_countdown()
-        else:
-            messagebox.showwarning("تنبيه", msg)
-
-    def _cancel_schedule(self):
-        self.scheduler.cancel()
-        self.btn_schedule.configure(state="normal")
-        self.btn_cancel_sched.configure(state="disabled")
-        self.sched_status_label.configure(text="")
-        self.log("❌ تم إلغاء الجدولة.")
-
-    def _update_schedule_countdown(self):
-        if not self.scheduler.is_scheduled:
-            self.btn_schedule.configure(state="normal")
-            self.btn_cancel_sched.configure(state="disabled")
-            self.sched_status_label.configure(text="")
-            return
-        remaining = self.scheduler.get_remaining_text()
-        if remaining:
-            self.sched_status_label.configure(text=f"⏳ متبقي: {remaining}")
-        self.after(1000, self._update_schedule_countdown)
-
-    def _scheduled_start_callback(self):
-        """Called by the scheduler when the scheduled time arrives."""
-        self.log("⏰ حان موعد الإرسال المجدول!")
-        self._run_on_ui(lambda: self.sched_status_label.configure(text=""))
-        self._run_on_ui(lambda: self.btn_schedule.configure(state="normal"))
-        self._run_on_ui(lambda: self.btn_cancel_sched.configure(state="disabled"))
-        self._run_on_ui(self._start_thread)
-
-    def _start_thread(self):
-        try:
-            self._start_action()
-        except Exception as e:
-            self.report_error("ERR-99", "خطأ غير متوقع أثناء بدء الإرسال.", detail=str(e), dialog=True)
 
     # ═══════════════════════════════════════════════════════════════════════
     #  ANALYTICS TAB
     # ═══════════════════════════════════════════════════════════════════════
-    def _build_tab_analytics(self):
-        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        self.tab_frames["analytics"] = frame
 
-        header = ctk.CTkLabel(frame, text="📊 التحليلات وسجل الحملات",
-                              font=ctk.CTkFont(size=20, weight="bold"))
-        header.pack(anchor="e", padx=25, pady=(20, 10))
 
-        # Overall Stats
-        stats_frame = ctk.CTkFrame(frame, corner_radius=16, fg_color=COLORS["card_bg"])
-        stats_frame.pack(fill="x", padx=20, pady=(0, 20))
-        
-        self.analytics_labels = {}
-        
-        # Grid layout for stats
-        stats_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
-        
-        items = [("total_campaigns", "حملات"), ("total_messages", "رسائل"), 
-                 ("overall_success_rate", "نجاح %"), ("total_duration_minutes", "دقيقة")]
-        
-        for i, (key, title) in enumerate(items):
-            f = ctk.CTkFrame(stats_frame, fg_color="transparent")
-            f.grid(row=0, column=i, pady=20)
-            ctk.CTkLabel(f, text=title, font=("Segoe UI", 13), text_color=COLORS["text_muted"]).pack()
-            l = ctk.CTkLabel(f, text="0", font=("Segoe UI", 24, "bold"), text_color=COLORS["primary"])
-            l.pack()
-            self.analytics_labels[key] = l
-
-        # Campaign History List
-        ctk.CTkLabel(frame, text="سجل الحملات السابقة:", 
-                     font=("Segoe UI", 14, "bold"), text_color=COLORS["text_muted"]).pack(anchor="e", padx=30, pady=(5, 5))
-        
-        self.campaigns_list = ctk.CTkScrollableFrame(frame, corner_radius=16, fg_color=COLORS["bg_dark"])
-        self.campaigns_list.pack(fill="both", expand=True, padx=20, pady=(0, 20))
-        
-        # Refresh Button
-        ctk.CTkButton(frame, text="🔄 تحديث البيانات", height=32,
-                      fg_color=COLORS["info"], command=self._refresh_analytics).pack(padx=20, pady=10)
-
-        # Initial Load
-        self._refresh_analytics()
-
-    def _refresh_analytics(self):
-        # Update Stats
-        stats = self.campaign_manager.get_aggregate_stats()
-        self.analytics_labels["total_campaigns"].configure(text=str(stats["total_campaigns"]))
-        self.analytics_labels["total_messages"].configure(text=str(stats["total_messages"]))
-        self.analytics_labels["overall_success_rate"].configure(text=f"{stats['overall_success_rate']}%")
-        self.analytics_labels["total_duration_minutes"].configure(text=str(stats["total_duration_minutes"]))
-
-        # Update List
-        for w in self.campaigns_list.winfo_children():
-            w.destroy()
-            
-        for c in self.campaign_manager.get_all():
-            row = ctk.CTkFrame(self.campaigns_list, corner_radius=6)
-            row.pack(fill="x", pady=2, padx=2)
-            
-            # Left: Action buttons
-            btn_frame = ctk.CTkFrame(row, fg_color="transparent", width=100)
-            btn_frame.pack(side="left", padx=5)
-            
-            ctk.CTkButton(btn_frame, text="csv", width=40, height=24, font=ctk.CTkFont(size=10),
-                          fg_color=COLORS["success"], 
-                          command=lambda p=c.get("csv_path"): self._open_csv(p)).pack(side="left", padx=2)
-            
-            ctk.CTkButton(btn_frame, text="🗑️", width=30, height=24, font=ctk.CTkFont(size=10),
-                          fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
-                          command=lambda cid=c["id"]: self._delete_campaign(cid)).pack(side="left", padx=2)
-
-            # Right: Info
-            info_frame = ctk.CTkFrame(row, fg_color="transparent")
-            info_frame.pack(side="right", fill="x", expand=True, padx=10, pady=5)
-            
-            name = c.get("name") or f"حملة #{c['id']}"
-            date = c.get("date")
-            rate = c.get("success_rate", 0)
-            total = c.get("total", 0)
-            
-            header = ctk.CTkLabel(info_frame, text=f"{name} | {date}", 
-                                  font=ctk.CTkFont(size=12, weight="bold"), anchor="e")
-            header.pack(fill="x")
-            
-            sub = ctk.CTkLabel(info_frame, text=f"نجاح: {rate}% | إجمالي: {total} رسالة", 
-                               font=ctk.CTkFont(size=11), text_color=COLORS["text_muted"], anchor="e")
-            sub.pack(fill="x")
-
-    def _delete_campaign(self, campaign_id):
-        if messagebox.askyesno("تأكيد", "هل تريد حذف سجل هذه الحملة؟"):
-            self.campaign_manager.delete_campaign(campaign_id)
-            self._refresh_analytics()
 
     def _open_csv(self, path):
         if path and os.path.exists(path):
@@ -2998,12 +2193,6 @@ class ModernWhatsAppApp(ctk.CTk):
         self.spin_text_var.set(self.config.get("enable_spintax", True))
         if hasattr(self, "use_valid_after_check_var"):
             self.use_valid_after_check_var.set(self.config.get("use_valid_after_check", False))
-        if hasattr(self, "use_workflow_var"):
-            self.use_workflow_var.set(self.config.get("use_workflow", False))
-        if hasattr(self, "workflow_var"):
-            last_wf = self.config.get("last_workflow", "")
-            if last_wf:
-                self.workflow_var.set(last_wf)
 
         # Load profile proxy settings at startup
         profile_name = self.config.get("profile_name", "Default")
@@ -3022,10 +2211,6 @@ class ModernWhatsAppApp(ctk.CTk):
         self.config.set("enable_spintax", self.spin_text_var.get())
         if hasattr(self, "use_valid_after_check_var"):
             self.config.set("use_valid_after_check", self.use_valid_after_check_var.get())
-        if hasattr(self, "use_workflow_var"):
-            self.config.set("use_workflow", self.use_workflow_var.get())
-        if hasattr(self, "workflow_var"):
-            self.config.set("last_workflow", self.workflow_var.get())
         # Save window size
         self.config.set("window_width", self.winfo_width())
         self.config.set("window_height", self.winfo_height())
@@ -3033,7 +2218,6 @@ class ModernWhatsAppApp(ctk.CTk):
 
     def _on_close(self):
         self._save_current_state()
-        self.scheduler.cancel()
         if self.bot:
             self.bot.close()
         self.destroy()
@@ -3168,13 +2352,6 @@ class ModernWhatsAppApp(ctk.CTk):
         pending = self.pending_start_payload
         self.pending_start_payload = None
         if not pending:
-            return
-        if isinstance(pending, dict) and pending.get("mode") == "workflow":
-            wf = self.workflow_manager.get(pending.get("workflow_id"))
-            if not wf:
-                self.report_error("ERR-05", "سير العمل غير موجود.", dialog=True)
-                return
-            self._begin_send_workflow(pending.get("contacts", []), wf)
             return
         if isinstance(pending, tuple):
             self._begin_send(*pending)
@@ -3339,9 +2516,6 @@ class ModernWhatsAppApp(ctk.CTk):
             types = "بدون مرفقات"
         self.log(f"🧪 فحص قبل الإرسال: جهات={len(contacts)} | رسالة={msg_len} حرف | مرفقات={types}")
 
-    def _log_preflight_workflow(self, contacts, workflow):
-        steps_count = len(workflow.get("steps") or [])
-        self.log(f"🧭 سير العمل: {workflow.get('name','')} | خطوات={steps_count} | جهات={len(contacts)}")
 
     def _apply_template(self, text, contact):
         if not text:
@@ -3544,41 +2718,6 @@ class ModernWhatsAppApp(ctk.CTk):
             daemon=True
         ).start()
 
-    def _begin_send_workflow(self, contacts, workflow):
-        if self.is_running:
-            return
-
-        if self.bg_mode_var.get():
-            self.bot.background_mode = True
-            self.bot.minimize()
-            self.log("🖥️ وضع الخلفية مفعل — المتصفح مُصغّر.")
-        else:
-            self.bot.background_mode = False
-            self.bot.bring_to_front()
-
-        self.is_running = True
-        self.stop_event.clear()
-        self.pause_event.clear()
-        self.is_paused = False
-
-        self._log_preflight_workflow(contacts, workflow)
-
-        self.btn_start.configure(state="disabled")
-        self.btn_stop.configure(state="normal")
-        if hasattr(self, "btn_check"):
-            self.btn_check.configure(state="disabled")
-        self.progress_bar.set(0)
-        self.status_label.configure(text="جاري العمل...")
-        if getattr(self, "pause_btn", None) and self.pause_btn.winfo_exists():
-            self.pause_btn.configure(text="Pause")
-
-        self._open_progress_window_blind(len(contacts), mode="workflow")
-
-        threading.Thread(
-            target=self._run_workflow_automation,
-            args=(contacts, workflow),
-            daemon=True
-        ).start()
 
     def _start_action(self):
         """Show Sending Mode dialog, then proceed with the campaign."""
@@ -3693,41 +2832,6 @@ class ModernWhatsAppApp(ctk.CTk):
         else:
             self.log("⚡ تم اختيار الوضع العشوائي (Blind Mode) — سيتم الإرسال لجميع الأرقام بدون فحص.")
 
-        # Workflow mode
-        if hasattr(self, "use_workflow_var") and self.use_workflow_var.get():
-            workflow = self._get_selected_workflow()
-            if not workflow or not workflow.get("steps"):
-                self.report_error("ERR-05", "يرجى اختيار سير عمل يحتوي على خطوات.", dialog=True)
-                return
-            contacts = self._get_contacts_from_input()
-            if not contacts:
-                return
-            if not self._check_campaign_safety(len(contacts), []):
-                return
-            self._save_current_state()
-
-            if not self.bot or not self.bot.driver:
-                auto_open = self.config.get("auto_open_login", True)
-                if auto_open or messagebox.askyesno("تنبيه", "المتصفح غير مفتوح. هل تريد فتحه الآن؟"):
-                    self.pending_start_payload = {
-                        "mode": "workflow",
-                        "contacts": contacts,
-                        "workflow_id": workflow["id"],
-                    }
-                    self._set_session_status("الحالة: جاري فتح المتصفح...", COLORS["info"])
-                    self._login_action()
-                return
-
-            if not self.bot.is_logged_in():
-                self.bot.bring_to_front()
-                self.report_error("ERR-21", dialog=True, level="warning")
-                return
-
-            self._set_session_status("الحالة: متصل", COLORS["success"])
-            self._begin_send_workflow(contacts, workflow)
-            return
-
-        # Normal mode
         msg_template, attachments = self._prepare_content()
         if msg_template is None and attachments is None:
             return  # Error reported
@@ -3879,298 +2983,6 @@ class ModernWhatsAppApp(ctk.CTk):
     # ═══════════════════════════════════════════════════════════════════════
     #  MAIN AUTOMATION LOOP
     # ═══════════════════════════════════════════════════════════════════════
-    def _run_workflow_automation(self, contacts, workflow):
-        if not self.bot:
-            return
-
-        self.sent = 0
-        self.failed = 0
-        self.invalid = 0
-        self.results_log = []
-
-        total = len(contacts)
-        start_time = datetime.datetime.now()
-
-        try:
-            try:
-                batch_size = int(self.batch_size_entry.get())
-                pause_min = int(self.batch_min_entry.get())
-                pause_max = int(self.batch_max_entry.get())
-                delay_min = int(self.delay_min_entry.get())
-                delay_max = int(self.delay_max_entry.get())
-                max_retries = int(self.config.get("max_retries", 2))
-                retry_delay_min = int(self.config.get("retry_delay_min", 3))
-                retry_delay_max = int(self.config.get("retry_delay_max", 6))
-                max_consecutive_failures = int(self.config.get("max_consecutive_failures", 5))
-            except ValueError:
-                batch_size, pause_min, pause_max, delay_min, delay_max = 30, 60, 120, 30, 120
-                max_retries, retry_delay_min, retry_delay_max, max_consecutive_failures = 1, 3, 6, 5
-
-            self.log(f"🧭 بدء سير العمل: {workflow.get('name','')} | جهات: {total}")
-            steps = workflow.get("steps") or []
-            consecutive_failures = 0
-
-            retryable_errors = {
-                "ERR_TIMEOUT",
-                "ERR_CHAT_INPUT_NOT_FOUND",
-                "ERR_ATTACH_BTN_NOT_FOUND",
-                "ERR_FILE_INPUT_NOT_FOUND",
-                "ERR_STICKER_PANEL_OPENED",
-                "ERR_SEND_BTN_NOT_FOUND",
-                "ERR_SEND_BTN_TIMEOUT",
-                "ERR_TEXT_SEND",
-            }
-            attach_only_errors = {
-                "ERR_ATTACH_BTN_NOT_FOUND",
-                "ERR_FILE_INPUT_NOT_FOUND",
-                "ERR_STICKER_PANEL_OPENED",
-                "ERR_DOC_BTN_NOT_FOUND",
-                "ERR_PHOTO_BTN_NOT_FOUND",
-            }
-            retry_full_navigation = bool(self.config.get("retry_full_navigation", False))
-
-            for i, c in enumerate(contacts):
-                if self.stop_event.is_set():
-                    break
-                while self.pause_event.is_set() and not self.stop_event.is_set():
-                    self.stop_event.wait(0.3)
-
-                if i > 0 and i % batch_size == 0:
-                    pause_time = random.uniform(pause_min, pause_max)
-                    self.log(f"⏸ استراحة لمدة {int(pause_time)} ثانية...")
-                    if self.stop_event.wait(pause_time):
-                        break
-
-                # Account Rotation Logic
-                rotation_enabled = self.config.get("rotation_enabled", False)
-                try:
-                    rotation_interval = int(self.config.get("rotation_interval", 50))
-                except ValueError:
-                    rotation_interval = 50
-
-                if rotation_enabled and i > 0 and i % rotation_interval == 0:
-                    self.log("🔄 التبديل التلقائي للحساب التالي (تدوير الحسابات)...")
-                    profiles = self._get_profiles()
-                    current_profile = self.config.get("profile_name", "Default")
-                    if profiles and len(profiles) > 1:
-                        try:
-                            curr_idx = profiles.index(current_profile)
-                            next_idx = (curr_idx + 1) % len(profiles)
-                        except ValueError:
-                            next_idx = 0
-                        next_profile = profiles[next_idx]
-                        self.log(f"🔄 التبديل من حساب {current_profile} إلى {next_profile}...")
-                        self._run_on_ui(lambda p=next_profile: self._on_profile_change(p))
-                        
-                        try:
-                            if self.bot:
-                                self.bot.close()
-                        except Exception:
-                            pass
-                        
-                        if self.stop_event.wait(2.0):
-                            break
-                        if self.stop_event.wait(1.0):
-                            break
-
-                        proxy_config = self.config.get("profile_proxies", {}).get(next_profile)
-                        from automation.whatsapp_bot import WhatsAppBot
-                        self.bot = WhatsAppBot(self.user_data_dir, proxy_config)
-                        self.bot.setup_driver(start_minimized=self.bg_mode_var.get())
-                        self.bot.open_whatsapp()
-                        self.log("⏳ انتظار تسجيل الدخول للحساب الجديد...")
-                        if not self.bot.wait_for_login():
-                            self.log("❌ فشل تسجيل الدخول للحساب الجديد. سيتم إيقاف سير العمل.")
-                            self.stop_event.set()
-                            break
-                        self.log("✅ تم الدخول بنجاح. استئناف سير العمل...")
-                    else:
-                        self.log("⚠️ إعداد التدوير مفعل، لكن لا يوجد حسابات أخرى محفوظة للتبديل إليها.")
-
-                phone = c.get("phone")
-                name = c.get("name", "عميل")
-
-                processed = i + 1
-                self._run_on_ui(lambda p=processed, t=total, n=name: self.status_label.configure(text=f"جاري الإرسال {p}/{t} إلى {n}..."))
-                self._run_on_ui(lambda p=processed, t=total: self.progress_bar.set(p / t))
-                elapsed = (datetime.datetime.now() - start_time).total_seconds()
-                eta = None
-                if processed > 0 and total > processed:
-                    eta = (elapsed / processed) * (total - processed)
-                self._update_progress_header_blind(processed, total, phone, name, eta)
-
-                if not phone:
-                    self.invalid += 1
-                    self.results_log.append({"phone": "N/A", "name": name, "status": "بدون واتساب", "error_code": "ERR-00", "timestamp": datetime.datetime.now()})
-                    self._add_progress_row_blind(["N/A", name, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "بدون رقم", "بيانات الرقم ناقصة"], tag="invalid")
-                    self._run_on_ui(self._update_stats)
-                    self._update_progress_header_blind(processed, total, phone, name, eta)
-                    continue
-
-                if not self.bot.is_logged_in():
-                    self.report_error("ERR-21", dialog=True, level="warning")
-                    break
-
-                contact_status = "SUCCESS"
-                contact_error = "-"
-
-                for s_idx, step in enumerate(steps):
-                    if self.stop_event.is_set():
-                        contact_status = "STOPPED"
-                        break
-
-                    body = step.get("body", "")
-                    step_attachments = step.get("attachments") or []
-                    if not body and not step_attachments:
-                        continue
-
-                    msg_for_contact = self._apply_template(body, c)
-                    atts_for_contact = self._format_attachments_for_contact(step_attachments, c)
-                    segments = self._split_messages(msg_for_contact)
-                    primary_msg = segments[0] if segments else msg_for_contact
-                    extra_msgs = segments[1:] if segments else []
-
-                    res = None
-                    for attempt in range(max_retries + 1):
-                        skip_nav = (
-                            attempt > 0
-                            and atts_for_contact
-                            and not retry_full_navigation
-                            and res in attach_only_errors
-                        )
-                        res = self.bot.send_message(
-                            phone=phone,
-                            name=name,
-                            message_template=primary_msg,
-                            extra_messages=extra_msgs,
-                            attachments=atts_for_contact,
-                            stop_event=self.stop_event,
-                            send_text_with_image=self.send_text_var.get(),
-                            skip_open_chat=skip_nav,
-                        )
-                        if res in ("SUCCESS", "INVALID", "STOPPED"):
-                            break
-                        is_retryable = (
-                            res in retryable_errors
-                            or str(res).startswith("ERR_ATTACH_")
-                            or str(res).startswith("ERR_TEXT_SEND")
-                            or str(res).startswith("ERR_GENERAL")
-                        )
-                        if attempt < max_retries and is_retryable:
-                            wait_s = random.uniform(retry_delay_min, retry_delay_max)
-                            self.log(f"🔁 إعادة محاولة خطوة ({attempt + 1}/{max_retries}) بعد {int(wait_s)}ث | {phone} | {res}")
-                            self._recover_bot_before_retry(atts_for_contact)
-                            if self.stop_event.wait(wait_s):
-                                break
-                            continue
-                        break
-
-                    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    step_label = f"Step {s_idx + 1}"
-
-                    if res == "SUCCESS":
-                        self._add_progress_row_blind([phone, f"{name} / {step_label}", timestamp, "تم", "تم إرسال الخطوة"], tag="success")
-                    elif res == "INVALID":
-                        self._add_progress_row_blind([phone, f"{name} / {step_label}", timestamp, "بدون واتساب", "الرقم غير صالح أو لا يستخدم واتساب"], tag="invalid")
-                        contact_status = "INVALID"
-                        contact_error = "ERR-20"
-                        break
-                    elif res == "STOPPED":
-                        self._add_progress_row_blind([phone, f"{name} / {step_label}", timestamp, "توقف", "تم إيقاف العملية"], tag="stopped")
-                        contact_status = "STOPPED"
-                        break
-                    else:
-                        self._add_progress_row_blind([phone, f"{name} / {step_label}", timestamp, "فشل", str(res)], tag="failed")
-                        contact_status = "FAILED"
-                        contact_error = res
-                        break
-
-                    try:
-                        s_min = int(step.get("delay_min", 0) or 0)
-                        s_max = int(step.get("delay_max", 0) or 0)
-                    except ValueError:
-                        s_min, s_max = 0, 0
-                    if s_max > 0:
-                        if self.stop_event.wait(random.uniform(s_min, max(s_min, s_max))):
-                            contact_status = "STOPPED"
-                            break
-
-                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                if contact_status == "SUCCESS":
-                    self.sent += 1
-                    self.results_log.append({"phone": phone, "name": name, "status": "نجاح", "error_code": "-", "timestamp": timestamp})
-                    consecutive_failures = 0
-                elif contact_status == "INVALID":
-                    self.invalid += 1
-                    self.results_log.append({"phone": phone, "name": name, "status": "بدون واتساب", "error_code": "ERR-20", "timestamp": timestamp})
-                    consecutive_failures = 0
-                elif contact_status == "STOPPED":
-                    self.results_log.append({"phone": phone, "name": name, "status": "توقف", "error_code": "-", "timestamp": timestamp})
-                    break
-                else:
-                    self.failed += 1
-                    err_code = contact_error if str(contact_error).startswith("ERR") else "ERR-UNKNOWN"
-                    self.results_log.append({"phone": phone, "name": name, "status": "فشل", "error_code": err_code, "timestamp": timestamp})
-                    consecutive_failures += 1
-                    if consecutive_failures >= max_consecutive_failures:
-                        self.log(f"⛔ تم الإيقاف تلقائيًا بعد {consecutive_failures} فشل متتالي لتقليل المخاطر.")
-                        self.stop_event.set()
-                        break
-
-                self._run_on_ui(self._update_stats)
-                self._update_progress_header_blind(processed, total, phone, name, eta)
-                # Human-like delay: mostly fast, occasionally slower to avoid detection
-                d_fast = random.uniform(delay_min * 0.3, delay_min * 0.7)
-                d_mid = random.uniform(delay_min * 0.7, (delay_min + delay_max) / 2)
-                d_slow = random.uniform((delay_min + delay_max) / 2, delay_max)
-                chosen_delay = random.choices([d_fast, d_mid, d_slow], weights=[70, 20, 10], k=1)[0]
-                if self.stop_event.wait(chosen_delay):
-                    break
-
-            end_time = datetime.datetime.now()
-            duration = end_time - start_time
-            csv_path = self._generate_final_report(duration)
-            self.last_report_path = csv_path
-
-            self.campaign_manager.add_campaign(
-                name=f"Workflow {workflow.get('name','')} | {start_time.strftime('%Y-%m-%d %H:%M')}",
-                total=total,
-                sent=self.sent,
-                failed=self.failed,
-                invalid=self.invalid,
-                duration_seconds=int(duration.total_seconds()),
-                results_log=self.results_log,
-                csv_path=csv_path
-            )
-            self._run_on_ui(self._refresh_analytics)
-
-            try:
-                if self.bg_mode_var.get():
-                    self.bot.minimize()
-                else:
-                    self.bot.bring_to_front()
-            except Exception:
-                pass
-
-            if self.stop_event.is_set():
-                self.log("🛑 تم إيقاف العملية.")
-            else:
-                self.log("🏁 انتهت العملية.")
-                self._run_on_ui(lambda: self.progress_bar.set(1.0))
-
-        except Exception as e:
-            self.log(f"⚠️ [ERR-99] خطأ غير متوقع في خيط سير العمل: {e}")
-        finally:
-            self.is_running = False
-            self.pause_event.clear()
-            self.is_paused = False
-            self._run_on_ui(lambda: self.btn_start.configure(state="normal"))
-            self._run_on_ui(lambda: self.btn_stop.configure(state="disabled"))
-            if hasattr(self, "btn_check"):
-                self._run_on_ui(lambda: self.btn_check.configure(state="normal"))
-            if getattr(self, "pause_btn", None):
-                self._run_on_ui(lambda: self.pause_btn.configure(text="Pause") if getattr(self, "pause_btn", None) and self.pause_btn.winfo_exists() else None)
-            self._run_on_ui(lambda: self.status_label.configure(text="جاهز..."))
 
     def _run_automation(self, contacts, msg_template, attachments):
         if not self.bot:
@@ -4433,8 +3245,6 @@ class ModernWhatsAppApp(ctk.CTk):
                 results_log=self.results_log,
                 csv_path=csv_path
             )
-            self._run_on_ui(self._refresh_analytics)
-
             try:
                 if self.bg_mode_var.get():
                     self.bot.minimize()
@@ -4996,195 +3806,13 @@ class ModernWhatsAppApp(ctk.CTk):
     # ═══════════════════════════════════════════════════════════════════════
     #  AUTO RESPONDER ACTIONS & LOGIC
     # ═══════════════════════════════════════════════════════════════════════
-    def _load_ar_rules(self):
-        import json
-        self.ar_rules = []
-        rules_path = os.path.join(os.getcwd(), "data", "auto_reply_rules.json")
-        os.makedirs(os.path.dirname(rules_path), exist_ok=True)
-        if os.path.exists(rules_path):
-            try:
-                with open(rules_path, "r", encoding="utf-8") as f:
-                    self.ar_rules = json.load(f)
-            except Exception:
-                self.ar_rules = []
-        
-        # Fallback default rules if empty
-        if not self.ar_rules:
-            self.ar_rules = [
-                {"rule_name": "ترحيب", "keywords": "مرحبا, سلام, هلا", "reply": "أهلاً بك! كيف يمكنني مساعدتك اليوم؟", "enabled": True},
-                {"rule_name": "الأسعار", "keywords": "سعر, اسعار, بكم", "reply": "أسعار باقاتنا تبدأ من 20 دولار شهرياً فقط. لمزيد من التفاصيل يرجى التواصل معنا.", "enabled": True},
-                {"rule_name": "العروض", "keywords": "عرض, خصم, كود", "reply": "لدينا عرض خاص حالياً خصم 20% باستخدام الكود SAVE20!", "enabled": True}
-            ]
-            self._save_ar_rules()
 
-    def _save_ar_rules(self):
-        import json
-        rules_path = os.path.join(os.getcwd(), "data", "auto_reply_rules.json")
-        try:
-            with open(rules_path, "w", encoding="utf-8") as f:
-                json.dump(self.ar_rules, f, ensure_ascii=False, indent=4)
-        except Exception as e:
-            self.log(f"⚠️ خطأ أثناء حفظ قواعد الرد الآلي: {e}")
 
-    def _populate_ar_rules_table(self):
-        # Clear
-        for item in self.ar_rules_tree.get_children():
-            self.ar_rules_tree.delete(item)
-        # Populate
-        for rule in self.ar_rules:
-            status = "✅ نشط" if rule.get("enabled", True) else "❌ معطل"
-            self.ar_rules_tree.insert("", "end", values=(rule.get("rule_name"), rule.get("keywords"), status))
 
-    def _add_ar_rule_dialog(self):
-        dialog = ctk.CTkToplevel(self)
-        dialog.title("إضافة قاعدة رد آلي")
-        dialog.geometry("380x300")
-        dialog.resizable(False, False)
-        dialog.transient(self)
-        dialog.grab_set()
 
-        # Center
-        x = self.winfo_x() + (self.winfo_width() - 380) // 2
-        y = self.winfo_y() + (self.winfo_height() - 300) // 2
-        dialog.geometry(f"+{x}+{y}")
 
-        frm = ctk.CTkFrame(dialog, fg_color="transparent")
-        frm.pack(fill="both", expand=True, padx=20, pady=15)
 
-        lbl_name = ctk.CTkLabel(frm, text="اسم القاعدة (مثال: الأسعار):", font=("Segoe UI", 11))
-        lbl_name.pack(anchor="e", pady=(0, 2))
-        entry_name = ctk.CTkEntry(frm, placeholder_text="اسم القاعدة", justify="right")
-        entry_name.pack(fill="x", pady=(0, 10))
 
-        lbl_keys = ctk.CTkLabel(frm, text="الكلمات المفتاحية (مفصولة بفاصلة):", font=("Segoe UI", 11))
-        lbl_keys.pack(anchor="e", pady=(0, 2))
-        entry_keys = ctk.CTkEntry(frm, placeholder_text="مثال: سعر, بكم, تكلفة", justify="right")
-        entry_keys.pack(fill="x", pady=(0, 10))
-
-        lbl_reply = ctk.CTkLabel(frm, text="نص الرد الآلي:", font=("Segoe UI", 11))
-        lbl_reply.pack(anchor="e", pady=(0, 2))
-        entry_reply = ctk.CTkEntry(frm, placeholder_text="اكتب الرد التلقائي هنا...", justify="right")
-        entry_reply.pack(fill="x", pady=(0, 15))
-
-        def on_save():
-            name = entry_name.get().strip()
-            keys = entry_keys.get().strip()
-            reply = entry_reply.get().strip()
-            if not name or not keys or not reply:
-                self._show_dialog("warning", "خطأ", "يرجى ملء جميع الحقول المطلوبة.")
-                return
-            
-            self.ar_rules.append({
-                "rule_name": name,
-                "keywords": keys,
-                "reply": reply,
-                "enabled": True
-            })
-            self._save_ar_rules()
-            self._populate_ar_rules_table()
-            dialog.destroy()
-
-        btn_frm = ctk.CTkFrame(frm, fg_color="transparent")
-        btn_frm.pack(fill="x")
-        
-        ctk.CTkButton(
-            btn_frm, text="إلغاء", font=("Segoe UI", 11),
-            width=80, height=28, fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
-            command=dialog.destroy
-        ).pack(side="left")
-        
-        ctk.CTkButton(
-            btn_frm, text="حفظ القاعدة", font=("Segoe UI", 11, "bold"),
-            width=100, height=28, fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
-            text_color="#000000",
-            command=on_save
-        ).pack(side="right")
-
-    def _delete_ar_rule(self):
-        selected = self.ar_rules_tree.selection()
-        if not selected:
-            self._show_dialog("warning", "تنبيه", "يرجى تحديد قاعدة لحذفها.")
-            return
-        for item in selected:
-            vals = self.ar_rules_tree.item(item, "values")
-            rule_name = vals[0]
-            # Remove from list
-            self.ar_rules = [r for r in self.ar_rules if r.get("rule_name") != rule_name]
-            self.ar_rules_tree.delete(item)
-        self._save_ar_rules()
-
-    def _toggle_auto_responder(self):
-        enabled = self.ar_switch_var.get()
-        self.config.set("enable_auto_responder", enabled)
-        self.config.save()
-        if enabled:
-            self.log("🤖 تم تفعيل نظام الرد الآلي التلقائي.")
-            self._start_auto_responder_thread()
-        else:
-            self.log("🤖 تم إيقاف نظام الرد الآلي التلقائي.")
-
-    def _start_auto_responder_thread(self):
-        if hasattr(self, "ar_thread") and self.ar_thread and self.ar_thread.is_alive():
-            return
-        self.ar_thread = threading.Thread(target=self._auto_responder_worker, daemon=True)
-        self.ar_thread.start()
-
-    def _auto_responder_worker(self):
-        import time
-        import random
-        from datetime import datetime
-        
-        while self.ar_switch_var.get():
-            # 1. Real Polling via Selenium (if bot is logged in and active!)
-            if self.bot and self.bot.is_logged_in():
-                try:
-                    unread_chats = []
-                    try:
-                        unread_chats = self.bot.get_unread_chats()
-                    except Exception:
-                        pass
-                    
-                    for chat_el in unread_chats[:5]:
-                        if not self.bot.open_chat_element(chat_el):
-                            continue
-                        time.sleep(1.2)
-                        last_msg = (self.bot.read_last_message() or "").strip()
-                        if not last_msg:
-                            continue
-                        sender_name = self.bot.get_active_chat_name() or "عميل"
-                        last_msg_lower = last_msg.lower()
-
-                        reply_text = None
-                        matched_rule = None
-                        for rule in self.ar_rules:
-                            if not rule.get("enabled", True):
-                                continue
-                            keywords = [
-                                k.strip().lower()
-                                for k in str(rule.get("keywords", "")).split(",")
-                                if k.strip()
-                            ]
-                            if any(kw in last_msg_lower for kw in keywords):
-                                reply_text = rule.get("reply")
-                                matched_rule = rule.get("rule_name", "قاعدة")
-                                break
-
-                        if reply_text:
-                            res = self.bot.reply_to_current_chat(reply_text)
-                            timestamp = datetime.now().strftime("%H:%M:%S")
-                            self._run_on_ui(
-                                lambda t=timestamp, s=sender_name, m=last_msg: self.recv_tree.insert(
-                                    "", 0, values=(t, s, m)
-                                )
-                            )
-                            if res == "SUCCESS":
-                                self.log(f"🤖 [رد تلقائي] تم الرد على '{sender_name}' ({matched_rule}).")
-                            else:
-                                self.log(f"⚠️ [رد تلقائي] فشل الرد على '{sender_name}': {res}")
-                except Exception as ex:
-                    self.log(f"⚠️ [رد تلقائي] خطأ: {str(ex)[:80]}")
-
-            time.sleep(random.uniform(4, 8))
 
     # ═══════════════════════════════════════════════════════════════════════
     #  TABLES & UTILS HELPERS
@@ -5540,641 +4168,5 @@ class ModernWhatsAppApp(ctk.CTk):
         self._refresh_theme()
 
     # â”€â”€â”€ GMaps Scraper Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    def _start_gmaps_scraper(self):
-        query = self.gmaps_query_entry.get().strip()
-        if not query:
-            messagebox.showerror("Ø®Ø·Ø£", "Ø§Ù„Ø±Ø¬Ø§Ø¡ Ø¥Ø¯Ø®Ø§Ù„ Ø§Ù„ÙƒÙ„Ù…Ø© Ø§Ù„Ù…ÙØªØ§Ø­ÙŠØ© Ù„Ù„Ø¨Ø­Ø«.")
-            return
 
-        if not self.bot:
-            messagebox.showerror("Ø®Ø·Ø£", "Ø§Ù„Ø±Ø¬Ø§Ø¡ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ø¥Ù„Ù‰ Ù…ØªØµÙØ­ ÙˆØ§ØªØ³Ø§Ø¨ Ø£ÙˆÙ„Ø§Ù‹ Ù„ÙŠØªÙ…ÙƒÙ† Ø§Ù„Ø¨Ø±Ù†Ø§Ù…Ø¬ Ù…Ù† Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ù…ØªØµÙØ­ Ù„Ù„Ø³Ø­Ø¨ØŒ Ø£Ùˆ ÙŠÙ…ÙƒÙ†Ùƒ ÙØªØ­ Ù…ØªØµÙØ­ Ø¬Ø¯ÙŠØ¯.")
-            # Actually, let's just create a new bot if it doesn't exist, but we need the user_data_dir
-            # Wait, WhatsAppBot is fine. We can use `self.bot.driver` if `self.bot` is initialized.
-            # But let's handle this in the thread.
 
-        self.btn_gmaps_start.configure(state="disabled")
-        self.btn_gmaps_stop.configure(state="normal")
-        self.gmaps_status_lbl.configure(text="Ø¬Ø§Ø±ÙŠ Ø¨Ø¯Ø¡ Ù…ØªØµÙØ­ Ø§Ù„Ø³Ø­Ø¨...", text_color=COLORS["warning"])
-        
-        # Clear old results
-        self._clear_gmaps_results()
-
-        self.gmaps_stop_event = threading.Event()
-        
-        t = threading.Thread(target=self._run_gmaps_scraper_thread, args=(query,), daemon=True)
-        t.start()
-
-    def _run_gmaps_scraper_thread(self, query):
-        try:
-            from automation.gmaps_scraper import GMapsScraper
-            from automation.whatsapp_bot import WhatsAppBot
-            
-            # Need a driver. We can create a temporary invisible one or use the current one.
-            # Let's create a temporary hidden Chrome driver using WhatsAppBot's setup logic but without loading a heavy profile if we don't want to.
-            # However, reusing our proxy_config is good.
-            temp_bot = WhatsAppBot(user_data_dir=None, proxy_config=None)
-            temp_bot.setup_driver(start_minimized=True)
-            
-            scraper = GMapsScraper(temp_bot.driver)
-            
-            def on_update(status, data):
-                if status == "FOUND":
-                    self._run_on_ui(lambda: self.gmaps_tree.insert("", "end", values=(data["name"], data["phone"])))
-                    self._run_on_ui(lambda: self.gmaps_status_lbl.configure(text=f"ØªÙ… Ø§Ø³ØªØ®Ø±Ø§Ø¬ {data['count']} Ù†ØªÙŠØ¬Ø©...", text_color=COLORS["success"]))
-                elif status == "ERROR":
-                    self._run_on_ui(lambda: self.gmaps_status_lbl.configure(text=data, text_color=COLORS["danger"]))
-
-            self._run_on_ui(lambda: self.gmaps_status_lbl.configure(text="Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø¨Ø­Ø« ÙˆØ³Ø­Ø¨ Ø§Ù„Ù†ØªØ§Ø¦Ø¬...", text_color=COLORS["warning"]))
-            self.log(f"ðŸ—ºï¸ Ø¨Ø¯Ø¡ Ø³Ø­Ø¨ Ø®Ø±Ø§Ø¦Ø· Ø¬ÙˆØ¬Ù„ Ù„Ù„Ø¨Ø­Ø«: {query}")
-            
-            results = scraper.scrape(query, self.gmaps_stop_event, max_results=1000, update_callback=on_update)
-            
-            temp_bot.close()
-            
-            if self.gmaps_stop_event.is_set():
-                self._run_on_ui(lambda: self.gmaps_status_lbl.configure(text=f"ØªÙ… Ø§Ù„Ø¥ÙŠÙ‚Ø§Ù ÙŠØ¯ÙˆÙŠØ§Ù‹. Ø§Ø³ØªØ®Ø±Ø¬Ù†Ø§ {len(results)} Ø±Ù‚Ù….", text_color=COLORS["info"]))
-                self.log(f"ðŸ—ºï¸ ØªÙ… Ø¥ÙŠÙ‚Ø§Ù Ø³Ø­Ø¨ Ø§Ù„Ø®Ø±Ø§Ø¦Ø·. Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹: {len(results)}")
-            else:
-                self._run_on_ui(lambda: self.gmaps_status_lbl.configure(text=f"Ø§Ù†ØªÙ‡Ù‰ Ø§Ù„Ø¨Ø­Ø«. Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹: {len(results)} Ø±Ù‚Ù….", text_color=COLORS["success"]))
-                self.log(f"ðŸ—ºï¸ Ø§ÙƒØªÙ…Ù„ Ø³Ø­Ø¨ Ø®Ø±Ø§Ø¦Ø· Ø¬ÙˆØ¬Ù„. Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹: {len(results)}")
-
-        except Exception as e:
-            self._run_on_ui(lambda: self.gmaps_status_lbl.configure(text=f"Ø­Ø¯Ø« Ø®Ø·Ø£ ØºÙŠØ± Ù…ØªÙˆÙ‚Ø¹", text_color=COLORS["danger"]))
-            self.log(f"âŒ Ø®Ø·Ø£ ÙÙŠ Ø³Ø­Ø¨ Ø§Ù„Ø®Ø±Ø§Ø¦Ø·: {str(e)}")
-        finally:
-            self._run_on_ui(lambda: self.btn_gmaps_start.configure(state="normal"))
-            self._run_on_ui(lambda: self.btn_gmaps_stop.configure(state="disabled"))
-
-    def _stop_gmaps_scraper(self):
-        if hasattr(self, "gmaps_stop_event"):
-            self.gmaps_stop_event.set()
-        self.btn_gmaps_stop.configure(state="disabled")
-        self.gmaps_status_lbl.configure(text="Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø¥ÙŠÙ‚Ø§Ù...", text_color=COLORS["warning"])
-
-    def _clear_gmaps_results(self):
-        for item in self.gmaps_tree.get_children():
-            self.gmaps_tree.delete(item)
-        self.gmaps_status_lbl.configure(text="")
-
-    def _export_gmaps_to_campaign(self):
-        items = self.gmaps_tree.get_children()
-        if not items:
-            messagebox.showwarning("ØªÙ†Ø¨ÙŠÙ‡", "Ù„Ø§ ØªÙˆØ¬Ø¯ Ù†ØªØ§Ø¦Ø¬ Ù„Ù†Ù‚Ù„Ù‡Ø§.")
-            return
-
-        imported_count = 0
-        from utils.helpers import normalize_phone
-        default_cc = self.config.get("default_country_code", "20")
-
-        # Get existing numbers to avoid duplicates if needed
-        existing_numbers = set()
-        for child in self.progress_tree.get_children():
-            existing_numbers.add(self.progress_tree.item(child, "values")[1])
-
-        for item in items:
-            vals = self.gmaps_tree.item(item, "values")
-            name = vals[0]
-            phone = vals[1]
-            cleaned_phone = normalize_phone(phone, default_cc)
-            if cleaned_phone and cleaned_phone not in existing_numbers:
-                self.progress_tree.insert("", "end", values=(name, cleaned_phone, "", "â³ Ù…Ø¹Ù„Ù‚"), tags=("pending",))
-                existing_numbers.add(cleaned_phone)
-                imported_count += 1
-
-        self._update_contacts_count_from_tree()
-        self.log(f"ðŸ—ºï¸ ØªÙ… Ù†Ù‚Ù„ {imported_count} Ø±Ù‚Ù… Ù…Ù† Ø®Ø±Ø§Ø¦Ø· Ø¬ÙˆØ¬Ù„ Ø¥Ù„Ù‰ Ø§Ù„Ø­Ù…Ù„Ø© Ø§Ù„Ø­Ø§Ù„ÙŠØ©.")
-        messagebox.showinfo("ØªÙ…", f"ØªÙ… Ù†Ù‚Ù„ {imported_count} Ø±Ù‚Ù… Ø¨Ù†Ø¬Ø§Ø­.")
-        self._switch_tab("main")
-
-    def _export_gmaps_to_csv(self):
-        items = self.gmaps_tree.get_children()
-        if not items:
-            messagebox.showwarning("ØªÙ†Ø¨ÙŠÙ‡", "Ù„Ø§ ØªÙˆØ¬Ø¯ Ù†ØªØ§Ø¦Ø¬ Ù„ØªØµØ¯ÙŠØ±Ù‡Ø§.")
-            return
-
-        import csv
-        from tkinter import filedialog
-        path = filedialog.asksaveasfilename(
-            title="Ø­ÙØ¸ ÙƒÙ…Ù„Ù CSV",
-            defaultextension=".csv",
-            filetypes=[("CSV Files", "*.csv")]
-        )
-        if not path:
-            return
-
-        try:
-            with open(path, "w", encoding="utf-8-sig", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow(["Ø§Ù„Ø§Ø³Ù…", "Ø±Ù‚Ù… Ø§Ù„Ù‡Ø§ØªÙ"])
-                for item in items:
-                    writer.writerow(self.gmaps_tree.item(item, "values"))
-            messagebox.showinfo("ØªÙ…", "ØªÙ… Ø§Ù„Ø­ÙØ¸ Ø¨Ù†Ø¬Ø§Ø­.")
-            self.log(f"ðŸ’¾ ØªÙ… Ø­ÙØ¸ Ø£Ø±Ù‚Ø§Ù… Ø§Ù„Ø®Ø±Ø§Ø¦Ø· ÙÙŠ {path}")
-        except Exception as e:
-            messagebox.showerror("Ø®Ø·Ø£", f"ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸: {str(e)}")
-    # â”€â”€â”€ Warmer Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    def _start_warmer(self):
-        if not self.bot or not self.bot.is_logged_in():
-            messagebox.showerror("Ø®Ø·Ø£", "Ø§Ù„Ø±Ø¬Ø§Ø¡ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ø£ÙˆÙ„Ø§Ù‹ Ù„Ù„Ù…ØªØµÙØ­ Ù„Ø¨Ø¯Ø¡ Ø§Ù„ØªØ³Ø®ÙŠÙ†.")
-            return
-
-        raw_targets = self.warmer_targets_textbox.get("1.0", "end-1c").strip().split('\n')
-        targets = [t.strip() for t in raw_targets if t.strip()]
-        if not targets:
-            messagebox.showerror("Ø®Ø·Ø£", "Ø§Ù„Ø±Ø¬Ø§Ø¡ Ø¥Ø¯Ø®Ø§Ù„ Ø±Ù‚Ù… ÙˆØ§Ø­Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„ Ù„Ù„ØªØ³Ø®ÙŠÙ†.")
-            return
-
-        try:
-            delay_min = float(self.warmer_delay_min.get())
-            delay_max = float(self.warmer_delay_max.get())
-            total_msgs = int(self.warmer_total_msgs.get())
-        except ValueError:
-            messagebox.showerror("Ø®Ø·Ø£", "Ø§Ù„Ø±Ø¬Ø§Ø¡ Ø¥Ø¯Ø®Ø§Ù„ Ø£Ø±Ù‚Ø§Ù… ØµØ­ÙŠØ­Ø© ÙÙŠ Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª.")
-            return
-
-        self.btn_warmer_start.configure(state="disabled")
-        self.btn_warmer_stop.configure(state="normal")
-        self.warmer_stop_event = threading.Event()
-
-        t = threading.Thread(target=self._run_warmer_automation, args=(targets, delay_min, delay_max, total_msgs), daemon=True)
-        t.start()
-
-    def _stop_warmer(self):
-        if hasattr(self, "warmer_stop_event"):
-            self.warmer_stop_event.set()
-        self.btn_warmer_stop.configure(state="disabled")
-        self.warmer_status_lbl.configure(text="Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø¥ÙŠÙ‚Ø§Ù...", text_color=COLORS["warning"])
-
-    def _run_warmer_automation(self, targets, delay_min, delay_max, total_msgs):
-        self.log("ðŸ”¥ Ø¨Ø¯Ø¡ Ø¹Ù…Ù„ÙŠØ© ØªØ³Ø®ÙŠÙ† Ø§Ù„Ø­Ø³Ø§Ø¨...")
-        self._run_on_ui(lambda: self.warmer_status_lbl.configure(text="Ø¬Ø§Ø±ÙŠ Ø¨Ø¯Ø¡ Ø§Ù„ØªØ³Ø®ÙŠÙ†...", text_color=COLORS["warning"]))
-        
-        warm_messages = [
-            "Ù…Ø±Ø­Ø¨Ø§Ù‹",
-            "ÙƒÙŠÙ Ø§Ù„Ø­Ø§Ù„ØŸ",
-            "Ø§Ù„Ø³Ù„Ø§Ù… Ø¹Ù„ÙŠÙƒÙ… ÙˆØ±Ø­Ù…Ø© Ø§Ù„Ù„Ù‡",
-            "Ù‡Ù„ ÙŠÙ…ÙƒÙ†Ùƒ Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„ØªÙØ§ØµÙŠÙ„ØŸ",
-            "Ø´ÙƒØ±Ø§Ù‹ Ø¬Ø²ÙŠÙ„Ø§Ù‹",
-            "Ø¨Ø®ÙŠØ± Ø§Ù„Ø­Ù…Ø¯ Ù„Ù„Ù‡",
-            "ØªÙ…Ø§Ù…",
-            "Ø£Ù‡Ù„Ø§Ù‹ Ø¨Ùƒ",
-            "ØµØ¨Ø§Ø­ Ø§Ù„Ø®ÙŠØ±",
-            "Ù…Ø³Ø§Ø¡ Ø§Ù„Ø®ÙŠØ±",
-            "Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ§Ø­ Ø§Ù„Ø¢Ù†ØŸ",
-            "Ø£Ù†ØªØ¸Ø± Ø±Ø¯Ùƒ",
-            "ÙŠØ¹Ø·ÙŠÙƒ Ø§Ù„Ø¹Ø§ÙÙŠØ©",
-            "ðŸ‘",
-            "ðŸ‘‹"
-        ]
-
-        sent = 0
-        from utils.helpers import normalize_phone
-
-        try:
-            for i in range(total_msgs):
-                if self.warmer_stop_event.is_set():
-                    break
-
-                target = random.choice(targets)
-                msg = random.choice(warm_messages)
-                
-                cc = self.config.get("default_country_code", "20")
-                cleaned = normalize_phone(target, cc)
-                if not cleaned:
-                    cleaned = target
-
-                self._run_on_ui(lambda s=sent, t=total_msgs: self.warmer_status_lbl.configure(text=f"ØªÙ… Ø¥Ø±Ø³Ø§Ù„ {s}/{t} Ø±Ø³Ø§Ù„Ø©...", text_color=COLORS["primary"]))
-                
-                # Send
-                res = self.bot.send_message(
-                    phone=cleaned,
-                    name="Warmer",
-                    message_template=msg,
-                    stop_event=self.warmer_stop_event
-                )
-
-                if res == "SUCCESS":
-                    sent += 1
-                    self.log(f"ðŸ”¥ [Ø§Ù„ØªØ³Ø®ÙŠÙ†] ØªÙ… Ø¥Ø±Ø³Ø§Ù„ '{msg}' Ø¥Ù„Ù‰ {cleaned}")
-                else:
-                    self.log(f"ðŸ”¥ [Ø§Ù„ØªØ³Ø®ÙŠÙ†] ÙØ´Ù„ Ø§Ù„Ø¥Ø±Ø³Ø§Ù„ Ø¥Ù„Ù‰ {cleaned}: {res}")
-
-                if sent >= total_msgs or self.warmer_stop_event.is_set():
-                    break
-
-                # Sleep
-                wait_m = random.uniform(delay_min, delay_max)
-                wait_s = wait_m * 60
-                self.log(f"ðŸ”¥ [Ø§Ù„ØªØ³Ø®ÙŠÙ†] Ø§Ù†ØªØ¸Ø§Ø± {int(wait_s)} Ø«Ø§Ù†ÙŠØ©...")
-                self._run_on_ui(lambda w=wait_m: self.warmer_status_lbl.configure(text=f"Ø§Ù†ØªØ¸Ø§Ø± {w:.1f} Ø¯Ù‚ÙŠÙ‚Ø© Ù„Ù„Ø±Ø³Ø§Ù„Ø© Ø§Ù„Ù‚Ø§Ø¯Ù…Ø©...", text_color=COLORS["warning"]))
-                
-                if self.warmer_stop_event.wait(wait_s):
-                    break
-
-            if self.warmer_stop_event.is_set():
-                self.log("ðŸ”¥ ØªÙ… Ø¥ÙŠÙ‚Ø§Ù Ø§Ù„ØªØ³Ø®ÙŠÙ† ÙŠØ¯ÙˆÙŠØ§Ù‹.")
-                self._run_on_ui(lambda: self.warmer_status_lbl.configure(text="ØªÙ… Ø¥ÙŠÙ‚Ø§Ù Ø§Ù„ØªØ³Ø®ÙŠÙ†.", text_color=COLORS["danger"]))
-            else:
-                self.log("ðŸ”¥ Ø§ÙƒØªÙ…Ù„Øª Ø¬Ù„Ø³Ø© Ø§Ù„ØªØ³Ø®ÙŠÙ† Ø¨Ù†Ø¬Ø§Ø­.")
-                self._run_on_ui(lambda: self.warmer_status_lbl.configure(text="Ø§ÙƒØªÙ…Ù„Øª Ø§Ù„Ø¬Ù„Ø³Ø© Ø¨Ù†Ø¬Ø§Ø­.", text_color=COLORS["success"]))
-
-        except Exception as e:
-            self.log(f"âŒ Ø®Ø·Ø£ Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„ØªØ³Ø®ÙŠÙ†: {str(e)}")
-            self._run_on_ui(lambda: self.warmer_status_lbl.configure(text="Ø­Ø¯Ø« Ø®Ø·Ø£ ØºÙŠØ± Ù…ØªÙˆÙ‚Ø¹.", text_color=COLORS["danger"]))
-        finally:
-            self._run_on_ui(lambda: self.btn_warmer_start.configure(state="normal"))
-            self._run_on_ui(lambda: self.btn_warmer_stop.configure(state="disabled"))
-    # â”€â”€â”€ Chatbot Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    def _build_tab_chatbot(self):
-        self.tab_chatbot = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        self.tab_frames["chatbot"] = self.tab_chatbot
-        
-        self.chatbot_rules = []
-        self.chatbot_running = False
-        self.chatbot_stop_event = threading.Event()
-
-        # Title
-        title_lbl = ctk.CTkLabel(self.tab_chatbot, text="Ù†Ø¸Ø§Ù… Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ (Chatbot) ðŸ¤–", font=("Segoe UI", 24, "bold"), text_color=COLORS["primary"])
-        title_lbl.pack(anchor="w", padx=20, pady=(20, 10))
-
-        # Instructions
-        inst_lbl = ctk.CTkLabel(self.tab_chatbot, text="Ø­Ø¯Ø¯ Ø§Ù„ÙƒÙ„Ù…Ø§Øª Ø§Ù„Ù…ÙØªØ§Ø­ÙŠØ© ÙˆØ§Ù„Ø±Ø¯ÙˆØ¯ Ø§Ù„Ù…Ù†Ø§Ø³Ø¨Ø© Ù„Ù‡Ø§. Ø³ÙŠÙ‚ÙˆÙ… Ø§Ù„Ø¨Ø±Ù†Ø§Ù…Ø¬ Ø¨Ù…Ø±Ø§Ù‚Ø¨Ø© Ø§Ù„Ù…Ø­Ø§Ø¯Ø«Ø§Øª ÙˆØ§Ù„Ø±Ø¯ ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹.", font=("Segoe UI", 12), text_color=COLORS["text_muted"])
-        inst_lbl.pack(anchor="w", padx=20, pady=(0, 20))
-
-        # Input Frame
-        input_frame = ctk.CTkFrame(self.tab_chatbot, fg_color=COLORS["card_bg"], corner_radius=10)
-        input_frame.pack(fill="x", padx=20, pady=10)
-
-        # Keyword
-        kw_lbl = ctk.CTkLabel(input_frame, text="Ø§Ù„ÙƒÙ„Ù…Ø© Ø§Ù„Ù…ÙØªØ§Ø­ÙŠØ©:", font=("Segoe UI", 12, "bold"))
-        kw_lbl.grid(row=0, column=0, padx=10, pady=10, sticky="w")
-        self.chatbot_kw_entry = ctk.CTkEntry(input_frame, width=200, font=("Segoe UI", 12))
-        self.chatbot_kw_entry.grid(row=0, column=1, padx=10, pady=10, sticky="w")
-
-        # Match Type
-        type_lbl = ctk.CTkLabel(input_frame, text="Ù†ÙˆØ¹ Ø§Ù„ØªØ·Ø§Ø¨Ù‚:", font=("Segoe UI", 12, "bold"))
-        type_lbl.grid(row=0, column=2, padx=10, pady=10, sticky="w")
-        self.chatbot_match_var = ctk.StringVar(value="ØªØ­ØªÙˆÙŠ Ø¹Ù„Ù‰")
-        self.chatbot_match_dropdown = ctk.CTkOptionMenu(
-            input_frame, variable=self.chatbot_match_var,
-            values=["ØªØ­ØªÙˆÙŠ Ø¹Ù„Ù‰", "Ù…Ø·Ø§Ø¨Ù‚Ø© ØªØ§Ù…Ø©"], font=("Segoe UI", 12)
-        )
-        self.chatbot_match_dropdown.grid(row=0, column=3, padx=10, pady=10, sticky="w")
-
-        # Reply
-        reply_lbl = ctk.CTkLabel(input_frame, text="Ù†Øµ Ø§Ù„Ø±Ø¯:", font=("Segoe UI", 12, "bold"))
-        reply_lbl.grid(row=1, column=0, padx=10, pady=10, sticky="nw")
-        self.chatbot_reply_entry = ctk.CTkTextbox(input_frame, width=450, height=80, font=("Segoe UI", 12))
-        self.chatbot_reply_entry.grid(row=1, column=1, columnspan=3, padx=10, pady=10, sticky="w")
-
-        # Add Button
-        btn_add_rule = ctk.CTkButton(
-            input_frame, text="Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ù‚Ø§Ø¹Ø¯Ø© âž•", font=("Segoe UI", 12, "bold"),
-            command=self._add_chatbot_rule
-        )
-        btn_add_rule.grid(row=2, column=1, columnspan=3, padx=10, pady=10, sticky="w")
-
-        # Rules Table
-        table_frame = ctk.CTkFrame(self.tab_chatbot, fg_color=COLORS["card_bg"], corner_radius=10)
-        table_frame.pack(fill="both", expand=True, padx=20, pady=10)
-
-        columns = ("keyword", "match", "reply")
-        self.chatbot_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=8)
-        self.chatbot_tree.heading("keyword", text="Ø§Ù„ÙƒÙ„Ù…Ø© Ø§Ù„Ù…ÙØªØ§Ø­ÙŠØ©")
-        self.chatbot_tree.heading("match", text="Ø§Ù„ØªØ·Ø§Ø¨Ù‚")
-        self.chatbot_tree.heading("reply", text="Ø§Ù„Ø±Ø¯")
-        self.chatbot_tree.column("keyword", width=150)
-        self.chatbot_tree.column("match", width=100)
-        self.chatbot_tree.column("reply", width=400)
-        self.chatbot_tree.pack(fill="both", expand=True, padx=10, pady=10)
-
-        # Delete selected rule
-        btn_del_rule = ctk.CTkButton(
-            table_frame, text="Ø­Ø°Ù Ø§Ù„Ù…Ø­Ø¯Ø¯ ðŸ—‘ï¸", font=("Segoe UI", 12, "bold"),
-            fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
-            command=self._delete_chatbot_rule
-        )
-        btn_del_rule.pack(anchor="e", padx=10, pady=(0, 10))
-
-        # Control Frame
-        ctrl_frame = ctk.CTkFrame(self.tab_chatbot, fg_color="transparent")
-        ctrl_frame.pack(fill="x", padx=20, pady=10)
-
-        self.btn_start_chatbot = ctk.CTkButton(
-            ctrl_frame, text="â–¶ï¸ ØªØ´ØºÙŠÙ„ Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ", font=("Segoe UI", 14, "bold"),
-            height=40, fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"], text_color="#000",
-            command=self._toggle_chatbot
-        )
-        self.btn_start_chatbot.pack(side="left", padx=5)
-
-        self.chatbot_status_lbl = ctk.CTkLabel(ctrl_frame, text="Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ Ù…ØªÙˆÙ‚Ù", font=("Segoe UI", 14, "bold"), text_color=COLORS["danger"])
-        self.chatbot_status_lbl.pack(side="left", padx=20)
-
-    def _add_chatbot_rule(self):
-        kw = self.chatbot_kw_entry.get().strip()
-        reply = self.chatbot_reply_entry.get("1.0", "end").strip()
-        match_type = self.chatbot_match_var.get()
-
-        if not kw or not reply:
-            messagebox.showerror("Ø®Ø·Ø£", "ÙŠØ¬Ø¨ Ø¥Ø¯Ø®Ø§Ù„ Ø§Ù„ÙƒÙ„Ù…Ø© Ø§Ù„Ù…ÙØªØ§Ø­ÙŠØ© ÙˆØ§Ù„Ø±Ø¯.")
-            return
-
-        rule = {"keyword": kw, "match": match_type, "reply": reply}
-        self.chatbot_rules.append(rule)
-        self.chatbot_tree.insert("", "end", values=(kw, match_type, reply))
-        
-        self.chatbot_kw_entry.delete(0, "end")
-        self.chatbot_reply_entry.delete("1.0", "end")
-        self.log(f"ðŸ¤– ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ù‚Ø§Ø¹Ø¯Ø© Ø±Ø¯ Ø¢Ù„ÙŠ Ù„Ù„ÙƒÙ„Ù…Ø©: {kw}")
-
-    def _delete_chatbot_rule(self):
-        selected = self.chatbot_tree.selection()
-        if not selected:
-            return
-        for item in selected:
-            idx = self.chatbot_tree.index(item)
-            self.chatbot_tree.delete(item)
-            if 0 <= idx < len(self.chatbot_rules):
-                del self.chatbot_rules[idx]
-
-    def _toggle_chatbot(self):
-        if not self.bot or not self.bot.driver:
-            messagebox.showerror("Ø®Ø·Ø£", "ÙŠØ¬Ø¨ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ ÙÙŠ ÙˆØ§ØªØ³Ø§Ø¨ Ø£ÙˆÙ„Ø§Ù‹.")
-            return
-            
-        if self.chatbot_running:
-            # Stop
-            self.chatbot_stop_event.set()
-            self.chatbot_running = False
-            self.btn_start_chatbot.configure(text="â–¶ï¸ ØªØ´ØºÙŠÙ„ Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ", fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"])
-            self.chatbot_status_lbl.configure(text="Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ Ù…ØªÙˆÙ‚Ù", text_color=COLORS["danger"])
-            self.log("ðŸ¤– ØªÙ… Ø¥ÙŠÙ‚Ø§Ù Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ.")
-        else:
-            # Start
-            if not self.chatbot_rules:
-                messagebox.showwarning("ØªÙ†Ø¨ÙŠÙ‡", "ÙŠØ¬Ø¨ Ø¥Ø¶Ø§ÙØ© Ù‚Ø§Ø¹Ø¯Ø© Ø±Ø¯ Ø¢Ù„ÙŠ ÙˆØ§Ø­Ø¯Ø© Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„ Ù‚Ø¨Ù„ Ø§Ù„ØªØ´ØºÙŠÙ„.")
-                return
-                
-            self.chatbot_stop_event.clear()
-            self.chatbot_running = True
-            self.btn_start_chatbot.configure(text="â¹ï¸ Ø¥ÙŠÙ‚Ø§Ù Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ", fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"])
-            self.chatbot_status_lbl.configure(text="Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ ÙŠØ¹Ù…Ù„ (ÙŠØ±Ø§Ù‚Ø¨ Ø§Ù„Ù…Ø­Ø§Ø¯Ø«Ø§Øª...)", text_color=COLORS["success"])
-            self.log("ðŸ¤– Ø¨Ø¯Ø¡ ØªØ´ØºÙŠÙ„ Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠØŒ Ø¬Ø§Ø±ÙŠ Ù…Ø±Ø§Ù‚Ø¨Ø© Ø§Ù„Ù…Ø­Ø§Ø¯Ø«Ø§Øª...")
-            
-            threading.Thread(target=self._run_chatbot_automation, daemon=True).start()
-
-    def _run_chatbot_automation(self):
-        while self.chatbot_running and not self.chatbot_stop_event.is_set():
-            if not self.bot or not self.bot.driver:
-                self.log("âŒ ÙÙ‚Ø¯Ø§Ù† Ø§Ù„Ø§ØªØµØ§Ù„ Ø¨Ø§Ù„ÙˆØ§ØªØ³Ø§Ø¨ Ø£Ø«Ù†Ø§Ø¡ ØªØ´ØºÙŠÙ„ Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ.")
-                self.after(0, self._toggle_chatbot)
-                break
-                
-            try:
-                # 1. Get unread chats
-                unread_chats = self.bot.get_unread_chats()
-                
-                if unread_chats:
-                    # 2. Open the first unread chat
-                    chat = unread_chats[0]
-                    if self.bot.open_chat_element(chat):
-                        # wait for messages to load
-                        time.sleep(1.5)
-                        
-                        # 3. Read last message
-                        last_message = self.bot.read_last_message()
-                        if last_message:
-                            # Add to Received Tab (Mini CRM)
-                            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                            sender_name = self.bot.get_active_chat_name() or "عميل"
-                            self._run_on_ui(lambda n=now_str, s=sender_name, m=last_message: self.received_tree.insert("", 0, values=(n, s, m)))
-                            
-                            # 4. Check against rules
-                            matched_reply = None
-                            for rule in self.chatbot_rules:
-                                kw = rule["keyword"].lower()
-                                msg_lower = last_message.lower()
-                                
-                                if rule["match"] in ("مطابقة تامة", "exact", "Exact"):
-                                    if kw == msg_lower:
-                                        matched_reply = rule["reply"]
-                                        break
-                                else:
-                                    if kw in msg_lower:
-                                        matched_reply = rule["reply"]
-                                        break
-                                        
-                            if matched_reply:
-                                # 5. Reply
-                                res = self.bot.reply_to_current_chat(matched_reply)
-                                if res == "SUCCESS":
-                                    self.log(f"ðŸ¤– ØªÙ… Ø¥Ø±Ø³Ø§Ù„ Ø±Ø¯ Ø¢Ù„ÙŠ Ù„Ù„Ø±Ø³Ø§Ù„Ø©: '{last_message[:20]}...'")
-                                else:
-                                    self.log(f"âš ï¸ ÙØ´Ù„ Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ: {res}")
-                            else:
-                                self.log(f"ðŸ’¬ Ø±Ø³Ø§Ù„Ø© Ø¬Ø¯ÙŠØ¯Ø© Ù„Ù… ØªØ·Ø§Ø¨Ù‚ Ø£ÙŠ Ù‚Ø§Ø¹Ø¯Ø©: '{last_message[:20]}...'")
-                
-            except Exception as e:
-                self.log(f"âš ï¸ Ø®Ø·Ø£ Ø£Ø«Ù†Ø§Ø¡ Ù…Ø±Ø§Ù‚Ø¨Ø© Ø§Ù„Ø±Ø¯ Ø§Ù„Ø¢Ù„ÙŠ: {str(e)[:50]}")
-                
-            # Wait a few seconds before polling again
-            time.sleep(5)
-    # â”€â”€â”€ Numbers Filter Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    def _build_tab_filter(self):
-        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        self.tab_frames["filter"] = frame
-
-        # Title
-        title_lbl = ctk.CTkLabel(frame, text="ÙÙ„ØªØ±Ø© Ø§Ù„Ø£Ø±Ù‚Ø§Ù… (Numbers Filter) ðŸ”", font=("Segoe UI", 24, "bold"), text_color=COLORS["primary"])
-        title_lbl.pack(anchor="w", padx=20, pady=(20, 10))
-        
-        inst_lbl = ctk.CTkLabel(frame, text="Ø£Ø¯Ø®Ù„ Ø§Ù„Ø£Ø±Ù‚Ø§Ù… Ù„Ù„ØªØ­Ù‚Ù‚ Ù…Ù† ÙˆØ¬ÙˆØ¯ Ø­Ø³Ø§Ø¨Ø§Øª ÙˆØ§ØªØ³Ø§Ø¨ Ù†Ø´Ø·Ø© Ù„Ù‡Ø§ Ù‚Ø¨Ù„ Ø¥Ø±Ø³Ø§Ù„ Ø­Ù…Ù„ØªÙƒ.", font=("Segoe UI", 12), text_color=COLORS["text_muted"])
-        inst_lbl.pack(anchor="w", padx=20, pady=(0, 20))
-
-        # Main Layout
-        content = ctk.CTkFrame(frame, fg_color="transparent")
-        content.pack(fill="both", expand=True, padx=20, pady=0)
-        
-        # Left side: Input
-        left = ctk.CTkFrame(content, fg_color=COLORS["card_bg"], corner_radius=10, width=300)
-        left.pack(side="left", fill="y", padx=(0, 10))
-        left.pack_propagate(False)
-        
-        lbl_in = ctk.CTkLabel(left, text="Ø£Ø¯Ø®Ù„ Ø§Ù„Ø£Ø±Ù‚Ø§Ù… (Ø±Ù‚Ù… ÙÙŠ ÙƒÙ„ Ø³Ø·Ø±):", font=("Segoe UI", 14, "bold"))
-        lbl_in.pack(anchor="w", padx=15, pady=15)
-        
-        self.filter_input_txt = ctk.CTkTextbox(left, font=("Consolas", 12))
-        self.filter_input_txt.pack(fill="both", expand=True, padx=15, pady=(0, 15))
-        
-        # Right-click menu for filter_input_txt
-        import tkinter as tk
-        ctx_menu = tk.Menu(self, tearoff=0, font=("Segoe UI", 11))
-        ctx_menu.add_command(label="Ù‚Øµ (Cut)", command=lambda: self.filter_input_txt._textbox.event_generate("<<Cut>>"))
-        ctx_menu.add_command(label="Ù†Ø³Ø® (Copy)", command=lambda: self.filter_input_txt._textbox.event_generate("<<Copy>>"))
-        ctx_menu.add_command(label="Ù„ØµÙ‚ (Paste)", command=lambda: self.filter_input_txt._textbox.event_generate("<<Paste>>"))
-        ctx_menu.add_separator()
-        ctx_menu.add_command(label="ØªØ­Ø¯ÙŠØ¯ Ø§Ù„ÙƒÙ„ (Select All)", command=lambda: self.filter_input_txt._textbox.tag_add("sel", "1.0", "end"))
-        def _show_ctx(event):
-            try: ctx_menu.tk_popup(event.x_root, event.y_root)
-            finally: ctx_menu.grab_release()
-        self.filter_input_txt.bind("<Button-3>", _show_ctx)
-
-        btn_start_filter = ctk.CTkButton(
-            left, text="Ø¨Ø¯Ø¡ Ø§Ù„ÙØ­Øµ ðŸ”", font=("Segoe UI", 14, "bold"), height=40,
-            fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"], text_color="#000",
-            command=self._start_number_filter
-        )
-        btn_start_filter.pack(fill="x", padx=15, pady=(0, 15))
-
-        # Right side: Results
-        right = ctk.CTkFrame(content, fg_color=COLORS["card_bg"], corner_radius=10)
-        right.pack(side="right", fill="both", expand=True)
-        
-        lbl_out = ctk.CTkLabel(right, text="Ù†ØªØ§Ø¦Ø¬ Ø§Ù„ÙØ­Øµ:", font=("Segoe UI", 14, "bold"))
-        lbl_out.pack(anchor="w", padx=15, pady=15)
-
-        self.filter_tree = ttk.Treeview(right, columns=("phone", "status"), show="headings")
-        self.filter_tree.heading("phone", text="Ø§Ù„Ø±Ù‚Ù…")
-        self.filter_tree.heading("status", text="Ø§Ù„Ø­Ø§Ù„Ø©")
-        self.filter_tree.column("phone", width=200, anchor="center")
-        self.filter_tree.column("status", width=150, anchor="center")
-        
-        scroll = ctk.CTkScrollbar(right, command=self.filter_tree.yview)
-        self.filter_tree.configure(yscrollcommand=scroll.set)
-        scroll.pack(side="right", fill="y", pady=(0, 15))
-        self.filter_tree.pack(fill="both", expand=True, padx=(15, 0), pady=(0, 15))
-        
-        # Tags for colors
-        self.filter_tree.tag_configure("valid", foreground="#16A34A")
-        self.filter_tree.tag_configure("invalid", foreground="#DC2626")
-        self.filter_tree.tag_configure("checking", foreground="#EAB308")
-        
-        # Stats & Export
-        bottom_right = ctk.CTkFrame(right, fg_color="transparent")
-        bottom_right.pack(fill="x", padx=15, pady=(0, 15))
-        
-        self.filter_stats_lbl = ctk.CTkLabel(bottom_right, text="Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ: 0 | ØµØ§Ù„Ø­: 0 | ØºÙŠØ± ØµØ§Ù„Ø­: 0", font=("Segoe UI", 12, "bold"))
-        self.filter_stats_lbl.pack(side="left")
-        
-        btn_export = ctk.CTkButton(
-            bottom_right, text="ØªØµØ¯ÙŠØ± Ø§Ù„ØµØ§Ù„Ø­ (Excel) ðŸ’¾", font=("Segoe UI", 12, "bold"),
-            fg_color="#3B82F6", hover_color="#2563EB", text_color="#FFF",
-            command=self._export_filtered_numbers
-        )
-        btn_export.pack(side="right")
-        
-    def _start_number_filter(self):
-        if not self.bot or not self.bot.driver:
-            messagebox.showerror("Ø®Ø·Ø£", "ÙŠØ¬Ø¨ ÙØªØ­ Ø§Ù„Ù…ØªØµÙØ­ (Open WhatsApp) Ø£ÙˆÙ„Ø§Ù‹.")
-            return
-        if not self.bot.is_logged_in():
-            messagebox.showerror("Ø®Ø·Ø£", "ÙŠØ¬Ø¨ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ ÙÙŠ ÙˆØ§ØªØ³Ø§Ø¨ Ø£ÙˆÙ„Ø§Ù‹.")
-            return
-
-        raw_text = self.filter_input_txt.get("1.0", "end").strip()
-        if not raw_text:
-            return
-        
-        numbers = [n.strip() for n in raw_text.split("\n") if n.strip()]
-        if not numbers:
-            return
-            
-        # Clear tree
-        for item in self.filter_tree.get_children():
-            self.filter_tree.delete(item)
-            
-        self.filter_stats = {"total": len(numbers), "valid": 0, "invalid": 0}
-        self.filter_stats_lbl.configure(text=f"Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ: {self.filter_stats['total']} | ØµØ§Ù„Ø­: 0 | ØºÙŠØ± ØµØ§Ù„Ø­: 0")
-        
-        # Insert all as checking
-        self.filter_tree_items = {}
-        for num in numbers:
-            item_id = self.filter_tree.insert("", "end", values=(num, "â³ ÙÙŠ Ø§Ù„Ø§Ù†ØªØ¸Ø§Ø±"), tags=("checking",))
-            self.filter_tree_items[num] = item_id
-            
-        self.log(f"ðŸ” Ø¨Ø¯Ø¡ ÙØ­Øµ {len(numbers)} Ø±Ù‚Ù…...")
-        threading.Thread(target=self._run_filter_thread, args=(numbers,), daemon=True).start()
-        
-    def _run_filter_thread(self, numbers):
-        for num in numbers:
-            if not self.bot or not self.bot.driver:
-                break
-            
-            # Format number simply
-            formatted = num.replace("+", "").replace(" ", "").replace("-", "")
-            
-            self._run_on_ui(lambda n=num: self.filter_tree.item(self.filter_tree_items[n], values=(n, "ðŸ”„ Ø¬Ø§Ø±ÙŠ Ø§Ù„ÙØ­Øµ...")))
-            
-            # Use WhatsApp's wa.me link check
-            is_valid = self.bot.check_number_validity(formatted)
-            
-            if is_valid:
-                self.filter_stats["valid"] += 1
-                self._run_on_ui(lambda n=num: self.filter_tree.item(self.filter_tree_items[n], values=(n, "âœ… Ù…ØªÙˆÙØ±"), tags=("valid",)))
-            else:
-                self.filter_stats["invalid"] += 1
-                self._run_on_ui(lambda n=num: self.filter_tree.item(self.filter_tree_items[n], values=(n, "âŒ ØºÙŠØ± Ù…ØªÙˆÙØ±"), tags=("invalid",)))
-                
-            self._run_on_ui(lambda: self.filter_stats_lbl.configure(text=f"Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ: {self.filter_stats['total']} | ØµØ§Ù„Ø­: {self.filter_stats['valid']} | ØºÙŠØ± ØµØ§Ù„Ø­: {self.filter_stats['invalid']}"))
-            time.sleep(1) # delay to prevent rate limit
-            
-        self.log("âœ… Ø§Ù†ØªÙ‡Øª Ø¹Ù…Ù„ÙŠØ© Ø§Ù„ÙØ­Øµ.")
-        
-    def _export_filtered_numbers(self):
-        valid_numbers = []
-        for item in self.filter_tree.get_children():
-            vals = self.filter_tree.item(item, "values")
-            if "Ù…ØªÙˆÙØ±" in vals[1] or "âœ…" in vals[1]:
-                valid_numbers.append(vals[0])
-                
-        if not valid_numbers:
-            messagebox.showwarning("ØªÙ†Ø¨ÙŠÙ‡", "Ù„Ø§ ØªÙˆØ¬Ø¯ Ø£Ø±Ù‚Ø§Ù… ØµØ§Ù„Ø­Ø© Ù„ØªØµØ¯ÙŠØ±Ù‡Ø§.")
-            return
-            
-        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
-        if not file_path:
-            return
-            
-        try:
-            import csv
-            with open(file_path, "w", newline="", encoding="utf-8-sig") as f:
-                writer = csv.writer(f)
-                writer.writerow(["Number"])
-                for n in valid_numbers:
-                    writer.writerow([n])
-            messagebox.showinfo("نجاح", f"تم تصدير {len(valid_numbers)} رقم بنجاح!")
-        except Exception as e:
-            messagebox.showerror("خطأ", f"حدث خطأ أثناء التصدير:\n{e}")
-
-    # â”€â”€â”€ Received Messages Tab (Mini CRM) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    def _build_tab_received(self):
-        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        self.tab_frames["received"] = frame
-
-        # Title
-        title_lbl = ctk.CTkLabel(frame, text="ØµÙ†Ø¯ÙˆÙ‚ Ø§Ù„ÙˆØ§Ø±Ø¯ (Received Messages) ðŸ“¥", font=("Segoe UI", 24, "bold"), text_color=COLORS["primary"])
-        title_lbl.pack(anchor="w", padx=20, pady=(20, 10))
-        
-        inst_lbl = ctk.CTkLabel(frame, text="Ù…Ø±Ø§Ù‚Ø¨Ø© Ø­ÙŠØ© Ù„Ù„Ø±Ø³Ø§Ø¦Ù„ Ø§Ù„ÙˆØ§Ø±Ø¯Ø© Ø£Ø«Ù†Ø§Ø¡ ØªØ´ØºÙŠÙ„ Ø§Ù„Ø¨Ø±Ù†Ø§Ù…Ø¬.", font=("Segoe UI", 12), text_color=COLORS["text_muted"])
-        inst_lbl.pack(anchor="w", padx=20, pady=(0, 20))
-
-        content = ctk.CTkFrame(frame, fg_color=COLORS["card_bg"], corner_radius=10)
-        content.pack(fill="both", expand=True, padx=20, pady=(0, 20))
-        
-        self.received_tree = ttk.Treeview(content, columns=("date", "sender", "message"), show="headings")
-        self.received_tree.heading("date", text="Ø§Ù„ÙˆÙ‚Øª ÙˆØ§Ù„ØªØ§Ø±ÙŠØ®")
-        self.received_tree.heading("sender", text="Ø§Ù„Ù…Ø±Ø³Ù„")
-        self.received_tree.heading("message", text="Ù†Øµ Ø§Ù„Ø±Ø³Ø§Ù„Ø©")
-        
-        self.received_tree.column("date", width=150, anchor="center")
-        self.received_tree.column("sender", width=150, anchor="center")
-        self.received_tree.column("message", width=500, anchor="w")
-        
-        scroll = ctk.CTkScrollbar(content, command=self.received_tree.yview)
-        self.received_tree.configure(yscrollcommand=scroll.set)
-        
-        scroll.pack(side="right", fill="y", pady=15)
-        self.received_tree.pack(fill="both", expand=True, padx=(15, 0), pady=15)
-        
-        # We will share the chatbot thread to update this list
-        # Whenever chatbot reads a message, it can append it here!
