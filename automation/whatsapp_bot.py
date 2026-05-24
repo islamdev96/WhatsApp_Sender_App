@@ -1427,11 +1427,11 @@ class WhatsAppBot:
             # Common locators for unread badge in WhatsApp Web
             unread_locators = [
                 (By.XPATH, '//span[contains(@aria-label, "unread message")]'),
-                (By.XPATH, '//span[contains(@aria-label, "Ø±Ø³Ø§Ù„Ø© ØºÙŠØ± Ù…Ù‚Ø±ÙˆØ¡Ø©")]'),
-                (By.XPATH, '//span[contains(@aria-label, "Ø±Ø³Ø§Ù„Ø© ØºÙŠØ± Ù…Ù‚Ø±ÙˆØ¡Ø©")]/ancestor::div[@role="listitem"]'),
+                (By.XPATH, '//span[contains(@aria-label, "رسالة غير مقروءة")]'),
+                (By.XPATH, '//span[contains(@aria-label, "رسالة غير مقروءة")]/ancestor::div[@role="listitem"]'),
                 (By.XPATH, '//span[contains(@aria-label, "unread message")]/ancestor::div[@role="listitem"]'),
                 (By.XPATH, '//div[contains(@aria-label, "unread message")]'),
-                (By.XPATH, '//div[contains(@aria-label, "Ø±Ø³Ø§Ù„Ø© ØºÙŠØ± Ù…Ù‚Ø±ÙˆØ¡Ø©")]')
+                (By.XPATH, '//div[contains(@aria-label, "رسالة غير مقروءة")]'),
             ]
             
             for loc_type, loc_val in unread_locators:
@@ -1451,14 +1451,31 @@ class WhatsAppBot:
         except Exception:
             return []
 
-    def open_chat(self, chat_element):
-        """Clicks on a chat element to open it."""
+    def open_chat_element(self, chat_element):
+        """Clicks a chat row in the side list to open that conversation."""
         try:
             self.driver.execute_script("arguments[0].click();", chat_element)
-            time.sleep(1) # wait for chat to load
+            time.sleep(1)
             return True
         except Exception:
             return False
+
+    def get_active_chat_name(self):
+        """Best-effort read of the open conversation title from the chat header."""
+        header_locators = [
+            (By.XPATH, '//header//span[@data-testid="conversation-info-header-chat-title"]'),
+            (By.XPATH, '//header//div[@role="button"]//span[@dir="auto"]'),
+            (By.XPATH, '//header//span[contains(@class,"selectable-text")]'),
+        ]
+        for by, value in header_locators:
+            try:
+                for el in self.driver.find_elements(by, value):
+                    text = (el.text or "").strip()
+                    if text and len(text) < 120:
+                        return text
+            except Exception:
+                continue
+        return ""
 
     def check_number_validity(self, phone):
         """Checks if a phone number has a WhatsApp account by navigating to wa.me link and checking for errors."""

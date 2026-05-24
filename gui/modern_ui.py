@@ -3432,9 +3432,40 @@ class ModernWhatsAppApp(ctk.CTk):
         parts = re.split(r"\n\s*---\s*\n", text)
         return [p.strip() for p in parts if p.strip()]
 
+    def _filter_contacts_safe_mode(self, contacts):
+        """Pre-validate numbers on WhatsApp before bulk send (Safe Mode)."""
+        if not contacts or not self.bot:
+            return contacts
+        validated = []
+        total = len(contacts)
+        self.log(f"🛡️ الوضع الآمن: جاري فحص {total} رقم على واتساب...")
+        for i, c in enumerate(contacts):
+            if self.stop_event.is_set():
+                break
+            phone = c.get("phone")
+            if not phone:
+                continue
+            res = self.bot.check_number(phone, stop_event=self.stop_event)
+            if res == "VALID":
+                validated.append(c)
+            elif res == "INVALID":
+                self.log(f"🚫 تم استبعاد {phone} (بدون واتساب)")
+            elif res == "STOPPED":
+                break
+            else:
+                self.log(f"⚠️ تعذر التحقق من {phone} ({res}) — سيتم تخطيه")
+        self.log(f"🛡️ الوضع الآمن: {len(validated)}/{total} رقم صالح للإرسال.")
+        return validated
+
     def _begin_send(self, contacts, msg_template, attachments):
         if self.is_running:
             return
+
+        if getattr(self, "sending_mode", None) == "safe":
+            contacts = self._filter_contacts_safe_mode(contacts)
+            if not contacts:
+                self.report_error("ERR-05", "لا توجد أرقام صالحة للإرسال بعد الفحص.", dialog=True)
+                return
 
         # 4. Apply background mode
         if self.bg_mode_var.get():
@@ -5000,15 +5031,6 @@ class ModernWhatsAppApp(ctk.CTk):
         import random
         from datetime import datetime
         
-        simulation_senders = ["محمد علي", "أحمد محمود", "سارة خالد", "رائد عبد الله", "فاطمة عمر"]
-        simulation_msgs = [
-            "السلام عليكم، ممكن اعرف الاسعار؟",
-            "مرحبا يا فندم، هل في عروض حاليا؟",
-            "بكم تكلفة الاشتراك الشهري؟",
-            "عايز اعرف الخصومات المتاحة حاليا",
-            "مرحبا، هل البرنامج متوفر الآن؟"
-        ]
-
         while self.ar_switch_var.get():
             # 1. Real Polling via Selenium (if bot is logged in and active!)
             if self.bot and self.bot.is_logged_in():
@@ -5019,56 +5041,47 @@ class ModernWhatsAppApp(ctk.CTk):
                     except Exception:
                         pass
                     
-                    if unread_chats:
-                        for chat in unread_chats:
-                            sender_phone = chat.get("phone")
-                            sender_name = chat.get("name") or sender_phone
-                            last_msg = chat.get("last_message", "").strip().lower()
-                            
-                            reply_text = None
-                            for rule in self.ar_rules:
-                                if not rule.get("enabled", True):
-                                    continue
-                                keywords = [k.strip().lower() for k in rule.get("keywords", "").split(",")]
-                                if any(kw in last_msg for kw in keywords if kw):
-                                    reply_text = rule.get("reply")
-                                    break
-                            
-                            if reply_text:
-                                self.bot.send_message(phone=sender_phone, name=sender_name, message_template=reply_text)
-                                timestamp = datetime.now().strftime("%H:%M:%S")
-                                self._run_on_ui(lambda t=timestamp, s=sender_name, m=last_msg: self.recv_tree.insert("", 0, values=(t, s, m)))
-                                self.log(f"🤖 [رد تلقائي] تم الرد على '{sender_name}' بنجاح.")
-                except Exception:
-                    pass
-
-            # 2. Visual Live Simulation
-            else:
-                time.sleep(random.uniform(12, 25))
-                if not self.ar_switch_var.get():
-                    break
-                
-                try:
-                    sender = random.choice(simulation_senders)
-                    msg = random.choice(simulation_msgs)
-                    timestamp = datetime.now().strftime("%H:%M:%S")
-                    
-                    reply_text = "شكراً لتواصلك معنا! سيقوم أحد ممثلي الخدمة بالرد عليك قريباً."
-                    matched_rule = "الرد العام"
-                    for rule in self.ar_rules:
-                        if not rule.get("enabled", True):
+                    for chat_el in unread_chats[:5]:
+                        if not self.bot.open_chat_element(chat_el):
                             continue
-                        keywords = [k.strip().lower() for k in rule.get("keywords", "").split(",")]
-                        if any(kw in msg.lower() for kw in keywords if kw):
-                            reply_text = rule.get("reply")
-                            matched_rule = rule.get("rule_name")
-                            break
-                    
-                    self._run_on_ui(lambda t=timestamp, s=sender, m=msg: self.recv_tree.insert("", 0, values=(t, s, m)))
-                    self.log(f"📥 [وارد] رسالة جديدة من '{sender}': {msg}")
-                    self.log(f"🤖 [رد تلقائي] تم تطبيق قاعدة '{matched_rule}' والرد بـ: {reply_text}")
-                except Exception:
-                    pass
+                        time.sleep(1.2)
+                        last_msg = (self.bot.read_last_message() or "").strip()
+                        if not last_msg:
+                            continue
+                        sender_name = self.bot.get_active_chat_name() or "عميل"
+                        last_msg_lower = last_msg.lower()
+
+                        reply_text = None
+                        matched_rule = None
+                        for rule in self.ar_rules:
+                            if not rule.get("enabled", True):
+                                continue
+                            keywords = [
+                                k.strip().lower()
+                                for k in str(rule.get("keywords", "")).split(",")
+                                if k.strip()
+                            ]
+                            if any(kw in last_msg_lower for kw in keywords):
+                                reply_text = rule.get("reply")
+                                matched_rule = rule.get("rule_name", "قاعدة")
+                                break
+
+                        if reply_text:
+                            res = self.bot.reply_to_current_chat(reply_text)
+                            timestamp = datetime.now().strftime("%H:%M:%S")
+                            self._run_on_ui(
+                                lambda t=timestamp, s=sender_name, m=last_msg: self.recv_tree.insert(
+                                    "", 0, values=(t, s, m)
+                                )
+                            )
+                            if res == "SUCCESS":
+                                self.log(f"🤖 [رد تلقائي] تم الرد على '{sender_name}' ({matched_rule}).")
+                            else:
+                                self.log(f"⚠️ [رد تلقائي] فشل الرد على '{sender_name}': {res}")
+                except Exception as ex:
+                    self.log(f"⚠️ [رد تلقائي] خطأ: {str(ex)[:80]}")
+
+            time.sleep(random.uniform(4, 8))
 
     # ═══════════════════════════════════════════════════════════════════════
     #  TABLES & UTILS HELPERS
@@ -5821,7 +5834,7 @@ class ModernWhatsAppApp(ctk.CTk):
                 if unread_chats:
                     # 2. Open the first unread chat
                     chat = unread_chats[0]
-                    if self.bot.open_chat(chat):
+                    if self.bot.open_chat_element(chat):
                         # wait for messages to load
                         time.sleep(1.5)
                         
@@ -5830,7 +5843,7 @@ class ModernWhatsAppApp(ctk.CTk):
                         if last_message:
                             # Add to Received Tab (Mini CRM)
                             now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                            sender_name = "عميل" # We could extract name, but keeping simple
+                            sender_name = self.bot.get_active_chat_name() or "عميل"
                             self._run_on_ui(lambda n=now_str, s=sender_name, m=last_message: self.received_tree.insert("", 0, values=(n, s, m)))
                             
                             # 4. Check against rules
@@ -5839,7 +5852,7 @@ class ModernWhatsAppApp(ctk.CTk):
                                 kw = rule["keyword"].lower()
                                 msg_lower = last_message.lower()
                                 
-                                if rule["match"] == "Ù…Ø·Ø§Ø¨Ù‚Ø© ØªØ§Ù…Ø©":
+                                if rule["match"] in ("مطابقة تامة", "exact", "Exact"):
                                     if kw == msg_lower:
                                         matched_reply = rule["reply"]
                                         break
