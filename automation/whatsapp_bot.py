@@ -64,31 +64,32 @@ class WhatsAppBot:
             (By.XPATH, '//div[@aria-label="إرسال"]'),
         ]
         self.ATTACH_BUTTON_LOCATORS = [
-            # Most specific: exact attach-menu-plus icon (modern WhatsApp Web)
-            (By.XPATH, '//span[@data-icon="attach-menu-plus"]'),
-            # Clip icons (older WhatsApp versions)
-            (By.XPATH, '//span[@data-icon="clip"]'),
-            (By.XPATH, '//span[@data-icon="clip-light"]'),
-            # Plus icons - SCOPED to footer to avoid hitting the emoji button
-            (By.XPATH, '//footer//span[@data-icon="plus"]'),
-            (By.XPATH, '//footer//span[@data-icon="plus-large"]'),
-            # Aria labels - SCOPED to footer
+            (By.CSS_SELECTOR, 'footer span[data-icon="attach-menu-plus"]'),
+            (By.XPATH, '//footer//span[@data-icon="attach-menu-plus"]'),
+            (By.CSS_SELECTOR, 'footer span[data-icon*="clip"]'),
+            (By.XPATH, '//footer//span[@data-icon="clip"]'),
+            (By.XPATH, '//footer//span[@data-icon="clip-light"]'),
             (By.XPATH, '//footer//*[@aria-label="Attach"]'),
             (By.XPATH, '//footer//*[@aria-label="إرفاق"]'),
-            # Title attributes - SCOPED to footer
             (By.XPATH, '//footer//div[@title="Attach"]'),
             (By.XPATH, '//footer//div[@title="إرفاق"]'),
-            # data-testid based
-            (By.CSS_SELECTOR, 'footer span[data-icon="attach-menu-plus"]'),
-            (By.CSS_SELECTOR, 'footer span[data-icon*="clip"]'),
-            (By.CSS_SELECTOR, 'button[data-testid*="clip"]'),
+            (By.CSS_SELECTOR, 'footer button[data-testid*="clip"]'),
         ]
         self.FILE_INPUT_LOCATORS = [
             (By.XPATH, '//input[@type="file" and @accept="*"]'),
-            (By.XPATH, '//input[@type="file" and not(contains(@accept,"image"))]'),
+            (By.XPATH, '//input[@type="file" and not(contains(@accept,"image")) and not(contains(@accept,"video"))]'),
         ]
         self.PHOTO_VIDEO_INPUT_LOCATORS = [
-            (By.XPATH, '//input[@type="file" and contains(@accept,"video")]'),
+            (By.XPATH, '//input[@type="file" and contains(@accept,"video/mp4")]'),
+            (By.XPATH, '//input[@type="file" and contains(@accept,"video/3gpp")]'),
+            (By.XPATH, '//input[@type="file" and contains(@accept,"video/quicktime")]'),
+        ]
+        self.STICKER_PANEL_LOCATORS = [
+            (By.XPATH, '//span[@data-icon="sticker"]'),
+            (By.XPATH, '//span[@data-icon="sticker-add"]'),
+            (By.XPATH, '//span[@data-icon="wds-ic-sticker"]'),
+            (By.XPATH, '//div[@data-testid="sticker-panel"]'),
+            (By.XPATH, '//*[@data-testid="sticker-maker"]'),
         ]
         self.MEDIA_PREVIEW_LOCATORS = [
             (By.XPATH, '//div[@data-testid="media-viewer"]'),
@@ -193,44 +194,339 @@ class WhatsAppBot:
                     continue
         return None
 
-    def _find_photo_video_input(self):
-        """Find the WhatsApp Photos/Videos file input, strictly avoiding sticker inputs.
-        
-        The real Photos/Videos input ALWAYS has video MIME types in its 'accept' attribute.
-        The sticker input NEVER accepts video files.
-        """
-        if not self.driver:
+    @staticmethod
+    def _file_input_signature(el):
+        try:
+            return (
+                el.get_attribute("name") or "",
+                el.get_attribute("id") or "",
+                el.get_attribute("accept") or "",
+            )
+        except Exception:
             return None
 
-        # Strategy 1: Try specific locators first
-        for by, value in self.PHOTO_VIDEO_INPUT_LOCATORS:
-            try:
-                elements = self.driver.find_elements(by, value)
-                for el in elements:
-                    try:
-                        accept = (el.get_attribute("accept") or "").lower().strip()
-                        if "video" in accept:
-                            return el
-                    except Exception:
-                        continue
-            except Exception:
-                continue
+    @staticmethod
+    def _accept_is_sticker_only(accept):
+        """Sticker maker accepts images only — never video/mp4/3gpp/quicktime."""
+        accept = (accept or "").lower()
+        if not accept:
+            return False
+        if "sticker" in accept:
+            return True
+        video_markers = ("video/mp4", "video/3gpp", "video/quicktime", "video/*")
+        if any(marker in accept for marker in video_markers):
+            return False
+        if "image" in accept:
+            return True
+        return False
 
-        # Strategy 2: Find ALL file inputs and pick the one that accepts video
+    @staticmethod
+    def _accept_is_photo_video(accept):
+        accept = (accept or "").lower()
+        return any(
+            marker in accept
+            for marker in ("video/mp4", "video/3gpp", "video/quicktime", "video/*")
+        )
+
+    @staticmethod
+    def _accept_is_document(accept):
+        accept = (accept or "").lower().strip()
+        if not accept:
+            return False
+        if WhatsAppBot._accept_is_sticker_only(accept):
+            return False
+        if WhatsAppBot._accept_is_photo_video(accept):
+            return False
+        return accept in ("*", "*/*") or ("image" not in accept and "video" not in accept)
+
+    def _snapshot_file_input_signatures(self):
+        try:
+            inputs = self.driver.find_elements(By.XPATH, '//input[@type="file"]')
+        except Exception:
+            return set()
+        signatures = set()
+        for el in inputs:
+            sig = self._file_input_signature(el)
+            if sig:
+                signatures.add(sig)
+        return signatures
+
+    def _classify_file_input(self, el):
+        try:
+            accept = el.get_attribute("accept") or ""
+            name = (el.get_attribute("name") or "").lower()
+            input_id = (el.get_attribute("id") or "").lower()
+        except Exception:
+            return None
+        if "sticker" in name or "sticker" in input_id or "sticker" in accept.lower():
+            return "sticker"
+        if self._accept_is_sticker_only(accept):
+            return "sticker"
+        if self._accept_is_photo_video(accept):
+            return "media"
+        if self._accept_is_document(accept):
+            return "document"
+        return None
+
+    def _find_file_input(self, kind, exclude_signatures=None):
+        exclude_signatures = exclude_signatures or set()
         try:
             inputs = self.driver.find_elements(By.XPATH, '//input[@type="file"]')
         except Exception:
             return None
 
         for el in inputs:
-            try:
-                accept = (el.get_attribute("accept") or "").lower().strip()
-                if "video" in accept:
-                    return el
-            except Exception:
+            sig = self._file_input_signature(el)
+            if not sig or sig in exclude_signatures:
                 continue
-
+            if self._classify_file_input(el) == kind:
+                return el
         return None
+
+    def _wait_for_new_file_input(self, kind, existing_signatures, timeout=8, stop_event=None):
+        end_time = time.time() + timeout
+        while time.time() < end_time:
+            if stop_event and stop_event.is_set():
+                return None
+            found = self._find_file_input(kind, exclude_signatures=existing_signatures)
+            if found:
+                return found
+            if stop_event:
+                stop_event.wait(0.25)
+            else:
+                time.sleep(0.25)
+        return self._find_file_input(kind)
+
+    def _attach_menu_option_locators(self, data_icon):
+        """Locators for attach dropdown items (menu opens inside/near footer)."""
+        locators = [
+            (By.XPATH, f'//li[.//span[@data-icon="{data_icon}"]]'),
+            (By.XPATH, f'//ul//span[@data-icon="{data_icon}"]'),
+            (By.CSS_SELECTOR, f'span[data-icon="{data_icon}"]'),
+        ]
+        if data_icon == "attach-image":
+            locators.extend([
+                (By.XPATH, '//*[contains(text(),"الصور ومقاطع الفيديو")]'),
+                (By.XPATH, '//*[contains(text(),"Photos & videos")]'),
+                (By.XPATH, '//*[contains(text(),"Photos and videos")]'),
+                (By.XPATH, '//*[contains(text(),"Photos & Videos")]'),
+                (By.XPATH, '//button[contains(@aria-label,"Photos")]'),
+                (By.XPATH, '//button[contains(@aria-label,"صور")]'),
+            ])
+        elif data_icon == "attach-document":
+            locators.extend([
+                (By.XPATH, '//*[contains(text(),"مستند")]'),
+                (By.XPATH, '//*[contains(text(),"Document")]'),
+                (By.XPATH, '//button[contains(@aria-label,"Document")]'),
+                (By.XPATH, '//button[contains(@aria-label,"مستند")]'),
+            ])
+        return locators
+
+    def _click_attach_menu_option(self, data_icon, timeout=10, stop_event=None):
+        """Click Photos/Videos or Document in the open attach menu."""
+        end_time = time.time() + timeout
+        while time.time() < end_time:
+            if stop_event and stop_event.is_set():
+                return False
+
+            for by, value in self._attach_menu_option_locators(data_icon):
+                try:
+                    elements = self.driver.find_elements(by, value)
+                except Exception:
+                    continue
+                for el in elements:
+                    try:
+                        if not el.is_displayed():
+                            continue
+                        if by in (By.CSS_SELECTOR, By.XPATH) and "data-icon" in value:
+                            icon = (el.get_attribute("data-icon") or "").strip()
+                            if icon and icon != data_icon:
+                                continue
+                        click_target = el
+                        if el.tag_name.lower() == "span":
+                            try:
+                                click_target = el.find_element(
+                                    By.XPATH, "./ancestor::li[1] | ./ancestor::div[@role='button'][1]"
+                                )
+                            except Exception:
+                                click_target = el
+                        if self._click_element(click_target):
+                            return True
+                    except Exception:
+                        continue
+
+            if stop_event:
+                stop_event.wait(0.3)
+            else:
+                time.sleep(0.3)
+        return False
+
+    def _sticker_panel_visible(self):
+        return self._find_best_clickable(self.STICKER_PANEL_LOCATORS) is not None
+
+    def _dismiss_sticker_panel(self):
+        try:
+            self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+            time.sleep(0.4)
+        except Exception:
+            pass
+
+    def _find_photo_video_input(self):
+        return self._find_file_input("media")
+
+    def _send_keys_to_file_input(self, input_el, path):
+        """Inject a local file path via send_keys only — never click the input (avoids OS file dialog)."""
+        if not input_el:
+            return False
+        abs_path = os.path.abspath(path)
+        if not os.path.isfile(abs_path):
+            return False
+        try:
+            self.driver.execute_script(
+                """
+                var el = arguments[0];
+                el.removeAttribute('hidden');
+                el.style.display = 'block';
+                el.style.visibility = 'visible';
+                el.style.opacity = '0';
+                el.style.position = 'fixed';
+                el.style.left = '0';
+                el.style.top = '0';
+                el.style.width = '1px';
+                el.style.height = '1px';
+                el.style.pointerEvents = 'none';
+                """,
+                input_el,
+            )
+        except Exception:
+            pass
+        try:
+            input_el.send_keys(abs_path)
+            return True
+        except Exception:
+            return False
+
+    def _dismiss_attach_menu(self):
+        try:
+            self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+            time.sleep(0.3)
+        except Exception:
+            pass
+
+    def _try_direct_file_injection(self, path, input_kind, stop_event=None):
+        """Send absolute path to an existing hidden file input (no attach menu clicks)."""
+        if stop_event and stop_event.is_set():
+            return "STOPPED"
+
+        if self._sticker_panel_visible():
+            self._dismiss_sticker_panel()
+
+        input_el = self._find_file_input(input_kind)
+        if not input_el or self._classify_file_input(input_el) != input_kind:
+            return False
+
+        if not self._send_keys_to_file_input(input_el, path):
+            return False
+
+        if stop_event:
+            stop_event.wait(0.6)
+        else:
+            time.sleep(0.6)
+
+        if self._sticker_panel_visible():
+            self._dismiss_sticker_panel()
+            return False
+
+        if input_kind == "media":
+            preview = self._find_any(self.MEDIA_PREVIEW_LOCATORS)
+            if not preview:
+                preview = self._wait_for_any(
+                    self.MEDIA_PREVIEW_LOCATORS, timeout=3, stop_event=stop_event
+                )
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
+            if not preview:
+                return False
+
+        return True
+
+    def _send_attachment_via_attach_menu(self, path, input_kind, stop_event=None):
+        """Open attach (+) only, locate hidden file input in DOM, inject path via send_keys.
+
+        Never clicks Photos/Document menu items or file inputs — those open the native OS picker.
+        """
+        for attempt in range(2):
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
+            try:
+                if self._sticker_panel_visible():
+                    self._dismiss_sticker_panel()
+
+                existing_signatures = self._snapshot_file_input_signatures()
+
+                attach_btn = self._find_best_clickable(self.ATTACH_BUTTON_LOCATORS)
+                if not attach_btn:
+                    return "ERR_ATTACH_BTN_NOT_FOUND"
+
+                self._click_element(attach_btn)
+                if stop_event:
+                    stop_event.wait(0.8)
+                else:
+                    time.sleep(0.8)
+
+                input_el = self._wait_for_new_file_input(
+                    input_kind,
+                    existing_signatures,
+                    timeout=6,
+                    stop_event=stop_event,
+                )
+                if not input_el:
+                    input_el = self._find_file_input(input_kind)
+
+                if not input_el or self._classify_file_input(input_el) != input_kind:
+                    self._dismiss_attach_menu()
+                    if attempt == 0:
+                        continue
+                    return "ERR_FILE_INPUT_NOT_FOUND"
+
+                if not self._send_keys_to_file_input(input_el, path):
+                    self._dismiss_attach_menu()
+                    if attempt == 0:
+                        continue
+                    return "ERR_FILE_INPUT_NOT_FOUND"
+
+                if stop_event:
+                    stop_event.wait(0.6)
+                else:
+                    time.sleep(0.6)
+
+                if input_kind == "media" and self._sticker_panel_visible():
+                    self._dismiss_attach_menu()
+                    if attempt == 0:
+                        self._dismiss_sticker_panel()
+                        continue
+                    return "ERR_STICKER_PANEL_OPENED"
+
+                if input_kind == "media" and not self._find_any(self.MEDIA_PREVIEW_LOCATORS):
+                    preview = self._wait_for_any(
+                        self.MEDIA_PREVIEW_LOCATORS, timeout=4, stop_event=stop_event
+                    )
+                    if not preview:
+                        self._dismiss_attach_menu()
+                        if attempt == 0:
+                            self._dismiss_sticker_panel()
+                            continue
+                        return "ERR_FILE_INPUT_NOT_FOUND"
+
+                return "SUCCESS"
+            except Exception as e:
+                self._dismiss_attach_menu()
+                if attempt == 0:
+                    self._dismiss_sticker_panel()
+                    continue
+                return f"ERR_ATTACH: {str(e)[:250]}"
+
+        return "ERR_FILE_INPUT_NOT_FOUND"
 
     def _wait_for_preview_close(self, timeout=5, poll=0.3, stop_event=None):
         end_time = time.time() + timeout
@@ -575,145 +871,44 @@ class WhatsAppBot:
         return False
 
     def _send_attachment(self, path, media_type, caption=None, stop_event=None):
-        """Send a file by injecting it directly into WhatsApp Web's hidden file input.
-        
-        Strategy: "Resilient Click & New Input Detection"
-        1. Snapshot all existing file inputs on the page.
-        2. Click the attach menu button '+'.
-        3. Click the target menu option (Photos & Videos or Document).
-        4. Detect the newly created <input type='file'> element that was just added to the DOM.
-        5. If that fails, fall back to locating using strict default locators.
-        """
+        """Send a file: direct hidden-input injection first, then attach-menu fallback."""
         if stop_event and stop_event.is_set():
             return "STOPPED"
+
+        if not path:
+            return "ERR_FILE_INPUT_NOT_FOUND"
+        path = os.path.abspath(path)
+        if not os.path.isfile(path):
+            return "ERR_FILE_INPUT_NOT_FOUND"
+
+        input_kind = "document" if media_type == "document" else "media"
+
+        direct_result = self._try_direct_file_injection(path, input_kind, stop_event=stop_event)
+        if direct_result == "STOPPED":
+            return "STOPPED"
+        if not direct_result:
+            menu_result = self._send_attachment_via_attach_menu(
+                path, input_kind, stop_event=stop_event
+            )
+            if menu_result != "SUCCESS":
+                return menu_result
+
         try:
-            # 1. Snapshot existing file inputs in the DOM to filter them out later
-            try:
-                existing_inputs = self.driver.find_elements(By.XPATH, '//input[@type="file"]')
-            except Exception:
-                existing_inputs = []
-
-            input_el = None
-
-            # 2. Click the attach button to open the menu
-            attach_btn = self._find_best_clickable(self.ATTACH_BUTTON_LOCATORS) or self._find_any(self.ATTACH_BUTTON_LOCATORS)
-            if not attach_btn:
-                return "ERR_ATTACH_BTN_NOT_FOUND"
-            
-            if stop_event and stop_event.is_set():
-                return "STOPPED"
-            
-            self._click_element(attach_btn)
-            
-            if stop_event:
-                stop_event.wait(0.8)
-            else:
-                time.sleep(0.8)
-
-            if media_type == 'document':
-                # === DOCUMENTS ===
-                doc_btn_locators = [
-                    (By.XPATH, '//span[@data-icon="attach-document"]'),
-                    (By.XPATH, '//li//*[contains(text(),"Document")]'),
-                    (By.XPATH, '//li//*[contains(text(),"مستند")]'),
-                    (By.CSS_SELECTOR, 'span[data-icon="attach-document"]'),
-                ]
-                if stop_event and stop_event.is_set():
-                    return "STOPPED"
-                doc_btn = self._find_any(doc_btn_locators)
-                if not doc_btn:
-                    return "ERR_DOC_BTN_NOT_FOUND"
-                
-                self._click_element(doc_btn)
-                
-                # 3. Detect the newly added input element
-                end_time = time.time() + 5
-                while time.time() < end_time and not input_el:
-                    if stop_event and stop_event.is_set():
-                        return "STOPPED"
-                    try:
-                        current_inputs = self.driver.find_elements(By.XPATH, '//input[@type="file"]')
-                        for el in current_inputs:
-                            if el not in existing_inputs:
-                                input_el = el
-                                break
-                    except Exception:
-                        pass
-                    if input_el:
-                        break
-                    if stop_event:
-                        stop_event.wait(0.3)
-                    else:
-                        time.sleep(0.3)
-
-                # Fallback to direct search if detection failed
-                if not input_el:
-                    input_el = self._find_any(self.FILE_INPUT_LOCATORS)
-            else:
-                # === IMAGES / VIDEOS ===
-                photo_btn_locators = [
-                    (By.XPATH, '//span[@data-icon="attach-image"]'),
-                    (By.CSS_SELECTOR, 'span[data-icon="attach-image"]'),
-                    (By.XPATH, '//li//*[contains(text(),"Photos")]'),
-                    (By.XPATH, '//li//*[contains(text(),"الصور")]'),
-                    (By.XPATH, '//li//*[contains(text(),"photo")]'),
-                    (By.XPATH, '//li//*[contains(text(),"Video")]'),
-                    (By.XPATH, '//li//*[contains(text(),"فيديو")]'),
-                    (By.XPATH, '//li//*[contains(text(),"صورة")]'),
-                    (By.XPATH, '//button[@aria-label="Photos & Videos"]'),
-                    (By.XPATH, '//button[contains(@aria-label,"Photos")]'),
-                    (By.XPATH, '//button[contains(@aria-label,"صور")]'),
-                ]
-                if stop_event and stop_event.is_set():
-                    return "STOPPED"
-                photo_btn = self._find_any(photo_btn_locators)
-                if not photo_btn:
-                    return "ERR_PHOTO_BTN_NOT_FOUND"
-                
-                self._click_element(photo_btn)
-                
-                # 3. Detect the newly added input element
-                end_time = time.time() + 5
-                while time.time() < end_time and not input_el:
-                    if stop_event and stop_event.is_set():
-                        return "STOPPED"
-                    try:
-                        current_inputs = self.driver.find_elements(By.XPATH, '//input[@type="file"]')
-                        for el in current_inputs:
-                            if el not in existing_inputs:
-                                input_el = el
-                                break
-                    except Exception:
-                        pass
-                    if input_el:
-                        break
-                    if stop_event:
-                        stop_event.wait(0.3)
-                    else:
-                        time.sleep(0.3)
-
-                # Fallback to strict direct search if detection failed
-                if not input_el:
-                    input_el = self._find_photo_video_input()
-
-            if not input_el:
-                return "ERR_FILE_INPUT_NOT_FOUND"
-
-            # Send file path directly to the input element
-            input_el.send_keys(path)
-
-            # Wait for Preview
-            if media_type == 'document':
-                send_btn = self._find_best_clickable(self.SEND_BUTTON_LOCATORS) or self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=15, stop_event=stop_event)
+            if media_type == "document":
+                send_btn = (
+                    self._find_best_clickable(self.SEND_BUTTON_LOCATORS)
+                    or self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=15, stop_event=stop_event)
+                )
                 if not send_btn:
                     return "ERR_DOC_SEND_BTN_NOT_FOUND"
             else:
-                # Media Preview
                 self._wait_for_any(self.MEDIA_PREVIEW_LOCATORS, timeout=40, stop_event=stop_event)
                 if stop_event and stop_event.is_set():
                     return "STOPPED"
                 if caption:
-                    caption_box = self._wait_for_any(self.CAPTION_BOX_LOCATORS, timeout=10, stop_event=stop_event)
+                    caption_box = self._wait_for_any(
+                        self.CAPTION_BOX_LOCATORS, timeout=10, stop_event=stop_event
+                    )
                     if caption_box:
                         if stop_event:
                             stop_event.wait(0.5)
@@ -727,7 +922,10 @@ class WhatsAppBot:
                         else:
                             time.sleep(1.0)
 
-                send_btn = self._find_best_clickable(self.SEND_BUTTON_LOCATORS) or self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=15, stop_event=stop_event)
+                send_btn = (
+                    self._find_best_clickable(self.SEND_BUTTON_LOCATORS)
+                    or self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=15, stop_event=stop_event)
+                )
 
             if not send_btn:
                 return "ERR_SEND_BTN_NOT_FOUND"
@@ -737,7 +935,6 @@ class WhatsAppBot:
 
             self.driver.execute_script("arguments[0].click();", send_btn)
 
-            # Wait for upload/processing — dynamic based on file size
             file_size = os.path.getsize(path) if os.path.exists(path) else 0
             wait_time = max(3, min(30, file_size // (1024 * 1024)))
             if stop_event:
@@ -745,15 +942,12 @@ class WhatsAppBot:
             else:
                 time.sleep(wait_time)
 
-            # Close preview if stuck
-            if media_type != 'document':
+            if media_type != "document":
                 self._wait_for_preview_close(timeout=10, stop_event=stop_event)
 
             return "SUCCESS"
-
         except Exception as e:
             return f"ERR_ATTACH: {str(e)[:250]}"
-            return f"ERR_ATTACH_{media_type.upper()}: {str(e)[:250]}"
 
     def _set_clipboard_text(self, text):
         """Sets Unicode text to the Windows clipboard using ctypes."""

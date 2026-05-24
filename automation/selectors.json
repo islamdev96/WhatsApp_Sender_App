@@ -36,25 +36,29 @@
     { "by": "xpath", "value": "//div[@role=\"dialog\"]//div[@role=\"button\" and contains(@aria-label,\"Send\")]" }
   ],
   "ATTACH_BUTTON_LOCATORS": [
+    { "by": "css", "value": "footer span[data-icon=\"attach-menu-plus\"]" },
     { "by": "xpath", "value": "//footer//span[@data-icon=\"attach-menu-plus\"]" },
-    { "by": "xpath", "value": "//footer//span[@data-icon=\"plus\"]" },
-    { "by": "xpath", "value": "//footer//span[@data-icon=\"plus-large\"]" },
+    { "by": "css", "value": "footer span[data-icon*=\"clip\"]" },
     { "by": "xpath", "value": "//footer//span[@data-icon=\"clip\"]" },
     { "by": "xpath", "value": "//footer//span[@data-icon=\"clip-light\"]" },
     { "by": "xpath", "value": "//footer//div[@title=\"Attach\"]" },
     { "by": "xpath", "value": "//footer//div[@title=\"إرفاق\"]" },
     { "by": "xpath", "value": "//footer//*[@aria-label=\"Attach\"]" },
-    { "by": "xpath", "value": "//footer//*[@aria-label=\"إرفاق\"]" },
-    { "by": "css",  "value": "footer span[data-icon=\"attach-menu-plus\"]" },
-    { "by": "css",  "value": "footer span[data-icon*=\"clip\"]" },
-    { "by": "css",  "value": "footer button[data-testid*=\"clip\"]" }
+    { "by": "xpath", "value": "//footer//*[@aria-label=\"إرفاق\"]" }
   ],
   "FILE_INPUT_LOCATORS": [
     { "by": "xpath", "value": "//input[@type=\"file\" and @accept=\"*\"]" },
     { "by": "xpath", "value": "//input[@type=\"file\" and not(contains(@accept,\"image\")) and not(contains(@accept,\"video\"))]" }
   ],
   "PHOTO_VIDEO_INPUT_LOCATORS": [
-    { "by": "xpath", "value": "//input[@type=\"file\" and contains(@accept,\"video\")]" }
+    { "by": "xpath", "value": "//input[@type=\"file\" and contains(@accept,\"video/mp4\")]" },
+    { "by": "xpath", "value": "//input[@type=\"file\" and contains(@accept,\"video/3gpp\")]" },
+    { "by": "xpath", "value": "//input[@type=\"file\" and contains(@accept,\"video/quicktime\")]" }
+  ],
+  "STICKER_PANEL_LOCATORS": [
+    { "by": "xpath", "value": "//span[@data-icon=\"sticker\"]" },
+    { "by": "xpath", "value": "//span[@data-icon=\"sticker-add\"]" },
+    { "by": "xpath", "value": "//span[@data-icon=\"wds-ic-sticker\"]" }
   ],
   "MEDIA_PREVIEW_LOCATORS": [
     { "by": "xpath", "value": "//div[@data-testid=\"media-viewer\"]" },
