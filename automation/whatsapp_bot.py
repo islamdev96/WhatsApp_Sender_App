@@ -548,102 +548,153 @@ class WhatsAppBot:
         except Exception as e:
             return f"ERR_GENERAL: {str(e)[:250]}"
 
+    def _click_element(self, element):
+        """Clicks an element using a highly resilient sequence of strategies:
+        1. Native click (best for React/Vue synthetic events)
+        2. ActionChains click (simulates real mouse movement and click)
+        3. JavaScript click (fallback for obscured/intercepted elements)
+        """
+        if not element:
+            return False
+        try:
+            element.click()
+            return True
+        except Exception:
+            pass
+        try:
+            from selenium.webdriver.common.action_chains import ActionChains
+            ActionChains(self.driver).move_to_element(element).click().perform()
+            return True
+        except Exception:
+            pass
+        try:
+            self.driver.execute_script("arguments[0].click();", element)
+            return True
+        except Exception:
+            pass
+        return False
+
     def _send_attachment(self, path, media_type, caption=None, stop_event=None):
         """Send a file by injecting it directly into WhatsApp Web's hidden file input.
         
-        Strategy: "Direct Input First"
-        1. Try to find hidden <input type='file'> elements already in the DOM
-           and send_keys() directly — no button clicking needed.
-        2. Only if direct injection fails, fall back to clicking the attach button.
-        
-        This is faster, more reliable, and avoids the emoji panel bug.
+        Strategy: "Resilient Click & New Input Detection"
+        1. Snapshot all existing file inputs on the page.
+        2. Click the attach menu button '+'.
+        3. Click the target menu option (Photos & Videos or Document).
+        4. Detect the newly created <input type='file'> element that was just added to the DOM.
+        5. If that fails, fall back to locating using strict default locators.
         """
         if stop_event and stop_event.is_set():
             return "STOPPED"
         try:
+            # 1. Snapshot existing file inputs in the DOM to filter them out later
+            try:
+                existing_inputs = self.driver.find_elements(By.XPATH, '//input[@type="file"]')
+            except Exception:
+                existing_inputs = []
+
             input_el = None
+
+            # 2. Click the attach button to open the menu
+            attach_btn = self._find_best_clickable(self.ATTACH_BUTTON_LOCATORS) or self._find_any(self.ATTACH_BUTTON_LOCATORS)
+            if not attach_btn:
+                return "ERR_ATTACH_BTN_NOT_FOUND"
+            
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
+            
+            self._click_element(attach_btn)
+            
+            if stop_event:
+                stop_event.wait(0.8)
+            else:
+                time.sleep(0.8)
 
             if media_type == 'document':
                 # === DOCUMENTS ===
-                # Strategy 1: Direct — find document file input in DOM
-                input_el = self._find_any(self.FILE_INPUT_LOCATORS)
-
-                # Strategy 2: Fallback — click attach → document menu
-                if not input_el:
-                    attach_btn = self._find_best_clickable(self.ATTACH_BUTTON_LOCATORS) or self._find_any(self.ATTACH_BUTTON_LOCATORS)
-                    if not attach_btn:
-                        return "ERR_ATTACH_BTN_NOT_FOUND"
+                doc_btn_locators = [
+                    (By.XPATH, '//span[@data-icon="attach-document"]'),
+                    (By.XPATH, '//li//*[contains(text(),"Document")]'),
+                    (By.XPATH, '//li//*[contains(text(),"مستند")]'),
+                    (By.CSS_SELECTOR, 'span[data-icon="attach-document"]'),
+                ]
+                if stop_event and stop_event.is_set():
+                    return "STOPPED"
+                doc_btn = self._find_any(doc_btn_locators)
+                if not doc_btn:
+                    return "ERR_DOC_BTN_NOT_FOUND"
+                
+                self._click_element(doc_btn)
+                
+                # 3. Detect the newly added input element
+                end_time = time.time() + 5
+                while time.time() < end_time and not input_el:
                     if stop_event and stop_event.is_set():
                         return "STOPPED"
-                    self.driver.execute_script("arguments[0].click();", attach_btn)
+                    try:
+                        current_inputs = self.driver.find_elements(By.XPATH, '//input[@type="file"]')
+                        for el in current_inputs:
+                            if el not in existing_inputs:
+                                input_el = el
+                                break
+                    except Exception:
+                        pass
+                    if input_el:
+                        break
                     if stop_event:
-                        stop_event.wait(1.0)
+                        stop_event.wait(0.3)
                     else:
-                        time.sleep(1.0)
+                        time.sleep(0.3)
 
-                    doc_btn_locators = [
-                        (By.XPATH, '//span[@data-icon="attach-document"]'),
-                        (By.XPATH, '//li//*[contains(text(),"Document")]'),
-                        (By.XPATH, '//li//*[contains(text(),"مستند")]'),
-                        (By.CSS_SELECTOR, 'span[data-icon="attach-document"]'),
-                    ]
-                    if stop_event and stop_event.is_set():
-                        return "STOPPED"
-                    doc_btn = self._find_any(doc_btn_locators)
-                    if doc_btn:
-                        self.driver.execute_script("arguments[0].click();", doc_btn)
-
-                    input_el = self._wait_for_any(self.FILE_INPUT_LOCATORS, timeout=5, stop_event=stop_event)
+                # Fallback to direct search if detection failed
+                if not input_el:
+                    input_el = self._find_any(self.FILE_INPUT_LOCATORS)
             else:
                 # === IMAGES / VIDEOS ===
-                # Strategy 1: Direct — find the photo/video file input in DOM
-                input_el = self._find_photo_video_input()
-
-                # Strategy 2: Fallback — click attach → photos menu
-                if not input_el:
-                    attach_btn = self._find_best_clickable(self.ATTACH_BUTTON_LOCATORS) or self._find_any(self.ATTACH_BUTTON_LOCATORS)
-                    if not attach_btn:
-                        return "ERR_ATTACH_BTN_NOT_FOUND"
+                photo_btn_locators = [
+                    (By.XPATH, '//span[@data-icon="attach-image"]'),
+                    (By.CSS_SELECTOR, 'span[data-icon="attach-image"]'),
+                    (By.XPATH, '//li//*[contains(text(),"Photos")]'),
+                    (By.XPATH, '//li//*[contains(text(),"الصور")]'),
+                    (By.XPATH, '//li//*[contains(text(),"photo")]'),
+                    (By.XPATH, '//li//*[contains(text(),"Video")]'),
+                    (By.XPATH, '//li//*[contains(text(),"فيديو")]'),
+                    (By.XPATH, '//li//*[contains(text(),"صورة")]'),
+                    (By.XPATH, '//button[@aria-label="Photos & Videos"]'),
+                    (By.XPATH, '//button[contains(@aria-label,"Photos")]'),
+                    (By.XPATH, '//button[contains(@aria-label,"صور")]'),
+                ]
+                if stop_event and stop_event.is_set():
+                    return "STOPPED"
+                photo_btn = self._find_any(photo_btn_locators)
+                if not photo_btn:
+                    return "ERR_PHOTO_BTN_NOT_FOUND"
+                
+                self._click_element(photo_btn)
+                
+                # 3. Detect the newly added input element
+                end_time = time.time() + 5
+                while time.time() < end_time and not input_el:
                     if stop_event and stop_event.is_set():
                         return "STOPPED"
-                    self.driver.execute_script("arguments[0].click();", attach_btn)
+                    try:
+                        current_inputs = self.driver.find_elements(By.XPATH, '//input[@type="file"]')
+                        for el in current_inputs:
+                            if el not in existing_inputs:
+                                input_el = el
+                                break
+                    except Exception:
+                        pass
+                    if input_el:
+                        break
                     if stop_event:
-                        stop_event.wait(1.0)
+                        stop_event.wait(0.3)
                     else:
-                        time.sleep(1.0)
+                        time.sleep(0.3)
 
-                    photo_btn_locators = [
-                        (By.XPATH, '//span[@data-icon="attach-image"]'),
-                        (By.CSS_SELECTOR, 'span[data-icon="attach-image"]'),
-                        (By.XPATH, '//li//*[contains(text(),"Photos")]'),
-                        (By.XPATH, '//li//*[contains(text(),"الصور")]'),
-                        (By.XPATH, '//li//*[contains(text(),"photo")]'),
-                        (By.XPATH, '//li//*[contains(text(),"Video")]'),
-                        (By.XPATH, '//li//*[contains(text(),"فيديو")]'),
-                        (By.XPATH, '//button[@aria-label="Photos & Videos"]'),
-                        (By.XPATH, '//button[contains(@aria-label,"Photos")]'),
-                        (By.XPATH, '//button[contains(@aria-label,"صور")]'),
-                    ]
-                    photo_btn = self._find_any(photo_btn_locators)
-                    if photo_btn:
-                        self.driver.execute_script("arguments[0].click();", photo_btn)
-                        if stop_event:
-                            stop_event.wait(1.0)
-                        else:
-                            time.sleep(1.0)
-
-                    # Now try to find the input again after menu opened
-                    end_time = time.time() + 5
-                    while time.time() < end_time and not input_el:
-                        if stop_event and stop_event.is_set():
-                            return "STOPPED"
-                        input_el = self._find_photo_video_input()
-                        if input_el:
-                            break
-                        if stop_event:
-                            stop_event.wait(0.3)
-                        else:
-                            time.sleep(0.3)
+                # Fallback to strict direct search if detection failed
+                if not input_el:
+                    input_el = self._find_photo_video_input()
 
             if not input_el:
                 return "ERR_FILE_INPUT_NOT_FOUND"
