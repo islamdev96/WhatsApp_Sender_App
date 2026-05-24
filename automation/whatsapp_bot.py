@@ -34,13 +34,29 @@ class WhatsAppBot:
         ]
         self.CHAT_INPUT_LOCATORS = [
             (By.XPATH, '//footer//div[@contenteditable="true"][@role="textbox"]'),
-            (By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'),
-            (By.XPATH, '//div[@contenteditable="true" and contains(@class,"copyable-text")]'),
+            (By.XPATH, '//footer//div[@contenteditable="true"][@data-tab="10"]'),
+            (By.XPATH, '//footer//div[@contenteditable="true" and contains(@class,"copyable-text")]'),
         ]
         self.CAPTION_BOX_LOCATORS = [
-            (By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'),
-            (By.XPATH, '//div[@contenteditable="true" and contains(@class,"copyable-text")]'),
-            (By.XPATH, '//div[@contenteditable="true" and @data-testid="media-caption-input-container"]'),
+            (By.XPATH, '//div[@data-testid="media-viewer"]//div[@data-testid="media-caption-input-container"]//div[@contenteditable="true"]'),
+            (By.XPATH, '//div[@data-testid="media-viewer"]//div[@contenteditable="true"][@role="textbox"]'),
+            (By.XPATH, '//div[@role="dialog"]//div[@data-testid="media-caption-input-container"]//div[@contenteditable="true"]'),
+            (By.XPATH, '//div[@role="dialog"][.//img or .//video]//div[@contenteditable="true"][@role="textbox"]'),
+            (By.XPATH, '//div[@role="dialog"]//*[@data-testid="media-caption-input-container"]//div[@contenteditable="true"]'),
+        ]
+        self.MEDIA_PREVIEW_SEND_BUTTON_LOCATORS = [
+            (By.XPATH, '//div[@data-testid="media-viewer"]//span[@data-icon="send"]'),
+            (By.XPATH, '//div[@data-testid="media-viewer"]//span[@data-icon="send-light"]'),
+            (By.XPATH, '//div[@data-testid="media-viewer"]//button[@aria-label="Send"]'),
+            (By.XPATH, '//div[@data-testid="media-viewer"]//button[@aria-label="إرسال"]'),
+            (By.XPATH, '//div[@data-testid="media-viewer"]//div[@role="button" and @aria-label="Send"]'),
+            (By.XPATH, '//div[@data-testid="media-viewer"]//div[@role="button" and @aria-label="إرسال"]'),
+            (By.XPATH, '//div[@role="dialog"]//span[@data-icon="send"]'),
+            (By.XPATH, '//div[@role="dialog"]//span[@data-icon="send-light"]'),
+            (By.XPATH, '//div[@role="dialog"]//button[@aria-label="Send"]'),
+            (By.XPATH, '//div[@role="dialog"]//button[@aria-label="إرسال"]'),
+            (By.XPATH, '//div[@role="dialog"]//div[@role="button" and @aria-label="Send"]'),
+            (By.XPATH, '//div[@role="dialog"]//div[@role="button" and @aria-label="إرسال"]'),
         ]
         self.SEND_BUTTON_LOCATORS = [
             (By.XPATH, '//span[@data-icon="send"]'),
@@ -283,6 +299,124 @@ class WhatsAppBot:
                 return el
         return None
 
+    def _find_file_input_in_attach_menu(self, kind):
+        """Locate file input nested under the matching attach-menu row."""
+        icon = "attach-document" if kind == "document" else "attach-image"
+        xpaths = [
+            f'//footer//li[.//span[@data-icon="{icon}"]]//input[@type="file"]',
+            f'//li[.//span[@data-icon="{icon}"]]//input[@type="file"]',
+            f'//*[.//span[@data-icon="{icon}"]]//input[@type="file"]',
+        ]
+        for xpath in xpaths:
+            try:
+                for el in self.driver.find_elements(By.XPATH, xpath):
+                    if self._classify_file_input(el) == kind:
+                        return el
+            except Exception:
+                continue
+        return None
+
+    def _wait_for_file_input_in_attach_menu(self, kind, timeout=3, stop_event=None):
+        end_time = time.time() + timeout
+        while time.time() < end_time:
+            if stop_event and stop_event.is_set():
+                return None
+            found = self._find_file_input_in_attach_menu(kind)
+            if found:
+                return found
+            if stop_event:
+                stop_event.wait(0.2)
+            else:
+                time.sleep(0.2)
+        return None
+
+    def _js_activate_attach_menu_option(self, data_icon):
+        """Activate Photos/Document row via JS on the menu <li>, not Selenium click on <input>.
+
+        Blocks bubbling clicks on the nested file input so the native OS picker does not open.
+        """
+        script = """
+        var icon = arguments[0];
+        function isVisible(el) {
+            if (!el) return false;
+            var st = window.getComputedStyle(el);
+            return st.display !== 'none' && st.visibility !== 'hidden' && el.offsetParent !== null;
+        }
+        function blockInputPicker(inp) {
+            if (!inp) return;
+            var block = function(e) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                return false;
+            };
+            inp.addEventListener('click', block, true);
+            inp.addEventListener('mousedown', block, true);
+        }
+        var roots = [];
+        var footer = document.querySelector('footer');
+        if (footer) roots.push(footer);
+        roots.push(document.body);
+        for (var r = 0; r < roots.length; r++) {
+            var spans = roots[r].querySelectorAll('span[data-icon="' + icon + '"]');
+            for (var i = 0; i < spans.length; i++) {
+                var span = spans[i];
+                if (!isVisible(span)) continue;
+                var row = span.closest('li')
+                    || span.closest('[role="button"]')
+                    || span.closest('div[tabindex]')
+                    || span.parentElement;
+                if (!row || !isVisible(row)) continue;
+                blockInputPicker(row.querySelector('input[type="file"]'));
+                ['mousedown', 'mouseup', 'click'].forEach(function(type) {
+                    row.dispatchEvent(new MouseEvent(type, {
+                        bubbles: true,
+                        cancelable: true,
+                        view: window
+                    }));
+                });
+                return true;
+            }
+        }
+        return false;
+        """
+        try:
+            return bool(self.driver.execute_script(script, data_icon))
+        except Exception:
+            return False
+
+    def _expose_attach_file_input(self, input_kind, existing_signatures, stop_event=None):
+        """After attach (+) is open: find or activate the correct hidden file input."""
+        data_icon = "attach-document" if input_kind == "document" else "attach-image"
+
+        input_el = self._wait_for_file_input_in_attach_menu(
+            input_kind, timeout=1.2, stop_event=stop_event
+        )
+        if input_el:
+            return input_el
+
+        if self._js_activate_attach_menu_option(data_icon):
+            if stop_event:
+                stop_event.wait(0.5)
+            else:
+                time.sleep(0.5)
+
+        input_el = self._wait_for_file_input_in_attach_menu(
+            input_kind, timeout=2.5, stop_event=stop_event
+        )
+        if input_el:
+            return input_el
+
+        input_el = self._wait_for_new_file_input(
+            input_kind,
+            existing_signatures,
+            timeout=5,
+            stop_event=stop_event,
+        )
+        if input_el:
+            return input_el
+
+        return self._find_file_input(input_kind)
+
     def _wait_for_new_file_input(self, kind, existing_signatures, timeout=8, stop_event=None):
         end_time = time.time() + timeout
         while time.time() < end_time:
@@ -323,10 +457,7 @@ class WhatsAppBot:
         return locators
 
     def _click_attach_menu_option(self, data_icon, timeout=10, stop_event=None):
-        """Legacy: clicking Photos/Document menu items opens the native OS file picker.
-
-        Unused by attachment send — kept for reference. Use _send_attachment_via_attach_menu instead.
-        """
+        """Fallback: activate Photos/Document row (prefers JS to avoid native file picker)."""
         end_time = time.time() + timeout
         while time.time() < end_time:
             if stop_event and stop_event.is_set():
@@ -353,8 +484,15 @@ class WhatsAppBot:
                                 )
                             except Exception:
                                 click_target = el
-                        if self._click_element(click_target):
+                        if self._js_activate_attach_menu_option(data_icon):
                             return True
+                        try:
+                            if self.driver.execute_script(
+                                "arguments[0].click();", click_target
+                            ):
+                                return True
+                        except Exception:
+                            pass
                     except Exception:
                         continue
 
@@ -454,10 +592,8 @@ class WhatsAppBot:
         return True
 
     def _send_attachment_via_attach_menu(self, path, input_kind, stop_event=None):
-        """Open attach (+) only, locate hidden file input in DOM, inject path via send_keys.
-
-        Never clicks Photos/Document menu items or file inputs — those open the native OS picker.
-        """
+        """Hybrid attach: (+) -> expose correct input (DOM or JS menu row) -> send_keys only."""
+        data_icon = "attach-document" if input_kind == "document" else "attach-image"
         for attempt in range(2):
             if stop_event and stop_event.is_set():
                 return "STOPPED"
@@ -477,14 +613,23 @@ class WhatsAppBot:
                 else:
                     time.sleep(0.8)
 
-                input_el = self._wait_for_new_file_input(
+                input_el = self._expose_attach_file_input(
                     input_kind,
                     existing_signatures,
-                    timeout=6,
                     stop_event=stop_event,
                 )
-                if not input_el:
-                    input_el = self._find_file_input(input_kind)
+                if not input_el and self._click_attach_menu_option(
+                    data_icon, timeout=4, stop_event=stop_event
+                ):
+                    if stop_event:
+                        stop_event.wait(0.5)
+                    else:
+                        time.sleep(0.5)
+                    input_el = self._expose_attach_file_input(
+                        input_kind,
+                        existing_signatures,
+                        stop_event=stop_event,
+                    )
 
                 if not input_el or self._classify_file_input(input_el) != input_kind:
                     self._dismiss_attach_menu()
@@ -543,6 +688,24 @@ class WhatsAppBot:
             else:
                 time.sleep(poll)
         return False
+
+    def _wait_for_chat_ready_after_attachments(self, stop_event=None):
+        """Wait for media preview to close and footer chat input before a follow-up text."""
+        if stop_event and stop_event.is_set():
+            return "STOPPED"
+        self._wait_for_preview_close(timeout=12, stop_event=stop_event)
+        if stop_event and stop_event.is_set():
+            return "STOPPED"
+        chat_input = self._wait_for_any(
+            self.CHAT_INPUT_LOCATORS, timeout=20, stop_event=stop_event
+        )
+        if not chat_input:
+            return "ERR_CHAT_INPUT_NOT_FOUND"
+        if stop_event:
+            stop_event.wait(0.5)
+        else:
+            time.sleep(0.5)
+        return "SUCCESS"
 
     def _wait_for_chat_or_invalid(self, timeout=60, poll=0.5, stop_event=None):
         end_time = time.time() + timeout
@@ -707,7 +870,7 @@ class WhatsAppBot:
             except:
                 pass
 
-    def send_message(self, phone, name, message_template, attachments=None, extra_messages=None, stop_event=None, send_text_with_image=True):
+    def send_message(self, phone, name, message_template, attachments=None, extra_messages=None, stop_event=None, send_text_with_image=False):
         """Sends a message and optionally multiple attachments (image, video, document)."""
         if stop_event and stop_event.is_set():
             return "STOPPED"
@@ -754,13 +917,15 @@ class WhatsAppBot:
 
             # 3. Send Content
             # Strategy:
-            # - If attachments exist:
-            #   - Send 1st attachment WITH the message as caption.
-            #   - Send subsequent attachments (no caption).
-            # - If no attachments:
-            #   - Send text message.
+            # - With attachments + message:
+            #   - send_text_with_image=False (default): send each attachment without message
+            #     caption, then send message as a separate chat message (press send twice).
+            #   - send_text_with_image=True: merge message into first attachment caption.
+            # - Without attachments: text only.
             
             if attachments:
+                use_caption_mode = bool(send_text_with_image and message)
+
                 for i, att in enumerate(attachments):
                     if stop_event and stop_event.is_set():
                         return "STOPPED"
@@ -768,24 +933,41 @@ class WhatsAppBot:
                     path = att.get("path")
                     type_ = att.get("type", "image")
                     
-                    # Determine caption: prefer per-attachment caption, else first attachment uses message
+                    # Caption: per-attachment only, or message on first item in caption mode
                     raw_caption = att.get("caption")
                     caption = None
                     if raw_caption:
                         caption = str(raw_caption).replace("{name}", name).strip()
-                    elif i == 0 and message and send_text_with_image:
+                    elif use_caption_mode and i == 0:
                         caption = message
                     
-                    # Perform Attachment
                     res = self._send_attachment(path, type_, caption, stop_event=stop_event)
                     if res != "SUCCESS":
-                        return res # Fail fast or continue? Fail fast is safer for now.
+                        return res
+
+                    if (
+                        use_caption_mode
+                        and i == 0
+                        and caption
+                        and self._footer_chat_input_text()
+                    ):
+                        text_res = self._send_caption_fallback_text(
+                            caption, stop_event=stop_event
+                        )
+                        if text_res != "SUCCESS":
+                            return text_res
                     
                     if stop_event:
                         stop_event.wait(2)
                     else:
                         time.sleep(2)
+
                 if message and not send_text_with_image:
+                    ready = self._wait_for_chat_ready_after_attachments(stop_event=stop_event)
+                    if ready == "STOPPED":
+                        return "STOPPED"
+                    if ready != "SUCCESS":
+                        return ready
                     text_res = self._send_text(message, stop_event=stop_event)
                     if text_res != "SUCCESS":
                         return text_res
@@ -846,6 +1028,72 @@ class WhatsAppBot:
             return "ERR_TIMEOUT"
         except Exception as e:
             return f"ERR_GENERAL: {str(e)[:250]}"
+
+    def _get_contenteditable_text(self, element):
+        if not element:
+            return ""
+        try:
+            text = (element.text or "").strip()
+            if text:
+                return text
+            text = (element.get_attribute("innerText") or "").strip()
+            if text:
+                return text
+            return (self.driver.execute_script(
+                "return (arguments[0].innerText || arguments[0].textContent || '').trim();",
+                element,
+            ) or "").strip()
+        except Exception:
+            return ""
+
+    def _find_footer_chat_input(self):
+        return self._find_best_clickable(self.CHAT_INPUT_LOCATORS) or self._find_any(
+            self.CHAT_INPUT_LOCATORS
+        )
+
+    def _footer_chat_input_text(self):
+        chat_input = self._find_footer_chat_input()
+        if not chat_input:
+            return ""
+        return self._get_contenteditable_text(chat_input)
+
+    def _caption_text_matches(self, caption_box, expected):
+        if not expected:
+            return True
+        actual = self._get_contenteditable_text(caption_box)
+        if not actual:
+            return False
+        if actual == expected:
+            return True
+        # Long captions may truncate in DOM reads; prefix match is enough.
+        shorter, longer = (actual, expected) if len(actual) <= len(expected) else (expected, actual)
+        return longer.startswith(shorter) and len(shorter) >= min(40, len(longer) // 2)
+
+    def _wait_for_media_caption_box(self, timeout=12, stop_event=None):
+        if not self._wait_for_any(
+            self.MEDIA_PREVIEW_LOCATORS, timeout=timeout, stop_event=stop_event
+        ):
+            return None
+        return self._wait_for_any(
+            self.CAPTION_BOX_LOCATORS, timeout=timeout, stop_event=stop_event
+        )
+
+    def _find_preview_send_button(self, stop_event=None):
+        send_btn = self._find_best_clickable(self.MEDIA_PREVIEW_SEND_BUTTON_LOCATORS)
+        if send_btn:
+            return send_btn
+        return self._wait_for_any(
+            self.MEDIA_PREVIEW_SEND_BUTTON_LOCATORS, timeout=10, stop_event=stop_event
+        )
+
+    def _send_caption_fallback_text(self, caption, stop_event=None):
+        if stop_event and stop_event.is_set():
+            return "STOPPED"
+        leftover = self._footer_chat_input_text()
+        text_to_send = leftover if leftover else caption
+        if not text_to_send:
+            return "SUCCESS"
+        return self._send_text(text_to_send, stop_event=stop_event)
 
     def _click_element(self, element):
         """Clicks an element using a highly resilient sequence of strategies:
@@ -908,11 +1156,15 @@ class WhatsAppBot:
                 self._wait_for_any(self.MEDIA_PREVIEW_LOCATORS, timeout=40, stop_event=stop_event)
                 if stop_event and stop_event.is_set():
                     return "STOPPED"
+
+                caption_applied = True
                 if caption:
-                    caption_box = self._wait_for_any(
-                        self.CAPTION_BOX_LOCATORS, timeout=10, stop_event=stop_event
+                    caption_box = self._wait_for_media_caption_box(
+                        timeout=12, stop_event=stop_event
                     )
-                    if caption_box:
+                    if not caption_box:
+                        caption_applied = False
+                    else:
                         if stop_event:
                             stop_event.wait(0.5)
                         else:
@@ -921,14 +1173,19 @@ class WhatsAppBot:
                             return "STOPPED"
                         self._enter_text(caption_box, caption, stop_event=stop_event)
                         if stop_event:
-                            stop_event.wait(1.0)
+                            stop_event.wait(0.8)
                         else:
-                            time.sleep(1.0)
+                            time.sleep(0.8)
+                        caption_applied = self._caption_text_matches(caption_box, caption)
 
-                send_btn = (
-                    self._find_best_clickable(self.SEND_BUTTON_LOCATORS)
-                    or self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=15, stop_event=stop_event)
-                )
+                send_btn = self._find_preview_send_button(stop_event=stop_event)
+                if not send_btn:
+                    send_btn = (
+                        self._find_best_clickable(self.SEND_BUTTON_LOCATORS)
+                        or self._wait_for_any(
+                            self.SEND_BUTTON_LOCATORS, timeout=15, stop_event=stop_event
+                        )
+                    )
 
             if not send_btn:
                 return "ERR_SEND_BTN_NOT_FOUND"
@@ -947,6 +1204,12 @@ class WhatsAppBot:
 
             if media_type != "document":
                 self._wait_for_preview_close(timeout=10, stop_event=stop_event)
+                if caption and (not caption_applied or self._footer_chat_input_text()):
+                    fallback = self._send_caption_fallback_text(
+                        caption, stop_event=stop_event
+                    )
+                    if fallback != "SUCCESS":
+                        return fallback
 
             return "SUCCESS"
         except Exception as e:

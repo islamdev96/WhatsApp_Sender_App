@@ -12,7 +12,7 @@ DEFAULT_CONFIG = {
     "last_image_file": "",
     "last_attachments": [],
     "last_message": "",
-    "send_text_with_image": True,
+    "send_text_with_image": False,
     "background_mode": False,
     "delay_min": 30,
     "delay_max": 120,

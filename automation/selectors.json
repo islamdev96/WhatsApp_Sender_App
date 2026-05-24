@@ -13,14 +13,18 @@
     { "by": "xpath", "value": "//div[@contenteditable=\"true\" and @title=\"Search input textbox\"]" }
   ],
   "CHAT_INPUT_LOCATORS": [
-    { "by": "xpath", "value": "//footer//div[@contenteditable=\"true\"][@role=\"textbox\"]" },
-    { "by": "xpath", "value": "//div[@contenteditable=\"true\"][@data-tab=\"10\"]" },
-    { "by": "xpath", "value": "//div[@contenteditable=\"true\" and contains(@class,\"copyable-text\")]" }
+    { "by": "xpath", "value": "//footer//div[@contenteditable=\"true\"][@data-tab=\"10\"]" },
+    { "by": "xpath", "value": "//footer//div[@contenteditable=\"true\" and contains(@class,\"copyable-text\")]" }
   ],
   "CAPTION_BOX_LOCATORS": [
-    { "by": "xpath", "value": "//div[@contenteditable=\"true\"][@data-tab=\"10\"]" },
-    { "by": "xpath", "value": "//div[@contenteditable=\"true\" and contains(@class,\"copyable-text\")]" },
-    { "by": "xpath", "value": "//div[@contenteditable=\"true\" and @data-testid=\"media-caption-input-container\"]" }
+    { "by": "xpath", "value": "//div[@data-testid=\"media-viewer\"]//div[@data-testid=\"media-caption-input-container\"]//div[@contenteditable=\"true\"]" },
+    { "by": "xpath", "value": "//div[@role=\"dialog\"]//div[@data-testid=\"media-caption-input-container\"]//div[@contenteditable=\"true\"]" }
+  ],
+  "MEDIA_PREVIEW_SEND_BUTTON_LOCATORS": [
+    { "by": "xpath", "value": "//div[@data-testid=\"media-viewer\"]//span[@data-icon=\"send\"]" },
+    { "by": "xpath", "value": "//div[@role=\"dialog\"]//span[@data-icon=\"send\"]" },
+    { "by": "xpath", "value": "//div[@role=\"dialog\"]//button[@aria-label=\"Send\"]" },
+    { "by": "xpath", "value": "//div[@role=\"dialog\"]//button[@aria-label=\"إرسال\"]" }
   ],
   "SEND_BUTTON_LOCATORS": [
     { "by": "xpath", "value": "//span[@data-icon=\"send\"]" },

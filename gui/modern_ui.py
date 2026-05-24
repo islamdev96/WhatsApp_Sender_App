@@ -860,10 +860,13 @@ class ModernWhatsAppApp(ctk.CTk):
         chk_frame = ctk.CTkFrame(pane_msg, fg_color="transparent", height=30)
         chk_frame.grid(row=2, column=0, sticky="ew", pady=(2, 2))
 
-        self.send_text_var = ctk.BooleanVar(value=True)
-        ctk.CTkCheckBox(chk_frame, text="إرسال النص مع أول مرفق",
-                        variable=self.send_text_var,
-                        font=("Segoe UI", 11)).pack(side="right", padx=5)
+        self.send_text_var = ctk.BooleanVar(value=False)
+        ctk.CTkCheckBox(
+            chk_frame,
+            text="إرسال النص كوصف مع أول مرفق (وضع مدمج)",
+            variable=self.send_text_var,
+            font=("Segoe UI", 11),
+        ).pack(side="right", padx=5)
 
         self.spin_text_var = ctk.BooleanVar(value=self.config.get("enable_spintax", True))
         ctk.CTkCheckBox(chk_frame, text="🎲 تدوير النص (Spintax)",
@@ -2990,7 +2993,7 @@ class ModernWhatsAppApp(ctk.CTk):
             self.message_textbox.insert("1.0", last_msg)
 
         # Load checkboxes
-        self.send_text_var.set(self.config.get("send_text_with_image", True))
+        self.send_text_var.set(self.config.get("send_text_with_image", False))
         self.bg_mode_var.set(self.config.get("background_mode", False))
         self.spin_text_var.set(self.config.get("enable_spintax", True))
         if hasattr(self, "use_valid_after_check_var"):
