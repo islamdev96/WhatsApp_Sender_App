@@ -55,6 +55,36 @@ class ConfigManager:
                 # Prefer two-step send; merged caption mode is unreliable in automation.
                 if self.config.get("send_text_with_image"):
                     self.config["send_text_with_image"] = False
+                self._enforce_safe_limits(persist=True)
+        except Exception:
+            pass
+
+    def _enforce_safe_limits(self, persist=False):
+        """Clamp aggressive settings that increase ban risk."""
+        try:
+            from utils.safety import MIN_DELAY_SECONDS, MIN_BATCH_PAUSE_SECONDS
+
+            changed = False
+            dmin = float(self.config.get("delay_min", 30))
+            dmax = float(self.config.get("delay_max", 120))
+            if dmin < MIN_DELAY_SECONDS:
+                self.config["delay_min"] = MIN_DELAY_SECONDS
+                changed = True
+            if dmax < float(self.config["delay_min"]):
+                self.config["delay_max"] = float(self.config["delay_min"]) + 30
+                changed = True
+            bpause = float(self.config.get("batch_pause_min", 180))
+            if bpause < MIN_BATCH_PAUSE_SECONDS:
+                self.config["batch_pause_min"] = MIN_BATCH_PAUSE_SECONDS
+                changed = True
+            if int(self.config.get("max_retries", 1)) > 2:
+                self.config["max_retries"] = 1
+                changed = True
+            if self.config.get("retry_full_navigation"):
+                self.config["retry_full_navigation"] = False
+                changed = True
+            if persist and changed:
+                self.save()
         except Exception:
             pass
 

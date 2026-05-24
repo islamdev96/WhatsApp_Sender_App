@@ -30,6 +30,14 @@ Desktop bulk messaging for **WhatsApp Web** (Selenium automation). Not affiliate
 - Keyword auto-reply (main tab) + chatbot tab
 - Multi Chrome profiles, proxy, fingerprint options
 
+## Anti-ban / policy (Arabic)
+
+- استخدم **الوضع الآمن** واترك **وضع الدمج** (نص مع أول مرفق) **معطّلاً**.
+- للصور والفيديو: تأخير **30–120 ثانية** بين الرسائل، واستراحة دفعة **60 ثانية** على الأقل.
+- لا ترسل لقوائم ضخمة دفعة واحدة؛ قسّم الحملات (≤200 جهة/جلسة تقريباً).
+- المحتوى يجب أن يكون مسموحاً بسياسة واتساب (لا سبام، لا محتوى محظور).
+- **لا يوجد ضمان** بعدم الحظر — الأتمتة غير الرسمية مخالفة لشروط واتساب.
+
 ## Limits (important)
 
 - Uses **WhatsApp Web automation** — UI changes can break selectors; update `automation/selectors.json` if needed.

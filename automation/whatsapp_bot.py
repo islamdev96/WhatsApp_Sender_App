@@ -903,11 +903,15 @@ class WhatsAppBot:
             if ready_state == "TIMEOUT":
                 return "ERR_TIMEOUT"
 
-            jitter = random.choices(
-                [random.uniform(1.0, 2.0), random.uniform(2.0, 3.5), random.uniform(3.5, 5.0)],
-                weights=[60, 30, 10],
-                k=1,
-            )[0]
+            has_media = bool(attachments)
+            if has_media:
+                jitter = random.uniform(2.0, 4.5)
+            else:
+                jitter = random.choices(
+                    [random.uniform(1.0, 2.0), random.uniform(2.0, 3.5), random.uniform(3.5, 5.0)],
+                    weights=[60, 30, 10],
+                    k=1,
+                )[0]
             if stop_event:
                 stop_event.wait(jitter)
             else:
@@ -969,10 +973,17 @@ class WhatsAppBot:
                     if text_res != "SUCCESS":
                         return text_res
 
+                extra = 0.0
+                try:
+                    from utils.safety import extra_delay_after_attachment
+
+                    extra = extra_delay_after_attachment(type_, path)
+                except Exception:
+                    extra = 5.0 if type_ in ("image", "video") else 2.0
                 if stop_event:
-                    stop_event.wait(2)
+                    stop_event.wait(2 + extra)
                 else:
-                    time.sleep(2)
+                    time.sleep(2 + extra)
 
             if message and not send_text_with_image:
                 ready = self._wait_for_chat_ready_after_attachments(stop_event=stop_event)
@@ -1140,6 +1151,9 @@ class WhatsAppBot:
         if not os.path.isfile(path):
             return "ERR_FILE_INPUT_NOT_FOUND"
 
+        media_type = (media_type or "image").lower().strip()
+        if media_type not in ("document", "image", "video"):
+            media_type = "image"
         input_kind = "document" if media_type == "document" else "media"
 
         if input_kind == "media":
@@ -1401,7 +1415,8 @@ class WhatsAppBot:
                 stop_event.wait(1.0)
             else:
                 time.sleep(1.0)
-            self._random_scroll(stop_event=stop_event) # Scroll a bit after sending
+            if random.random() < 0.25:
+                self._random_scroll(stop_event=stop_event)
             return "SUCCESS"
         except Exception as e:
             return f"ERR_TEXT_SEND: {str(e)[:250]}"

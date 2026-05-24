@@ -3457,6 +3457,49 @@ class ModernWhatsAppApp(ctk.CTk):
         self.log(f"🛡️ الوضع الآمن: {len(validated)}/{total} رقم صالح للإرسال.")
         return validated
 
+    def _check_campaign_safety(self, contact_count, attachments):
+        """Warn or auto-fix delays when campaign settings are too aggressive."""
+        from utils.safety import assess_campaign_settings
+
+        try:
+            delay_min = int(self.delay_min_entry.get())
+            delay_max = int(self.delay_max_entry.get())
+            batch_size = int(self.batch_size_entry.get())
+            pause_min = int(self.batch_min_entry.get())
+        except ValueError:
+            return True
+
+        has_media = bool(attachments)
+        report = assess_campaign_settings(
+            contact_count, delay_min, delay_max, batch_size, pause_min, has_media
+        )
+        if not report.get("warnings"):
+            return True
+
+        body = "\n".join(f"• {w}" for w in report["warnings"])
+        body += (
+            f"\n\nمقترح: تأخير {int(report['suggested_delay_min'])}–"
+            f"{int(report['suggested_delay_max'])} ثانية بين الرسائل."
+        )
+        body += "\n\nنعم = تطبيق الإعدادات المقترحة والمتابعة\nلا = المتابعة كما هي\nإلغاء = إيقاف"
+
+        choice = messagebox.askyesnocancel("تحذير — تقليل مخاطر الحظر", body)
+        if choice is None:
+            return False
+        if choice:
+            self.delay_min_entry.delete(0, "end")
+            self.delay_min_entry.insert(0, str(int(report["suggested_delay_min"])))
+            self.delay_max_entry.delete(0, "end")
+            self.delay_max_entry.insert(0, str(int(report["suggested_delay_max"])))
+            if pause_min < 60:
+                self.batch_min_entry.delete(0, "end")
+                self.batch_min_entry.insert(0, "60")
+            self.config.set("delay_min", int(report["suggested_delay_min"]))
+            self.config.set("delay_max", int(report["suggested_delay_max"]))
+            self.config.save()
+            self.log("✅ تم تطبيق إعدادات تأخير أكثر أماناً للحملة.")
+        return True
+
     def _begin_send(self, contacts, msg_template, attachments):
         if self.is_running:
             return
@@ -3586,7 +3629,7 @@ class ModernWhatsAppApp(ctk.CTk):
         safe_badge.pack(side="right")
 
         safe_desc = ctk.CTkLabel(safe_card,
-                                 text="يرسل فقط إلى جهات الاتصال الآمنة (التي لديك محادثة سابقة معها).\nيتم فحص صلاحية كل رقم قبل الإرسال مما يقلل خطر الحظر بشكل كبير.",
+                                 text="يُفحص كل رقم على واتساب قبل الإرسال (أرقام غير مسجلة تُستبعد).\nاستخدم تأخيراً 30–120 ثانية مع الوسائط — لا يمكن ضمان عدم الحظر (سياسة واتساب).",
                                  font=("Segoe UI", 11),
                                  text_color=COLORS.get("text_muted", "#94A3B8"),
                                  justify="right", anchor="e")
@@ -3659,6 +3702,8 @@ class ModernWhatsAppApp(ctk.CTk):
             contacts = self._get_contacts_from_input()
             if not contacts:
                 return
+            if not self._check_campaign_safety(len(contacts), []):
+                return
             self._save_current_state()
 
             if not self.bot or not self.bot.driver:
@@ -3690,9 +3735,11 @@ class ModernWhatsAppApp(ctk.CTk):
         contacts = self._get_contacts_from_input()
         if not contacts:
             return
+        if not self._check_campaign_safety(len(contacts), attachments):
+            return
 
         self._save_current_state()
-        
+
         # 3. Check Bot & Login
         if not self.bot or not self.bot.driver:
             auto_open = self.config.get("auto_open_login", True)
@@ -3812,8 +3859,8 @@ class ModernWhatsAppApp(ctk.CTk):
                 retry_delay_max = int(self.config.get("retry_delay_max", 6))
                 max_consecutive_failures = int(self.config.get("max_consecutive_failures", 5))
             except ValueError:
-                batch_size, pause_min, pause_max, delay_min, delay_max = 30, 60, 120, 8, 25
-                max_retries, retry_delay_min, retry_delay_max, max_consecutive_failures = 2, 3, 6, 5
+                batch_size, pause_min, pause_max, delay_min, delay_max = 30, 60, 120, 30, 120
+                max_retries, retry_delay_min, retry_delay_max, max_consecutive_failures = 1, 3, 6, 5
 
             self.log(f"🧭 بدء سير العمل: {workflow.get('name','')} | جهات: {total}")
             steps = workflow.get("steps") or []
@@ -4100,8 +4147,8 @@ class ModernWhatsAppApp(ctk.CTk):
                 retry_delay_max = int(self.config.get("retry_delay_max", 6))
                 max_consecutive_failures = int(self.config.get("max_consecutive_failures", 5))
             except ValueError:
-                batch_size, pause_min, pause_max, delay_min, delay_max = 30, 60, 120, 8, 25
-                max_retries, retry_delay_min, retry_delay_max, max_consecutive_failures = 2, 3, 6, 5
+                batch_size, pause_min, pause_max, delay_min, delay_max = 30, 60, 120, 30, 120
+                max_retries, retry_delay_min, retry_delay_max, max_consecutive_failures = 1, 3, 6, 5
 
             self.log(f"🚀 بدء إرسال {total} رسالة...")
             consecutive_failures = 0
