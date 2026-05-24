@@ -1230,13 +1230,13 @@ class ModernWhatsAppApp(ctk.CTk):
         self.delay_min_entry = ctk.CTkEntry(delay_row, width=70, height=34, corner_radius=8,
                                             justify="center")
         self.delay_min_entry.pack(side="right", padx=5)
-        self.delay_min_entry.insert(0, str(self.config.get("delay_min", 30)))
+        self.delay_min_entry.insert(0, str(self.config.get("delay_min", 8)))
 
         ctk.CTkLabel(delay_row, text="إلى:", font=ctk.CTkFont(size=12)).pack(side="right", padx=(5, 0))
         self.delay_max_entry = ctk.CTkEntry(delay_row, width=70, height=34, corner_radius=8,
                                             justify="center")
         self.delay_max_entry.pack(side="right", padx=5)
-        self.delay_max_entry.insert(0, str(self.config.get("delay_max", 120)))
+        self.delay_max_entry.insert(0, str(self.config.get("delay_max", 25)))
 
         # Batch Settings
         batch_card = ctk.CTkFrame(scroll, corner_radius=10)
@@ -3778,7 +3778,7 @@ class ModernWhatsAppApp(ctk.CTk):
                 retry_delay_max = int(self.config.get("retry_delay_max", 6))
                 max_consecutive_failures = int(self.config.get("max_consecutive_failures", 5))
             except ValueError:
-                batch_size, pause_min, pause_max, delay_min, delay_max = 50, 300, 600, 10, 20
+                batch_size, pause_min, pause_max, delay_min, delay_max = 30, 60, 120, 8, 25
                 max_retries, retry_delay_min, retry_delay_max, max_consecutive_failures = 2, 3, 6, 5
 
             self.log(f"🧭 بدء سير العمل: {workflow.get('name','')} | جهات: {total}")
@@ -3972,7 +3972,12 @@ class ModernWhatsAppApp(ctk.CTk):
 
                 self._run_on_ui(self._update_stats)
                 self._update_progress_header_blind(processed, total, phone, name, eta)
-                if self.stop_event.wait(random.uniform(delay_min, delay_max)):
+                # Human-like delay: mostly fast, occasionally slower to avoid detection
+                d_fast = random.uniform(delay_min * 0.3, delay_min * 0.7)
+                d_mid = random.uniform(delay_min * 0.7, (delay_min + delay_max) / 2)
+                d_slow = random.uniform((delay_min + delay_max) / 2, delay_max)
+                chosen_delay = random.choices([d_fast, d_mid, d_slow], weights=[70, 20, 10], k=1)[0]
+                if self.stop_event.wait(chosen_delay):
                     break
 
             end_time = datetime.datetime.now()
@@ -4045,7 +4050,7 @@ class ModernWhatsAppApp(ctk.CTk):
                 retry_delay_max = int(self.config.get("retry_delay_max", 6))
                 max_consecutive_failures = int(self.config.get("max_consecutive_failures", 5))
             except ValueError:
-                batch_size, pause_min, pause_max, delay_min, delay_max = 50, 300, 600, 10, 20
+                batch_size, pause_min, pause_max, delay_min, delay_max = 30, 60, 120, 8, 25
                 max_retries, retry_delay_min, retry_delay_max, max_consecutive_failures = 2, 3, 6, 5
 
             self.log(f"🚀 بدء إرسال {total} رسالة...")
@@ -4229,7 +4234,12 @@ class ModernWhatsAppApp(ctk.CTk):
                 self._update_progress_header_blind(processed, total, phone, name, eta)
                 
                 # Delay (interruptible)
-                if self.stop_event.wait(random.uniform(delay_min, delay_max)):
+                # Human-like delay: mostly fast, occasionally slower to avoid detection
+                d_fast = random.uniform(delay_min * 0.3, delay_min * 0.7)
+                d_mid = random.uniform(delay_min * 0.7, (delay_min + delay_max) / 2)
+                d_slow = random.uniform((delay_min + delay_max) / 2, delay_max)
+                chosen_delay = random.choices([d_fast, d_mid, d_slow], weights=[70, 20, 10], k=1)[0]
+                if self.stop_event.wait(chosen_delay):
                     break
 
             end_time = datetime.datetime.now()

@@ -50,9 +50,11 @@
     { "by": "css",  "value": "footer button[data-testid*=\"clip\"]" }
   ],
   "FILE_INPUT_LOCATORS": [
-    { "by": "xpath", "value": "//input[@accept=\"image/*,video/mp4,video/3gpp,video/quicktime\"]" },
-    { "by": "xpath", "value": "//input[@type=\"file\" and contains(@accept,\"image\")]"},
-    { "by": "xpath", "value": "//input[@type=\"file\"]"}
+    { "by": "xpath", "value": "//input[@type=\"file\" and @accept=\"*\"]" },
+    { "by": "xpath", "value": "//input[@type=\"file\" and not(contains(@accept,\"image\")) and not(contains(@accept,\"video\"))]" }
+  ],
+  "PHOTO_VIDEO_INPUT_LOCATORS": [
+    { "by": "xpath", "value": "//input[@type=\"file\" and contains(@accept,\"video\")]" }
   ],
   "MEDIA_PREVIEW_LOCATORS": [
     { "by": "xpath", "value": "//div[@data-testid=\"media-viewer\"]" },
