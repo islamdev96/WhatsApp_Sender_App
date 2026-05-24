@@ -323,7 +323,10 @@ class WhatsAppBot:
         return locators
 
     def _click_attach_menu_option(self, data_icon, timeout=10, stop_event=None):
-        """Click Photos/Videos or Document in the open attach menu."""
+        """Legacy: clicking Photos/Document menu items opens the native OS file picker.
+
+        Unused by attachment send — kept for reference. Use _send_attachment_via_attach_menu instead.
+        """
         end_time = time.time() + timeout
         while time.time() < end_time:
             if stop_event and stop_event.is_set():
