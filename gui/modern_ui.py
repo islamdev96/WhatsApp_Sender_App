@@ -2831,7 +2831,7 @@ class ModernWhatsAppApp(ctk.CTk):
             contacts = self._filter_contacts_safe_mode(contacts)
             if not contacts:
                 self.report_error("ERR-05", "لا توجد أرقام صالحة للإرسال بعد الفحص.", dialog=True)
-            return
+                return
 
         # 4. Apply background mode
         if self.bg_mode_var.get():
