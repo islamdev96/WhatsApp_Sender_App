@@ -36,9 +36,9 @@ class WhatsAppBot:
             (By.XPATH, '//div[@contenteditable="true" and @title="Search input textbox"]'),
         ]
         self.CHAT_INPUT_LOCATORS = [
-            (By.XPATH, '//footer//div[@contenteditable="true"][@role="textbox"]'),
-            (By.XPATH, '//footer//div[@contenteditable="true"][@data-tab="10"]'),
-            (By.XPATH, '//footer//div[@contenteditable="true" and contains(@class,"copyable-text")]'),
+            (By.XPATH, '//*[@id="main"]//footer//div[@contenteditable="true"][@role="textbox"]'),
+            (By.XPATH, '//*[@id="main"]//footer//div[@contenteditable="true"][@data-tab="10"]'),
+            (By.XPATH, '//*[@id="main"]//footer//div[@contenteditable="true" and contains(@class,"copyable-text")]'),
         ]
         self.CAPTION_BOX_LOCATORS = [
             (By.XPATH, '//div[@data-testid="media-viewer"]//div[@data-testid="media-caption-input-container"]//div[@contenteditable="true"]'),
@@ -62,37 +62,50 @@ class WhatsAppBot:
             (By.XPATH, '//div[@role="dialog"]//div[@role="button" and @aria-label="إرسال"]'),
         ]
         self.FOOTER_SEND_BUTTON_LOCATORS = [
-            (By.XPATH, '//footer//span[@data-icon="send"]'),
-            (By.XPATH, '//footer//span[@data-icon="send-light"]'),
-            (By.XPATH, '//footer//span[contains(@data-icon,"send")]'),
-            (By.XPATH, '//footer//button[@data-testid="compose-btn-send"]'),
-            (By.XPATH, '//footer//button[@aria-label="Send"]'),
-            (By.XPATH, '//footer//button[@aria-label="إرسال"]'),
-            (By.XPATH, '//footer//div[@role="button" and @aria-label="Send"]'),
-            (By.XPATH, '//footer//div[@role="button" and @aria-label="إرسال"]'),
-            (By.XPATH, '//footer//div[@role="button" and contains(@aria-label,"Send")]'),
-            (By.XPATH, '//footer//div[@role="button" and contains(@aria-label,"إرسال")]'),
-            (By.XPATH, '//footer//button[contains(@aria-label,"Send")]'),
-            (By.XPATH, '//footer//button[contains(@aria-label,"إرسال")]'),
+            (By.XPATH, '//*[@id="main"]//footer//span[@data-icon="send"]'),
+            (By.XPATH, '//*[@id="main"]//footer//span[@data-icon="send-light"]'),
+            (By.XPATH, '//*[@id="main"]//footer//span[contains(@data-icon,"send")]'),
+            (By.XPATH, '//*[@id="main"]//footer//button[@data-testid="compose-btn-send"]'),
+            (By.XPATH, '//*[@id="main"]//footer//button[@aria-label="Send"]'),
+            (By.XPATH, '//*[@id="main"]//footer//button[@aria-label="إرسال"]'),
+            (By.XPATH, '//*[@id="main"]//footer//div[@role="button" and @aria-label="Send"]'),
+            (By.XPATH, '//*[@id="main"]//footer//div[@role="button" and @aria-label="إرسال"]'),
+            (By.XPATH, '//*[@id="main"]//footer//div[@role="button" and contains(@aria-label,"Send")]'),
+            (By.XPATH, '//*[@id="main"]//footer//div[@role="button" and contains(@aria-label,"إرسال")]'),
+            (By.XPATH, '//*[@id="main"]//footer//button[contains(@aria-label,"Send")]'),
+            (By.XPATH, '//*[@id="main"]//footer//button[contains(@aria-label,"إرسال")]'),
         ]
         self.SEND_BUTTON_LOCATORS = list(self.FOOTER_SEND_BUTTON_LOCATORS)
         self.ATTACH_BUTTON_LOCATORS = [
-            (By.CSS_SELECTOR, 'footer span[data-icon="attach-menu-plus"]'),
-            (By.XPATH, '//footer//span[@data-icon="attach-menu-plus"]'),
-            (By.CSS_SELECTOR, 'footer span[data-icon*="attach"]'),
-            (By.XPATH, '//footer//span[contains(@data-icon,"attach")]'),
-            (By.XPATH, '//footer//span[@data-icon="wds-ic-attach"]'),
-            (By.XPATH, '//footer//span[@data-icon="plus"]'),
-            (By.CSS_SELECTOR, 'footer span[data-icon*="clip"]'),
-            (By.XPATH, '//footer//span[@data-icon="clip"]'),
-            (By.XPATH, '//footer//span[@data-icon="clip-light"]'),
-            (By.XPATH, '//footer//*[@aria-label="Attach"]'),
-            (By.XPATH, '//footer//*[@aria-label="إرفاق"]'),
-            (By.XPATH, '//footer//div[@title="Attach"]'),
-            (By.XPATH, '//footer//div[@title="إرفاق"]'),
-            (By.CSS_SELECTOR, 'footer button[data-testid*="clip"]'),
-            (By.CSS_SELECTOR, 'footer button[aria-label*="Attach"]'),
-            (By.CSS_SELECTOR, 'footer button[aria-label*="إرفاق"]'),
+            (By.CSS_SELECTOR, '#main footer span[data-icon="attach-menu-plus"]'),
+            (By.XPATH, '//*[@id="main"]//footer//span[@data-icon="attach-menu-plus"]'),
+            (By.CSS_SELECTOR, '#main footer span[data-icon*="attach"]'),
+            (By.XPATH, '//*[@id="main"]//footer//span[contains(@data-icon,"attach")]'),
+            (By.XPATH, '//*[@id="main"]//footer//span[@data-icon="wds-ic-attach"]'),
+            (By.XPATH, '//*[@id="main"]//footer//span[@data-icon="plus"]'),
+            (By.CSS_SELECTOR, '#main footer span[data-icon*="clip"]'),
+            (By.XPATH, '//*[@id="main"]//footer//span[@data-icon="clip"]'),
+            (By.XPATH, '//*[@id="main"]//footer//span[@data-icon="clip-light"]'),
+            (By.XPATH, '//*[@id="main"]//footer//*[@aria-label="Attach"]'),
+            (By.XPATH, '//*[@id="main"]//footer//*[@aria-label="إرفاق"]'),
+            (By.XPATH, '//*[@id="main"]//footer//div[@title="Attach"]'),
+            (By.XPATH, '//*[@id="main"]//footer//div[@title="إرفاق"]'),
+            (By.CSS_SELECTOR, '#main footer button[data-testid*="clip"]'),
+            (By.CSS_SELECTOR, '#main footer button[aria-label*="Attach"]'),
+            (By.CSS_SELECTOR, '#main footer button[aria-label*="إرفاق"]'),
+        ]
+        self._ATTACH_BUTTON_RELATIVE_XPATHS = [
+            './/span[@data-icon="attach-menu-plus"]',
+            './/span[contains(@data-icon,"attach")]',
+            './/span[@data-icon="wds-ic-attach"]',
+            './/span[@data-icon="plus"]',
+            './/span[@data-icon="clip"]',
+            './/span[@data-icon="clip-light"]',
+            './/span[contains(@data-icon,"clip")]',
+            './/*[@aria-label="Attach"]',
+            './/*[@aria-label="إرفاق"]',
+            './/div[@title="Attach"]',
+            './/div[@title="إرفاق"]',
         ]
         self.FILE_INPUT_LOCATORS = [
             (By.XPATH, '//input[@type="file" and @accept="*"]'),
@@ -770,18 +783,43 @@ class WhatsAppBot:
             time.sleep(0.4)
         return self._wait_for_footer_compose_ready(timeout=15, stop_event=stop_event)
 
-    def _find_compose_footer(self):
-        """Footer of the open chat (not the side panel)."""
+    def _get_main_compose_footer(self):
+        """Compose footer inside #main only (not side panel or stray footers)."""
         if not self.driver:
             return None
-        for xpath in (
-            '//*[@id="main"]//footer',
-            '//div[contains(@class,"x1n2onr6")]//footer',
-            '//footer',
-        ):
+        try:
+            for el in self.driver.find_elements(By.XPATH, '//*[@id="main"]//footer'):
+                if el.is_displayed():
+                    return el
+        except Exception:
+            pass
+        return None
+
+    def _find_compose_footer(self):
+        """Footer of the open chat (prefer #main)."""
+        footer = self._get_main_compose_footer()
+        if footer:
+            return footer
+        if not self.driver:
+            return None
+        for xpath in ('//div[contains(@class,"x1n2onr6")]//footer', '//footer'):
             try:
                 for el in self.driver.find_elements(By.XPATH, xpath):
                     if el.is_displayed():
+                        return el
+            except Exception:
+                continue
+        return None
+
+    def _find_in_compose_footer(self, relative_xpaths):
+        """Find a visible control only inside the main chat compose footer."""
+        footer = self._get_main_compose_footer()
+        if not footer:
+            return None
+        for xpath in relative_xpaths:
+            try:
+                for el in footer.find_elements(By.XPATH, xpath):
+                    if el.is_displayed() and el.get_attribute("aria-disabled") != "true":
                         return el
             except Exception:
                 continue
@@ -809,11 +847,11 @@ class WhatsAppBot:
         return False
 
     def _find_attach_button_js(self):
-        """Find attach (+) control inside the chat footer via JavaScript."""
+        """Find attach (+) control inside #main chat footer via JavaScript."""
         if not self.driver:
             return None
         script = """
-        var footer = document.querySelector('#main footer') || document.querySelector('footer');
+        var footer = document.querySelector('#main footer');
         if (!footer) return null;
         function visible(el) {
             if (!el) return false;
@@ -852,6 +890,11 @@ class WhatsAppBot:
             return None
 
     def _find_attach_button(self):
+        attach_btn = self._find_in_compose_footer(
+            getattr(self, "_ATTACH_BUTTON_RELATIVE_XPATHS", [])
+        )
+        if attach_btn:
+            return attach_btn
         attach_btn = self._find_best_clickable(self.ATTACH_BUTTON_LOCATORS)
         if attach_btn:
             return attach_btn
@@ -997,9 +1040,8 @@ class WhatsAppBot:
             if not self._is_active_chat_ready():
                 last_err = "ERR_ATTACH_BTN_NOT_FOUND"
                 if attempt < max_attempts - 1:
-                    if phone:
-                        self._force_url_next = True
-                        self._ensure_chat_open_for_send(phone, stop_event=stop_event)
+                    self.recover_compose_state(stop_event=stop_event)
+                    self.bring_to_front()
                     if stop_event:
                         stop_event.wait(0.6)
                     else:
@@ -1007,9 +1049,20 @@ class WhatsAppBot:
                     continue
                 return last_err
 
-            self._wait_for_footer_compose_ready(
-                timeout=8, stop_event=stop_event, require_attach=False
-            )
+            if not self._wait_for_footer_compose_ready(
+                timeout=20, stop_event=stop_event, require_attach=True
+            ):
+                self._emit("ERROR", "زر الإرفاق (+) غير جاهز")
+                last_err = "ERR_ATTACH_BTN_NOT_FOUND"
+                if attempt < max_attempts - 1:
+                    self.recover_compose_state(stop_event=stop_event)
+                    self.bring_to_front()
+                    if stop_event:
+                        stop_event.wait(0.8)
+                    else:
+                        time.sleep(0.8)
+                    continue
+                return last_err
 
             try:
                 result = self._send_attachment_via_attach_menu_once(
@@ -1217,9 +1270,18 @@ class WhatsAppBot:
         return True
 
     def _ensure_chat_open_for_send(self, phone, stop_event=None):
-        """Re-open chat via URL when landing screen has no compose footer (after invalid skip)."""
+        """Ensure compose footer and (+) are ready; reload URL only if needed."""
         if self._is_active_chat_ready():
-            return True
+            if self._wait_for_footer_compose_ready(
+                timeout=20, stop_event=stop_event, require_attach=True
+            ):
+                return True
+            self._reset_compose_overlays()
+            self.bring_to_front()
+            if self._wait_for_footer_compose_ready(
+                timeout=15, stop_event=stop_event, require_attach=True
+            ):
+                return True
         if not phone or (stop_event and stop_event.is_set()):
             return False
         self._force_url_next = True
@@ -1229,7 +1291,7 @@ class WhatsAppBot:
         if state != "READY":
             return False
         return self._wait_for_footer_compose_ready(
-            timeout=25, stop_event=stop_event, require_attach=False
+            timeout=25, stop_event=stop_event, require_attach=True
         )
 
     def _wait_for_chat_or_invalid(self, timeout=60, poll=0.5, stop_event=None):
@@ -1465,9 +1527,11 @@ class WhatsAppBot:
 
         can_search = (
             not force_url
-            and self._last_opened_phone
             and self.is_logged_in()
-            and phone != self._last_opened_phone
+            and (
+                not self._last_opened_phone
+                or phone != self._last_opened_phone
+            )
         )
         if can_search and self._open_chat_via_search(phone, stop_event=stop_event):
             self._last_opened_phone = phone
@@ -1533,10 +1597,18 @@ class WhatsAppBot:
                 return "ERR_TIMEOUT"
 
             if attachments and ready_state == "READY":
-                if not self._is_active_chat_ready():
+                if not self._wait_for_footer_compose_ready(
+                    timeout=25, stop_event=stop_event, require_attach=True
+                ):
                     if not self._ensure_chat_open_for_send(phone, stop_event=stop_event):
                         if self._handle_invalid_if_present(stop_event=stop_event):
                             return "INVALID"
+                        self._emit("ERROR", "زر الإرفاق (+) غير جاهز بعد فتح المحادثة")
+                        return "ERR_ATTACH_BTN_NOT_FOUND"
+                    if not self._wait_for_footer_compose_ready(
+                        timeout=20, stop_event=stop_event, require_attach=True
+                    ):
+                        self._emit("ERROR", "زر الإرفاق (+) غير جاهز بعد فتح المحادثة")
                         return "ERR_ATTACH_BTN_NOT_FOUND"
 
             has_media = bool(attachments)

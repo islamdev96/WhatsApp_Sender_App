@@ -13,8 +13,9 @@
     { "by": "xpath", "value": "//div[@contenteditable=\"true\" and @title=\"Search input textbox\"]" }
   ],
   "CHAT_INPUT_LOCATORS": [
-    { "by": "xpath", "value": "//footer//div[@contenteditable=\"true\"][@data-tab=\"10\"]" },
-    { "by": "xpath", "value": "//footer//div[@contenteditable=\"true\" and contains(@class,\"copyable-text\")]" }
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//div[@contenteditable=\"true\"][@data-tab=\"10\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//div[@contenteditable=\"true\"][@role=\"textbox\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//div[@contenteditable=\"true\" and contains(@class,\"copyable-text\")]" }
   ],
   "CAPTION_BOX_LOCATORS": [
     { "by": "xpath", "value": "//div[@data-testid=\"media-viewer\"]//div[@data-testid=\"media-caption-input-container\"]//div[@contenteditable=\"true\"]" },
@@ -27,37 +28,37 @@
     { "by": "xpath", "value": "//div[@role=\"dialog\"]//button[@aria-label=\"إرسال\"]" }
   ],
   "SEND_BUTTON_LOCATORS": [
-    { "by": "xpath", "value": "//footer//span[@data-icon=\"send\"]" },
-    { "by": "xpath", "value": "//footer//span[@data-icon=\"send-light\"]" },
-    { "by": "xpath", "value": "//footer//span[contains(@data-icon,\"send\")]" },
-    { "by": "xpath", "value": "//footer//button[@data-testid=\"compose-btn-send\"]" },
-    { "by": "xpath", "value": "//footer//button[@aria-label=\"Send\"]" },
-    { "by": "xpath", "value": "//footer//button[@aria-label=\"إرسال\"]" },
-    { "by": "xpath", "value": "//footer//div[@role=\"button\" and @aria-label=\"Send\"]" },
-    { "by": "xpath", "value": "//footer//div[@role=\"button\" and contains(@aria-label,\"Send\")]" },
-    { "by": "xpath", "value": "//footer//button[contains(@aria-label,\"Send\")]" },
-    { "by": "xpath", "value": "//footer//button[contains(@aria-label,\"إرسال\")]" }
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//span[@data-icon=\"send\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//span[@data-icon=\"send-light\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//span[contains(@data-icon,\"send\")]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//button[@data-testid=\"compose-btn-send\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//button[@aria-label=\"Send\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//button[@aria-label=\"إرسال\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//div[@role=\"button\" and @aria-label=\"Send\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//div[@role=\"button\" and contains(@aria-label,\"Send\")]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//button[contains(@aria-label,\"Send\")]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//button[contains(@aria-label,\"إرسال\")]" }
   ],
   "FOOTER_SEND_BUTTON_LOCATORS": [
-    { "by": "xpath", "value": "//footer//span[@data-icon=\"send\"]" },
-    { "by": "xpath", "value": "//footer//button[@aria-label=\"إرسال\"]" }
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//span[@data-icon=\"send\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//button[@aria-label=\"إرسال\"]" }
   ],
   "ATTACH_BUTTON_LOCATORS": [
-    { "by": "css", "value": "footer span[data-icon=\"attach-menu-plus\"]" },
-    { "by": "xpath", "value": "//footer//span[@data-icon=\"attach-menu-plus\"]" },
-    { "by": "css", "value": "footer span[data-icon*=\"attach\"]" },
-    { "by": "xpath", "value": "//footer//span[contains(@data-icon,\"attach\")]" },
-    { "by": "xpath", "value": "//footer//span[@data-icon=\"wds-ic-attach\"]" },
-    { "by": "xpath", "value": "//footer//span[@data-icon=\"plus\"]" },
-    { "by": "css", "value": "footer span[data-icon*=\"clip\"]" },
-    { "by": "xpath", "value": "//footer//span[@data-icon=\"clip\"]" },
-    { "by": "xpath", "value": "//footer//span[@data-icon=\"clip-light\"]" },
-    { "by": "xpath", "value": "//footer//div[@title=\"Attach\"]" },
-    { "by": "xpath", "value": "//footer//div[@title=\"إرفاق\"]" },
-    { "by": "xpath", "value": "//footer//*[@aria-label=\"Attach\"]" },
-    { "by": "xpath", "value": "//footer//*[@aria-label=\"إرفاق\"]" },
-    { "by": "css", "value": "footer button[aria-label*=\"Attach\"]" },
-    { "by": "css", "value": "footer button[aria-label*=\"إرفاق\"]" }
+    { "by": "css", "value": "#main footer span[data-icon=\"attach-menu-plus\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//span[@data-icon=\"attach-menu-plus\"]" },
+    { "by": "css", "value": "#main footer span[data-icon*=\"attach\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//span[contains(@data-icon,\"attach\")]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//span[@data-icon=\"wds-ic-attach\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//span[@data-icon=\"plus\"]" },
+    { "by": "css", "value": "#main footer span[data-icon*=\"clip\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//span[@data-icon=\"clip\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//span[@data-icon=\"clip-light\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//div[@title=\"Attach\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//div[@title=\"إرفاق\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//*[@aria-label=\"Attach\"]" },
+    { "by": "xpath", "value": "//*[@id=\"main\"]//footer//*[@aria-label=\"إرفاق\"]" },
+    { "by": "css", "value": "#main footer button[aria-label*=\"Attach\"]" },
+    { "by": "css", "value": "#main footer button[aria-label*=\"إرفاق\"]" }
   ],
   "FILE_INPUT_LOCATORS": [
     { "by": "xpath", "value": "//input[@type=\"file\" and @accept=\"*\"]" },

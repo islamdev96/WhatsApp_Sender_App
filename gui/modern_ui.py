@@ -2460,7 +2460,7 @@ class ModernWhatsAppApp(ctk.CTk):
                 self._set_session_status("الحالة: في انتظار تسجيل الدخول...", COLORS["warning"])
                 self.log("يرجى فتح واتساب على الهاتف ومسح QR لتسجيل الدخول...")
                 self.log("💡 تلميح: يرجى الانتظار 3 ثوانٍ بعد ظهور الباركود قبل مسحه بالهاتف لضمان استقرار الاتصال من المرة الأولى.")
-
+                
                 login_status = self.bot.wait_for_login(timeout=900)
                 if login_status == "SUCCESS":
                     self._on_login_success()
@@ -2831,7 +2831,7 @@ class ModernWhatsAppApp(ctk.CTk):
             contacts = self._filter_contacts_safe_mode(contacts)
             if not contacts:
                 self.report_error("ERR-05", "لا توجد أرقام صالحة للإرسال بعد الفحص.", dialog=True)
-                return
+            return
 
         # 4. Apply background mode
         if self.bg_mode_var.get():
@@ -2996,7 +2996,7 @@ class ModernWhatsAppApp(ctk.CTk):
             return
 
         self._save_current_state()
-
+        
         # 3. Check Bot & Login
         if not self.bot or not self.bot.driver:
             auto_open = self.config.get("auto_open_login", True)
@@ -3065,13 +3065,11 @@ class ModernWhatsAppApp(ctk.CTk):
         if not attachments:
             return True
         if getattr(self, "send_text_var", None) and self.send_text_var.get():
-            if not messagebox.askyesno(
-                "وضع مدمج مفعّل",
-                "الوضع المدمج (نص كوصف مع الصورة) غير موصى به وقد يسبب أخطاء.\n\n"
-                "يُفضّل إلغاء التفعيل لإرسال الصورة ثم النص منفصلين.\n\n"
-                "هل تريد المتابعة على أي حال؟",
-            ):
-                return False
+            self.send_text_var.set(False)
+            self.log(
+                "ℹ️ تم إلغاء «الوضع المدمج» تلقائياً — سيتم إرسال الصورة ثم النص منفصلين (أكثر استقراراً).",
+                level="INFO",
+            )
         if getattr(self, "bg_mode_var", None) and self.bg_mode_var.get():
             messagebox.showwarning(
                 "وضع الخلفية",
@@ -3176,7 +3174,6 @@ class ModernWhatsAppApp(ctk.CTk):
                 "ERR_TEXT_SEND",
             }
             attach_only_errors = {
-                "ERR_ATTACH_BTN_NOT_FOUND",
                 "ERR_FILE_INPUT_NOT_FOUND",
                 "ERR_STICKER_PANEL_OPENED",
                 "ERR_DOC_BTN_NOT_FOUND",
