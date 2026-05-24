@@ -13,6 +13,7 @@ import random
 import os
 import csv
 import datetime
+import json
 
 from .components import RichTextFrame, AttachmentManager
 
@@ -22,6 +23,7 @@ from utils.config_manager import ConfigManager
 from utils.templates_manager import TemplatesManager
 from utils.contacts_manager import ContactsManager
 from utils.campaign_manager import CampaignManager
+from utils.event_log import format_event
 
 # ─── Color Palette (Premium) ────────────────────────────────────────────────
 PALETTE_DARK = {
@@ -156,6 +158,7 @@ class ModernWhatsAppApp(ctk.CTk):
         self.progress_state_label = None
         self.progress_metric_labels = {}
         self.last_report_path = None
+        self._log_to_terminal = True
 
         # ── Profiles ──
         self.profiles_dir = os.path.join(os.getcwd(), self.config.get("profiles_dir", os.path.join("data", "profiles")))
@@ -345,7 +348,7 @@ class ModernWhatsAppApp(ctk.CTk):
         # 6. Help Menu (مساعدة)
         help_menu = tk.Menu(menu_bar, tearoff=0)
         help_menu.add_command(label="📖 دليل الاستخدام والمساعدة...", command=self._show_help_dialog)
-        help_menu.add_command(label="📋 عرض السجل التشغيلي (Log)", command=lambda: self._switch_tab("log"))
+        help_menu.add_command(label="📋 سجل الأحداث والتشخيص", command=lambda: self._switch_tab("log"))
         help_menu.add_separator()
         help_menu.add_command(label="ℹ️ حول البرنامج", command=self._show_about_dialog)
         menu_bar.add_cascade(label="مساعدة", menu=help_menu)
@@ -379,7 +382,7 @@ class ModernWhatsAppApp(ctk.CTk):
             (self.tr("groups_grabber"), "groups"),
             (self.tr("templates"), "templates"),
             (self.tr("settings"), "settings"),
-            (self.tr("log"), "log"),
+            ("الأحداث", "log"),
         ]
 
         self.nav_buttons = {}
@@ -1175,16 +1178,50 @@ class ModernWhatsAppApp(ctk.CTk):
         header_row = ctk.CTkFrame(frame, fg_color="transparent")
         header_row.pack(fill="x", padx=20, pady=(15, 5))
 
-        ctk.CTkLabel(header_row, text="📋 سجل العمليات",
-                     font=ctk.CTkFont(size=20, weight="bold")).pack(side="right")
+        ctk.CTkLabel(
+            header_row,
+            text="📋 سجل الأحداث والتشخيص",
+            font=ctk.CTkFont(size=20, weight="bold"),
+        ).pack(side="right")
 
-        ctk.CTkButton(header_row, text="🗑️ مسح السجل", width=100, height=32,
-                      fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
-                      command=self._clear_log).pack(side="left")
+        ctk.CTkButton(
+            header_row,
+            text="📂 فتح ملف السجل",
+            width=110,
+            height=32,
+            fg_color=COLORS["secondary"],
+            hover_color=COLORS["secondary_hover"],
+            command=self._open_log_file,
+        ).pack(side="left", padx=4)
 
-        self.log_textbox = ctk.CTkTextbox(frame, font=ctk.CTkFont(family="Consolas", size=12),
-                                          corner_radius=12, state="disabled")
+        ctk.CTkButton(
+            header_row,
+            text="🗑️ مسح",
+            width=80,
+            height=32,
+            fg_color=COLORS["danger"],
+            hover_color=COLORS["danger_hover"],
+            command=self._clear_log,
+        ).pack(side="left", padx=4)
+
+        hint = ctk.CTkLabel(
+            frame,
+            text="كل خطوة من البوت والإرسال تظهر هنا وفي التيرمنال (python main.py). عند مشكلة الصور ابحث عن ERROR أو «لم يُعثر على حقل».",
+            font=ctk.CTkFont(size=11),
+            text_color=COLORS["text_muted"],
+            wraplength=900,
+            justify="right",
+        )
+        hint.pack(fill="x", padx=20, pady=(0, 6))
+
+        self.log_textbox = ctk.CTkTextbox(
+            frame,
+            font=ctk.CTkFont(family="Consolas", size=12),
+            corner_radius=12,
+            state="disabled",
+        )
         self.log_textbox.pack(fill="both", expand=True, padx=20, pady=(5, 15))
+        self.log("✅ سجل التشخيص جاهز — شغّل الحملة وراقب الأحداث هنا.")
 
     # ═══════════════════════════════════════════════════════════════════════
     #  UI HELPERS
@@ -1262,26 +1299,96 @@ class ModernWhatsAppApp(ctk.CTk):
         elif status == "closed" or status == "offline":
             self._set_session_status("الحالة: غير متصل", COLORS["danger"])
 
-    def log(self, message):
-        ts = time.strftime('%H:%M:%S')
+    def log(self, message, level="INFO"):
+        line = format_event(level, message) if not str(message).startswith("[") else message
+
+        if self._log_to_terminal:
+            try:
+                import sys
+                print(line, file=sys.stderr, flush=True)
+            except Exception:
+                pass
 
         def _do():
+            if not hasattr(self, "log_textbox"):
+                return
             self.log_textbox.configure(state="normal")
-            self.log_textbox.insert("end", f"[{ts}] {message}\n")
+            self.log_textbox.insert("end", line + "\n")
             self.log_textbox.see("end")
             self.log_textbox.configure(state="disabled")
         self._run_on_ui(_do)
         try:
             os.makedirs(self.log_dir, exist_ok=True)
             with open(self.log_file_path, "a", encoding="utf-8") as f:
-                f.write(f"[{ts}] {message}\n")
+                f.write(line + "\n")
         except Exception:
             pass
+
+    def _on_bot_event(self, level, message, detail=None):
+        """Callback from WhatsAppBot — same stream as UI log + terminal."""
+        self.log(format_event(level, message, detail))
+
+    def _open_log_file(self):
+        try:
+            os.makedirs(self.log_dir, exist_ok=True)
+            if os.path.exists(self.log_file_path):
+                os.startfile(self.log_file_path)
+            else:
+                messagebox.showinfo("السجل", "لا يوجد ملف سجل بعد. ابدأ إرسالاً أولاً.")
+        except Exception as e:
+            messagebox.showerror("خطأ", str(e))
 
     def _clear_log(self):
         self.log_textbox.configure(state="normal")
         self.log_textbox.delete("1.0", "end")
         self.log_textbox.configure(state="disabled")
+        self.log("تم مسح السجل.", level="INFO")
+
+    def _agent_debug_log(self, hypothesis_id, location, message, data=None):
+        # #region agent log
+        try:
+            log_path = os.path.join(os.getcwd(), "debug-364cc6.log")
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(
+                    json.dumps(
+                        {
+                            "sessionId": "364cc6",
+                            "hypothesisId": hypothesis_id,
+                            "location": location,
+                            "message": message,
+                            "data": data or {},
+                            "timestamp": int(time.time() * 1000),
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+        except Exception:
+            pass
+        # #endregion
+
+    def _on_login_success(self):
+        """After WhatsApp login: auto-continue pending send/check without blocking dialogs."""
+        self.log("✅ تم تسجيل الدخول بنجاح!")
+        self._set_session_status("الحالة: متصل", COLORS["success"])
+        has_send = bool(self.pending_start_payload)
+        has_check = bool(self.pending_check_contacts)
+        self._agent_debug_log(
+            "H1",
+            "modern_ui.py:_on_login_success",
+            "login_success",
+            {"has_pending_send": has_send, "has_pending_check": has_check},
+        )
+        if has_send:
+            self.log("🚀 بدء الإرسال تلقائياً بعد تسجيل الدخول.")
+            self._run_on_ui(self._run_pending_start)
+        elif has_check:
+            pending_contacts = self.pending_check_contacts
+            self.pending_check_contacts = None
+            self.log("🔍 بدء فحص الأرقام تلقائياً بعد تسجيل الدخول.")
+            self._run_on_ui(lambda: self._check_numbers_action(pending_contacts))
+        else:
+            self.log("✅ تم تسجيل الدخول — يمكنك الضغط على «بدء الإرسال» متى شئت.")
 
     def _show_dialog(self, kind, title, message):
         def _do():
@@ -2280,6 +2387,28 @@ class ModernWhatsAppApp(ctk.CTk):
     # ═══════════════════════════════════════════════════════════════════════
     #  BOT ACTIONS
     # ═══════════════════════════════════════════════════════════════════════
+    def _wait_for_login_worker(self):
+        """Background: wait for QR scan on an already-open browser."""
+        try:
+            login_status = self.bot.wait_for_login(timeout=900)
+            if login_status == "SUCCESS":
+                self._on_login_success()
+            elif login_status == "CLOSED":
+                self.log("ℹ️ تم إغلاق متصفح تسجيل الدخول أو إيقافه بواسطة المستخدم.")
+                self._set_session_status("الحالة: غير متصل", COLORS["danger"])
+                self.pending_start_payload = None
+                self.pending_check_contacts = None
+            else:
+                self.report_error("ERR-02", dialog=True, level="warning")
+                self._set_session_status("الحالة: غير متصل", COLORS["danger"])
+                self.pending_start_payload = None
+                self.pending_check_contacts = None
+        except Exception as e:
+            self.report_error("ERR-01", detail=str(e), dialog=True)
+            self._set_session_status("الحالة: غير متصل", COLORS["danger"])
+            self.pending_start_payload = None
+            self.pending_check_contacts = None
+
     def _login_action(self):
         # Check if the bot exists and the driver is actively open (has windows)
         is_active = False
@@ -2292,11 +2421,25 @@ class ModernWhatsAppApp(ctk.CTk):
         if is_active:
             self.bot.background_mode = False
             self.bot.bring_to_front()
+            has_pending = bool(self.pending_start_payload or self.pending_check_contacts)
+            self._agent_debug_log(
+                "H2",
+                "modern_ui.py:_login_action",
+                "browser_already_active",
+                {
+                    "logged_in": bool(self.bot.is_logged_in()),
+                    "has_pending": has_pending,
+                },
+            )
             if self.bot.is_logged_in():
-                self._set_session_status("الحالة: متصل", COLORS["success"])
-            else:
-                self._set_session_status("الحالة: غير متصل", COLORS["warning"])
-            self.log("المتصفح مفتوح بالفعل.")
+                self._on_login_success()
+                return
+            self._set_session_status("الحالة: في انتظار تسجيل الدخول...", COLORS["warning"])
+            if has_pending:
+                self.log("⏳ المتصفح مفتوح — انتظار مسح QR ثم متابعة الإرسال تلقائياً...")
+                threading.Thread(target=self._wait_for_login_worker, daemon=True).start()
+                return
+            self.log("المتصفح مفتوح بالفعل — أكمل تسجيل الدخول من واتساب ويب.")
             return
 
         def run_login():
@@ -2306,27 +2449,21 @@ class ModernWhatsAppApp(ctk.CTk):
                 active_profile = self.config.get("profile_name", "Default")
                 profile_proxies = self.config.get("profile_proxies", {})
                 proxy_config = profile_proxies.get(active_profile, {"enabled": False})
-                self.bot = WhatsAppBot(self.user_data_dir, proxy_config=proxy_config)
+                self.bot = WhatsAppBot(
+                    self.user_data_dir,
+                    proxy_config=proxy_config,
+                    on_event=self._on_bot_event,
+                )
                 self.bot.open_whatsapp()
                 self.bot.background_mode = False
                 self.bot.bring_to_front()
                 self._set_session_status("الحالة: في انتظار تسجيل الدخول...", COLORS["warning"])
                 self.log("يرجى فتح واتساب على الهاتف ومسح QR لتسجيل الدخول...")
                 self.log("💡 تلميح: يرجى الانتظار 3 ثوانٍ بعد ظهور الباركود قبل مسحه بالهاتف لضمان استقرار الاتصال من المرة الأولى.")
-                
+
                 login_status = self.bot.wait_for_login(timeout=900)
                 if login_status == "SUCCESS":
-                    self.log("✅ تم تسجيل الدخول بنجاح!")
-                    self._set_session_status("الحالة: متصل", COLORS["success"])
-                    self._show_dialog("info", "تم", "تم تسجيل الدخول. يمكنك الآن الضغط على 'بدء الإرسال'.")
-                    if self.pending_start_payload:
-                        self.log("🚀 بدء الإرسال تلقائياً بعد تسجيل الدخول.")
-                        self._run_on_ui(self._run_pending_start)
-                    if self.pending_check_contacts:
-                        pending_contacts = self.pending_check_contacts
-                        self.pending_check_contacts = None
-                        self.log("🔍 بدء فحص الأرقام تلقائياً بعد تسجيل الدخول.")
-                        self._run_on_ui(lambda: self._check_numbers_action(pending_contacts))
+                    self._on_login_success()
                 elif login_status == "CLOSED":
                     self.log("ℹ️ تم إغلاق متصفح تسجيل الدخول أو إيقافه بواسطة المستخدم.")
                     self._set_session_status("الحالة: غير متصل", COLORS["danger"])
@@ -2351,6 +2488,12 @@ class ModernWhatsAppApp(ctk.CTk):
     def _run_pending_start(self):
         pending = self.pending_start_payload
         self.pending_start_payload = None
+        self._agent_debug_log(
+            "H3",
+            "modern_ui.py:_run_pending_start",
+            "run_pending_start",
+            {"has_pending": bool(pending), "is_running": bool(self.is_running)},
+        )
         if not pending:
             return
         if isinstance(pending, tuple):
@@ -2675,6 +2818,12 @@ class ModernWhatsAppApp(ctk.CTk):
         return True
 
     def _begin_send(self, contacts, msg_template, attachments):
+        self._agent_debug_log(
+            "H4",
+            "modern_ui.py:_begin_send",
+            "begin_send_called",
+            {"contact_count": len(contacts) if contacts else 0, "is_running": bool(self.is_running)},
+        )
         if self.is_running:
             return
 
@@ -2695,6 +2844,8 @@ class ModernWhatsAppApp(ctk.CTk):
 
         # 5. Start Thread
         self.is_running = True
+        self._switch_tab("log")
+        self.log("📋 سجل التشخيص — كل خطوات البوت تظهر هنا وفي التيرمنال.", level="INFO")
         self.stop_event.clear()
         self.pause_event.clear()
         self.is_paused = False
@@ -3084,7 +3235,11 @@ class ModernWhatsAppApp(ctk.CTk):
                         # Start new bot
                         proxy_config = self.config.get("profile_proxies", {}).get(next_profile)
                         from automation.whatsapp_bot import WhatsAppBot
-                        self.bot = WhatsAppBot(self.user_data_dir, proxy_config)
+                        self.bot = WhatsAppBot(
+                            self.user_data_dir,
+                            proxy_config,
+                            on_event=self._on_bot_event,
+                        )
                         self.bot.setup_driver(start_minimized=self.bg_mode_var.get())
                         self.bot.open_whatsapp()
                         self.log("⏳ انتظار تسجيل الدخول للحساب الجديد...")

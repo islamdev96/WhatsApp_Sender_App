@@ -11,9 +11,10 @@ from selenium.common.exceptions import TimeoutException, ElementClickIntercepted
 from webdriver_manager.chrome import ChromeDriverManager
 
 class WhatsAppBot:
-    def __init__(self, user_data_dir, proxy_config=None):
+    def __init__(self, user_data_dir, proxy_config=None, on_event=None):
         self.user_data_dir = user_data_dir
         self.proxy_config = proxy_config
+        self.on_event = on_event
         self.driver = None
         self.background_mode = False
         self._just_launched = False
@@ -152,6 +153,22 @@ class WhatsAppBot:
         )
 
         self._load_selectors_from_file()
+        self._emit("INFO", "تم تهيئة بوت واتساب")
+
+    def _emit(self, level, message, detail=None):
+        """Diagnostic line → GUI callback (if set) else terminal stderr."""
+        if self.on_event:
+            try:
+                self.on_event(level, message, detail)
+            except Exception:
+                pass
+            return
+        try:
+            from utils.event_log import print_event
+
+            print_event(level, message, detail)
+        except Exception:
+            pass
 
     def _load_selectors_from_file(self):
         selectors_path = os.path.join(os.path.dirname(__file__), "selectors.json")
@@ -570,34 +587,125 @@ class WhatsAppBot:
 
         return False
 
+    def _click_attach_menu_row_by_text(self, labels):
+        """Selenium click on visible attach-menu row (Arabic/English)."""
+        if not self.driver:
+            return False
+        for label in labels:
+            fragments = [
+                f"//li[.//*[contains(normalize-space(.),'{label}')]]",
+                f"//*[@role='button'][.//*[contains(normalize-space(.),'{label}')]]",
+                f"//div[contains(@class,'x1n2onr6')][.//*[contains(normalize-space(.),'{label}')]]",
+            ]
+            for xpath in fragments:
+                try:
+                    for el in self.driver.find_elements(By.XPATH, xpath):
+                        if el.is_displayed():
+                            if self._click_element(el):
+                                return True
+                            try:
+                                self.driver.execute_script("arguments[0].click();", el)
+                                return True
+                            except Exception:
+                                continue
+                except Exception:
+                    continue
+        return False
+
+    def _find_visible_menu_file_input(self, kind):
+        """File input inside the open (+) menu popup."""
+        if not self.driver:
+            return None
+        script = """
+        var kind = arguments[0];
+        function classify(accept) {
+            accept = (accept || '').toLowerCase();
+            if (!accept) return null;
+            if (accept.indexOf('sticker') >= 0) return 'sticker';
+            if (accept.indexOf('video/mp4') >= 0 || accept.indexOf('video/3gpp') >= 0
+                || accept.indexOf('video/quicktime') >= 0 || accept.indexOf('video/*') >= 0)
+                return 'media';
+            if (accept === '*' || accept === '*/*') return 'document';
+            if (accept.indexOf('image') < 0 && accept.indexOf('video') < 0) return 'document';
+            return null;
+        }
+        function visible(el) {
+            if (!el) return false;
+            var st = window.getComputedStyle(el);
+            if (st.display === 'none' || st.visibility === 'hidden') return false;
+            var r = el.getBoundingClientRect();
+            return r.width > 0 || r.height > 0;
+        }
+        var inputs = document.querySelectorAll('input[type="file"]');
+        for (var i = 0; i < inputs.length; i++) {
+            var inp = inputs[i];
+            if (classify(inp.getAttribute('accept')) !== kind) continue;
+            var host = inp.closest('li') || inp.closest('[role="listbox"]')
+                || inp.closest('[data-animate-dropdown-item]') || inp.parentElement;
+            if (host && visible(host)) return inp;
+            if (visible(inp)) return inp;
+        }
+        return null;
+        """
+        try:
+            return self.driver.execute_script(script, kind)
+        except Exception:
+            return None
+
     def _expose_attach_file_input(self, input_kind, existing_signatures, stop_event=None):
-        """After attach (+) is open: find or activate the correct hidden file input."""
+        """After attach (+) is open: find the correct file input and prepare for send_keys."""
+        labels = (
+            ["Document", "مستند", "Documents"]
+            if input_kind == "document"
+            else [
+                "الصور ومقاطع الفيديو",
+                "Photos & videos",
+                "Photos and videos",
+            ]
+        )
+
+        input_el = self._find_visible_menu_file_input(input_kind)
+        if input_el:
+            return input_el
+
+        input_el = self._find_file_input_in_attach_menu(input_kind)
+        if input_el:
+            return input_el
+
         input_el = self._find_file_input_for_kind(input_kind, existing_signatures)
         if input_el:
             return input_el
 
-        input_el = self._wait_for_file_input_in_attach_menu(
-            input_kind, timeout=1.5, stop_event=stop_event
-        )
-        if input_el:
-            return input_el
+        self._click_attach_menu_row_by_text(labels)
+        if stop_event:
+            stop_event.wait(0.6)
+        else:
+            time.sleep(0.6)
 
-        self._activate_attach_menu_option(input_kind, stop_event=stop_event)
-
-        input_el = self._find_file_input_for_kind(input_kind, existing_signatures)
+        input_el = self._find_visible_menu_file_input(input_kind)
         if input_el:
             return input_el
 
         input_el = self._wait_for_file_input_in_attach_menu(
-            input_kind, timeout=3, stop_event=stop_event
+            input_kind, timeout=2.5, stop_event=stop_event
         )
+        if input_el:
+            return input_el
+
+        self._js_activate_attach_menu_option_by_text(labels)
+        if stop_event:
+            stop_event.wait(0.5)
+        else:
+            time.sleep(0.5)
+
+        input_el = self._find_visible_menu_file_input(input_kind)
         if input_el:
             return input_el
 
         input_el = self._wait_for_new_file_input(
             input_kind,
             existing_signatures,
-            timeout=6,
+            timeout=5,
             stop_event=stop_event,
         )
         if input_el:
@@ -928,16 +1036,19 @@ class WhatsAppBot:
     def _send_attachment_via_attach_menu_once(self, path, input_kind, stop_event=None):
         try:
             existing_signatures = self._snapshot_file_input_signatures()
+            self._emit("STEP", "بدء إرفاق ملف", os.path.basename(path))
 
             attach_btn = self._find_attach_button()
             if not attach_btn:
+                self._emit("ERROR", "زر الإرفاق (+) غير موجود")
                 return "ERR_ATTACH_BTN_NOT_FOUND"
 
             self._click_element(attach_btn)
+            self._emit("STEP", "تم فتح قائمة الإرفاق (+)")
             if stop_event:
-                stop_event.wait(1.0)
+                stop_event.wait(1.2)
             else:
-                time.sleep(1.0)
+                time.sleep(1.2)
 
             input_el = self._expose_attach_file_input(
                 input_kind,
@@ -946,14 +1057,11 @@ class WhatsAppBot:
             )
 
             if not input_el or self._classify_file_input(input_el) != input_kind:
-                self._activate_attach_menu_option(input_kind, stop_event=stop_event)
-                input_el = self._find_file_input_for_kind(
-                    input_kind, existing_signatures
-                )
-
-            if not input_el or self._classify_file_input(input_el) != input_kind:
+                self._emit("ERROR", "لم يُعثر على حقل رفع الملف في القائمة")
                 self._dismiss_attach_menu()
                 return "ERR_FILE_INPUT_NOT_FOUND"
+
+            self._emit("INFO", "تم العثور على حقل الملف", input_kind)
 
             if self._sticker_panel_visible():
                 self._dismiss_attach_menu()
@@ -961,13 +1069,16 @@ class WhatsAppBot:
                 return "ERR_STICKER_PANEL_OPENED"
 
             if not self._send_keys_to_file_input(input_el, path):
+                self._emit("ERROR", "فشل حقن مسار الملف (send_keys)")
                 self._dismiss_attach_menu()
                 return "ERR_FILE_INPUT_NOT_FOUND"
 
+            self._emit("STEP", "تم حقن مسار الملف — انتظار المعاينة")
+
             if stop_event:
-                stop_event.wait(0.6)
+                stop_event.wait(1.0)
             else:
-                time.sleep(0.6)
+                time.sleep(1.0)
 
             if input_kind == "media" and self._sticker_panel_visible():
                 self._dismiss_attach_menu()
@@ -975,18 +1086,28 @@ class WhatsAppBot:
                 return "ERR_STICKER_PANEL_OPENED"
 
             if input_kind == "media":
-                preview = self._find_any(self.MEDIA_PREVIEW_LOCATORS)
+                preview = self._wait_for_any(
+                    self.MEDIA_PREVIEW_LOCATORS, timeout=20, stop_event=stop_event
+                )
                 if not preview:
-                    preview = self._wait_for_any(
-                        self.MEDIA_PREVIEW_LOCATORS, timeout=12, stop_event=stop_event
-                    )
-                if not preview:
+                    self._emit("ERROR", "معاينة الصورة لم تظهر بعد الرفع")
                     self._dismiss_attach_menu()
                     return "ERR_FILE_INPUT_NOT_FOUND"
+                self._emit("INFO", "ظهرت معاينة الوسائط")
+                try:
+                    self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+                except Exception:
+                    pass
+                if stop_event:
+                    stop_event.wait(0.3)
+                else:
+                    time.sleep(0.3)
 
+            self._emit("INFO", "اكتمل رفع الملف في الواجهة")
             return "SUCCESS"
         except Exception as e:
             self._dismiss_attach_menu()
+            self._emit("ERROR", "استثناء أثناء الإرفاق", str(e)[:200])
             return f"ERR_ATTACH: {str(e)[:250]}"
 
     def _wait_for_preview_close(self, timeout=5, poll=0.3, stop_event=None):
@@ -1089,6 +1210,7 @@ class WhatsAppBot:
         """If invalid-number modal is open: dismiss it and report invalid."""
         if not self._page_indicates_invalid_number():
             return False
+        self._emit("WARN", "رقم غير مسجل على واتساب — إغلاق النافذة والتخطي")
         self._dismiss_invalid_number_modal(stop_event=stop_event)
         self._last_opened_phone = None
         self._force_url_next = True
@@ -1349,12 +1471,18 @@ class WhatsAppBot:
         )
         if can_search and self._open_chat_via_search(phone, stop_event=stop_event):
             self._last_opened_phone = phone
-            return self._wait_for_chat_or_invalid(timeout=45, stop_event=stop_event)
+            self._emit("STEP", "فتح المحادثة عبر البحث", phone)
+            state = self._wait_for_chat_or_invalid(timeout=45, stop_event=stop_event)
+            self._emit("INFO", f"حالة المحادثة: {state}", phone)
+            return state
 
         url = f"https://web.whatsapp.com/send?phone={phone}"
+        self._emit("STEP", "فتح المحادثة عبر الرابط", phone)
         self.driver.get(url)
         self._last_opened_phone = phone
-        return self._wait_for_chat_or_invalid(timeout=90, stop_event=stop_event)
+        state = self._wait_for_chat_or_invalid(timeout=90, stop_event=stop_event)
+        self._emit("INFO", f"حالة المحادثة: {state}", phone)
+        return state
 
     def send_message(
         self,
@@ -1396,10 +1524,12 @@ class WhatsAppBot:
             if ready_state == "STOPPED":
                 return "STOPPED"
             if ready_state == "INVALID":
+                self._emit("WARN", "تخطي — لا واتساب", phone)
                 return "INVALID"
             if ready_state == "TIMEOUT":
                 if self._handle_invalid_if_present(stop_event=stop_event):
                     return "INVALID"
+                self._emit("ERROR", "انتهت مهلة فتح المحادثة", phone)
                 return "ERR_TIMEOUT"
 
             if attachments and ready_state == "READY":
@@ -1733,15 +1863,18 @@ class WhatsAppBot:
 
                 send_btn = self._find_preview_send_button(stop_event=stop_event)
                 if not send_btn:
+                    self._emit("ERROR", "زر إرسال المعاينة غير موجود")
                     return "ERR_SEND_BTN_NOT_FOUND"
 
             if stop_event and stop_event.is_set():
                 return "STOPPED"
 
-            self.driver.execute_script("arguments[0].click();", send_btn)
+            self._emit("STEP", "الضغط على إرسال المعاينة")
+            if not self._click_element(send_btn):
+                self.driver.execute_script("arguments[0].click();", send_btn)
 
             file_size = os.path.getsize(path) if os.path.exists(path) else 0
-            wait_time = max(3, min(30, file_size // (1024 * 1024)))
+            wait_time = max(4, min(30, file_size // (1024 * 1024)) + 3)
             if stop_event:
                 stop_event.wait(wait_time)
             else:
@@ -1913,7 +2046,10 @@ class WhatsAppBot:
                 return "STOPPED"
         try:
             if not self._wait_for_footer_compose_ready(timeout=25, stop_event=stop_event):
+                self._emit("ERROR", "صندوق الكتابة غير جاهز")
                 return "ERR_CHAT_INPUT_NOT_FOUND"
+
+            self._emit("STEP", "إرسال النص", f"{len(message)} حرف")
 
             chat_input = self._find_footer_chat_input() or self._find_any(
                 self.CHAT_INPUT_LOCATORS
@@ -1984,13 +2120,17 @@ class WhatsAppBot:
                 time.sleep(1.0)
             if random.random() < 0.25:
                 self._random_scroll(stop_event=stop_event)
+            self._emit("INFO", "تم إرسال النص")
             return "SUCCESS"
         except ElementClickInterceptedException:
+            self._emit("WARN", "النقر محجوب — إعادة محاولة")
             return "ERR_TEXT_SEND_RETRY"
         except Exception as e:
             err = str(e)
             if "intercepted" in err.lower():
+                self._emit("WARN", "النقر محجوب — إعادة محاولة")
                 return "ERR_TEXT_SEND_RETRY"
+            self._emit("ERROR", "فشل إرسال النص", err[:200])
             return f"ERR_TEXT_SEND: {err[:250]}"
 
     def close(self):
