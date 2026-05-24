@@ -863,7 +863,7 @@ class ModernWhatsAppApp(ctk.CTk):
         self.send_text_var = ctk.BooleanVar(value=False)
         ctk.CTkCheckBox(
             chk_frame,
-            text="إرسال النص كوصف مع أول مرفق (وضع مدمج)",
+            text="إرسال النص كوصف مع أول مرفق (وضع مدمج — غير موصى به)",
             variable=self.send_text_var,
             font=("Segoe UI", 11),
         ).pack(side="right", padx=5)
@@ -3793,10 +3793,19 @@ class ModernWhatsAppApp(ctk.CTk):
                 "ERR_CHAT_INPUT_NOT_FOUND",
                 "ERR_ATTACH_BTN_NOT_FOUND",
                 "ERR_FILE_INPUT_NOT_FOUND",
+                "ERR_STICKER_PANEL_OPENED",
                 "ERR_SEND_BTN_NOT_FOUND",
                 "ERR_SEND_BTN_TIMEOUT",
                 "ERR_TEXT_SEND",
             }
+            attach_only_errors = {
+                "ERR_ATTACH_BTN_NOT_FOUND",
+                "ERR_FILE_INPUT_NOT_FOUND",
+                "ERR_STICKER_PANEL_OPENED",
+                "ERR_DOC_BTN_NOT_FOUND",
+                "ERR_PHOTO_BTN_NOT_FOUND",
+            }
+            retry_full_navigation = bool(self.config.get("retry_full_navigation", False))
 
             for i, c in enumerate(contacts):
                 if self.stop_event.is_set():
@@ -3901,6 +3910,12 @@ class ModernWhatsAppApp(ctk.CTk):
 
                     res = None
                     for attempt in range(max_retries + 1):
+                        skip_nav = (
+                            attempt > 0
+                            and atts_for_contact
+                            and not retry_full_navigation
+                            and res in attach_only_errors
+                        )
                         res = self.bot.send_message(
                             phone=phone,
                             name=name,
@@ -3908,7 +3923,8 @@ class ModernWhatsAppApp(ctk.CTk):
                             extra_messages=extra_msgs,
                             attachments=atts_for_contact,
                             stop_event=self.stop_event,
-                            send_text_with_image=self.send_text_var.get()
+                            send_text_with_image=self.send_text_var.get(),
+                            skip_open_chat=skip_nav,
                         )
                         if res in ("SUCCESS", "INVALID", "STOPPED"):
                             break
@@ -4063,10 +4079,19 @@ class ModernWhatsAppApp(ctk.CTk):
                 "ERR_CHAT_INPUT_NOT_FOUND",
                 "ERR_ATTACH_BTN_NOT_FOUND",
                 "ERR_FILE_INPUT_NOT_FOUND",
+                "ERR_STICKER_PANEL_OPENED",
                 "ERR_SEND_BTN_NOT_FOUND",
                 "ERR_SEND_BTN_TIMEOUT",
                 "ERR_TEXT_SEND",
             }
+            attach_only_errors = {
+                "ERR_ATTACH_BTN_NOT_FOUND",
+                "ERR_FILE_INPUT_NOT_FOUND",
+                "ERR_STICKER_PANEL_OPENED",
+                "ERR_DOC_BTN_NOT_FOUND",
+                "ERR_PHOTO_BTN_NOT_FOUND",
+            }
+            retry_full_navigation = bool(self.config.get("retry_full_navigation", False))
 
             for i, c in enumerate(contacts):
                 if self.stop_event.is_set():
@@ -4175,6 +4200,12 @@ class ModernWhatsAppApp(ctk.CTk):
                 # Send Message + Attachments with retries
                 res = None
                 for attempt in range(max_retries + 1):
+                    skip_nav = (
+                        attempt > 0
+                        and atts_for_contact
+                        and not retry_full_navigation
+                        and res in attach_only_errors
+                    )
                     res = self.bot.send_message(
                         phone=phone,
                         name=name,
@@ -4182,14 +4213,16 @@ class ModernWhatsAppApp(ctk.CTk):
                         extra_messages=extra_msgs,
                         attachments=atts_for_contact,
                         stop_event=self.stop_event,
-                        send_text_with_image=self.send_text_var.get()
+                        send_text_with_image=self.send_text_var.get(),
+                        skip_open_chat=skip_nav,
                     )
                     if res in ("SUCCESS", "INVALID", "STOPPED"):
                         break
                     is_retryable = res in retryable_errors or str(res).startswith("ERR_ATTACH_") or str(res).startswith("ERR_GENERAL")
                     if attempt < max_retries and is_retryable:
                         wait_s = random.uniform(retry_delay_min, retry_delay_max)
-                        self.log(f"🔁 إعادة محاولة ({attempt + 1}/{max_retries}) بعد {int(wait_s)}ث | {phone} | {res}")
+                        retry_mode = "مرفق فقط" if skip_nav else "كامل"
+                        self.log(f"🔁 إعادة محاولة ({attempt + 1}/{max_retries}) [{retry_mode}] بعد {int(wait_s)}ث | {phone} | {res}")
                         if self.stop_event.wait(wait_s):
                             break
                         continue

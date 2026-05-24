@@ -17,6 +17,7 @@ class WhatsAppBot:
         self.driver = None
         self.background_mode = False
         self._just_launched = False
+        self._last_opened_phone = None
 
         # Common locators (mix XPath + CSS for robustness)
         self.LOGGED_IN_LOCATORS = [
@@ -431,76 +432,8 @@ class WhatsAppBot:
                 time.sleep(0.25)
         return self._find_file_input(kind)
 
-    def _attach_menu_option_locators(self, data_icon):
-        """Locators for attach dropdown items (menu opens inside/near footer)."""
-        locators = [
-            (By.XPATH, f'//li[.//span[@data-icon="{data_icon}"]]'),
-            (By.XPATH, f'//ul//span[@data-icon="{data_icon}"]'),
-            (By.CSS_SELECTOR, f'span[data-icon="{data_icon}"]'),
-        ]
-        if data_icon == "attach-image":
-            locators.extend([
-                (By.XPATH, '//*[contains(text(),"الصور ومقاطع الفيديو")]'),
-                (By.XPATH, '//*[contains(text(),"Photos & videos")]'),
-                (By.XPATH, '//*[contains(text(),"Photos and videos")]'),
-                (By.XPATH, '//*[contains(text(),"Photos & Videos")]'),
-                (By.XPATH, '//button[contains(@aria-label,"Photos")]'),
-                (By.XPATH, '//button[contains(@aria-label,"صور")]'),
-            ])
-        elif data_icon == "attach-document":
-            locators.extend([
-                (By.XPATH, '//*[contains(text(),"مستند")]'),
-                (By.XPATH, '//*[contains(text(),"Document")]'),
-                (By.XPATH, '//button[contains(@aria-label,"Document")]'),
-                (By.XPATH, '//button[contains(@aria-label,"مستند")]'),
-            ])
-        return locators
-
-    def _click_attach_menu_option(self, data_icon, timeout=10, stop_event=None):
-        """Fallback: activate Photos/Document row (prefers JS to avoid native file picker)."""
-        end_time = time.time() + timeout
-        while time.time() < end_time:
-            if stop_event and stop_event.is_set():
-                return False
-
-            for by, value in self._attach_menu_option_locators(data_icon):
-                try:
-                    elements = self.driver.find_elements(by, value)
-                except Exception:
-                    continue
-                for el in elements:
-                    try:
-                        if not el.is_displayed():
-                            continue
-                        if by in (By.CSS_SELECTOR, By.XPATH) and "data-icon" in value:
-                            icon = (el.get_attribute("data-icon") or "").strip()
-                            if icon and icon != data_icon:
-                                continue
-                        click_target = el
-                        if el.tag_name.lower() == "span":
-                            try:
-                                click_target = el.find_element(
-                                    By.XPATH, "./ancestor::li[1] | ./ancestor::div[@role='button'][1]"
-                                )
-                            except Exception:
-                                click_target = el
-                        if self._js_activate_attach_menu_option(data_icon):
-                            return True
-                        try:
-                            if self.driver.execute_script(
-                                "arguments[0].click();", click_target
-                            ):
-                                return True
-                        except Exception:
-                            pass
-                    except Exception:
-                        continue
-
-            if stop_event:
-                stop_event.wait(0.3)
-            else:
-                time.sleep(0.3)
-        return False
+    def _media_preview_visible(self):
+        return self._find_any(self.MEDIA_PREVIEW_LOCATORS) is not None
 
     def _sticker_panel_visible(self):
         return self._find_best_clickable(self.STICKER_PANEL_LOCATORS) is not None
@@ -511,6 +444,20 @@ class WhatsAppBot:
             time.sleep(0.4)
         except Exception:
             pass
+
+    def _reset_compose_overlays(self):
+        """Close sticker panel, media preview, and attach menu before a new upload."""
+        for _ in range(2):
+            if (
+                not self._sticker_panel_visible()
+                and not self._media_preview_visible()
+            ):
+                break
+            try:
+                self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+            except Exception:
+                pass
+            time.sleep(0.35)
 
     def _find_photo_video_input(self):
         return self._find_file_input("media")
@@ -555,7 +502,9 @@ class WhatsAppBot:
             pass
 
     def _try_direct_file_injection(self, path, input_kind, stop_event=None):
-        """Send absolute path to an existing hidden file input (no attach menu clicks)."""
+        """Documents only — media must use attach menu to avoid sticker file inputs."""
+        if input_kind == "media":
+            return False
         if stop_event and stop_event.is_set():
             return "STOPPED"
 
@@ -592,89 +541,68 @@ class WhatsAppBot:
         return True
 
     def _send_attachment_via_attach_menu(self, path, input_kind, stop_event=None):
-        """Hybrid attach: (+) -> expose correct input (DOM or JS menu row) -> send_keys only."""
-        data_icon = "attach-document" if input_kind == "document" else "attach-image"
-        for attempt in range(2):
-            if stop_event and stop_event.is_set():
-                return "STOPPED"
-            try:
-                if self._sticker_panel_visible():
-                    self._dismiss_sticker_panel()
+        """Single-path attach: reset overlays -> (+) -> JS menu row -> send_keys only."""
+        if stop_event and stop_event.is_set():
+            return "STOPPED"
 
-                existing_signatures = self._snapshot_file_input_signatures()
+        self._reset_compose_overlays()
 
-                attach_btn = self._find_best_clickable(self.ATTACH_BUTTON_LOCATORS)
-                if not attach_btn:
-                    return "ERR_ATTACH_BTN_NOT_FOUND"
+        try:
+            existing_signatures = self._snapshot_file_input_signatures()
 
-                self._click_element(attach_btn)
-                if stop_event:
-                    stop_event.wait(0.8)
-                else:
-                    time.sleep(0.8)
+            attach_btn = self._find_best_clickable(self.ATTACH_BUTTON_LOCATORS)
+            if not attach_btn:
+                return "ERR_ATTACH_BTN_NOT_FOUND"
 
-                input_el = self._expose_attach_file_input(
-                    input_kind,
-                    existing_signatures,
-                    stop_event=stop_event,
-                )
-                if not input_el and self._click_attach_menu_option(
-                    data_icon, timeout=4, stop_event=stop_event
-                ):
-                    if stop_event:
-                        stop_event.wait(0.5)
-                    else:
-                        time.sleep(0.5)
-                    input_el = self._expose_attach_file_input(
-                        input_kind,
-                        existing_signatures,
-                        stop_event=stop_event,
-                    )
+            self._click_element(attach_btn)
+            if stop_event:
+                stop_event.wait(0.8)
+            else:
+                time.sleep(0.8)
 
-                if not input_el or self._classify_file_input(input_el) != input_kind:
-                    self._dismiss_attach_menu()
-                    if attempt == 0:
-                        continue
-                    return "ERR_FILE_INPUT_NOT_FOUND"
+            input_el = self._expose_attach_file_input(
+                input_kind,
+                existing_signatures,
+                stop_event=stop_event,
+            )
 
-                if not self._send_keys_to_file_input(input_el, path):
-                    self._dismiss_attach_menu()
-                    if attempt == 0:
-                        continue
-                    return "ERR_FILE_INPUT_NOT_FOUND"
-
-                if stop_event:
-                    stop_event.wait(0.6)
-                else:
-                    time.sleep(0.6)
-
-                if input_kind == "media" and self._sticker_panel_visible():
-                    self._dismiss_attach_menu()
-                    if attempt == 0:
-                        self._dismiss_sticker_panel()
-                        continue
-                    return "ERR_STICKER_PANEL_OPENED"
-
-                if input_kind == "media" and not self._find_any(self.MEDIA_PREVIEW_LOCATORS):
-                    preview = self._wait_for_any(
-                        self.MEDIA_PREVIEW_LOCATORS, timeout=4, stop_event=stop_event
-                    )
-                    if not preview:
-                        self._dismiss_attach_menu()
-                        if attempt == 0:
-                            self._dismiss_sticker_panel()
-                            continue
-                        return "ERR_FILE_INPUT_NOT_FOUND"
-
-                return "SUCCESS"
-            except Exception as e:
+            if not input_el or self._classify_file_input(input_el) != input_kind:
                 self._dismiss_attach_menu()
-                if attempt == 0:
-                    self._dismiss_sticker_panel()
-                    continue
-                return f"ERR_ATTACH: {str(e)[:250]}"
+                return "ERR_FILE_INPUT_NOT_FOUND"
 
-        return "ERR_FILE_INPUT_NOT_FOUND"
+            if self._sticker_panel_visible():
+                self._dismiss_attach_menu()
+                self._reset_compose_overlays()
+                return "ERR_STICKER_PANEL_OPENED"
+
+            if not self._send_keys_to_file_input(input_el, path):
+                self._dismiss_attach_menu()
+                return "ERR_FILE_INPUT_NOT_FOUND"
+
+            if stop_event:
+                stop_event.wait(0.6)
+            else:
+                time.sleep(0.6)
+
+            if input_kind == "media" and self._sticker_panel_visible():
+                self._dismiss_attach_menu()
+                self._reset_compose_overlays()
+                return "ERR_STICKER_PANEL_OPENED"
+
+            if input_kind == "media":
+                preview = self._find_any(self.MEDIA_PREVIEW_LOCATORS)
+                if not preview:
+                    preview = self._wait_for_any(
+                        self.MEDIA_PREVIEW_LOCATORS, timeout=8, stop_event=stop_event
+                    )
+                if not preview:
+                    self._dismiss_attach_menu()
+                    return "ERR_FILE_INPUT_NOT_FOUND"
+
+            return "SUCCESS"
+        except Exception as e:
+            self._dismiss_attach_menu()
+            return f"ERR_ATTACH: {str(e)[:250]}"
 
     def _wait_for_preview_close(self, timeout=5, poll=0.3, stop_event=None):
         end_time = time.time() + timeout
@@ -870,32 +798,104 @@ class WhatsAppBot:
             except:
                 pass
 
-    def send_message(self, phone, name, message_template, attachments=None, extra_messages=None, stop_event=None, send_text_with_image=False):
+    def _open_chat_via_search(self, phone, stop_event=None):
+        """Open a chat from the side search box without reloading the page."""
+        if stop_event and stop_event.is_set():
+            return False
+        try:
+            search_box = (
+                self._find_best_clickable(self.SEARCH_BOX_LOCATORS)
+                or self._find_any(self.SEARCH_BOX_LOCATORS)
+            )
+            if not search_box:
+                return False
+            self._click_element(search_box)
+            if stop_event:
+                stop_event.wait(0.3)
+            else:
+                time.sleep(0.3)
+            try:
+                search_box.send_keys(Keys.CONTROL, "a")
+                search_box.send_keys(Keys.BACKSPACE)
+            except Exception:
+                pass
+            query = phone.lstrip("+")
+            search_box.send_keys(query)
+            if stop_event:
+                stop_event.wait(1.2)
+            else:
+                time.sleep(1.2)
+            search_box.send_keys(Keys.ENTER)
+            if stop_event:
+                stop_event.wait(0.8)
+            else:
+                time.sleep(0.8)
+            return self._find_any(self.CHAT_INPUT_LOCATORS) is not None
+        except Exception:
+            return False
+
+    def open_chat(self, phone, stop_event=None):
+        """Open chat: search when switching numbers in-session, else navigate by URL."""
+        if stop_event and stop_event.is_set():
+            return "STOPPED"
+        if not self.driver:
+            return "ERR_NOT_READY"
+
+        phone = str(phone or "").strip()
+        if not phone:
+            return "TIMEOUT"
+
+        can_search = (
+            self._last_opened_phone
+            and self.is_logged_in()
+            and phone != self._last_opened_phone
+        )
+        if can_search and self._open_chat_via_search(phone, stop_event=stop_event):
+            self._last_opened_phone = phone
+            return self._wait_for_chat_or_invalid(timeout=45, stop_event=stop_event)
+
+        url = f"https://web.whatsapp.com/send?phone={phone}"
+        self.driver.get(url)
+        self._last_opened_phone = phone
+        return self._wait_for_chat_or_invalid(timeout=90, stop_event=stop_event)
+
+    def send_message(
+        self,
+        phone,
+        name,
+        message_template,
+        attachments=None,
+        extra_messages=None,
+        stop_event=None,
+        send_text_with_image=False,
+        skip_open_chat=False,
+    ):
         """Sends a message and optionally multiple attachments (image, video, document)."""
         if stop_event and stop_event.is_set():
             return "STOPPED"
         if not self.driver:
             return "ERR_NOT_READY"
 
-        # Personalize message
         message_template = message_template or ""
         message = message_template.replace("{name}", name).strip()
-        
-        # Attachments can be None or list
+
         if not attachments:
             attachments = []
-        
+
         if not attachments and not message:
             return "ERR_EMPTY_MESSAGE"
 
-        # 1. Open the chat
-        url = f"https://web.whatsapp.com/send?phone={phone}"
-        
         try:
-            self.driver.get(url)
-            
-            # 2. Wait for loading
-            ready_state = self._wait_for_chat_or_invalid(timeout=90, stop_event=stop_event)
+            if skip_open_chat:
+                if self._find_any(self.INVALID_NUMBER_LOCATORS):
+                    ready_state = "INVALID"
+                elif self._find_any(self.CHAT_INPUT_LOCATORS):
+                    ready_state = "READY"
+                else:
+                    ready_state = "TIMEOUT"
+            else:
+                ready_state = self.open_chat(phone, stop_event=stop_event)
+
             if ready_state == "STOPPED":
                 return "STOPPED"
             if ready_state == "INVALID":
@@ -903,10 +903,10 @@ class WhatsAppBot:
             if ready_state == "TIMEOUT":
                 return "ERR_TIMEOUT"
 
-            # Human-like jitter: mostly fast, occasionally a bit slower
             jitter = random.choices(
                 [random.uniform(1.0, 2.0), random.uniform(2.0, 3.5), random.uniform(3.5, 5.0)],
-                weights=[60, 30, 10], k=1
+                weights=[60, 30, 10],
+                k=1,
             )[0]
             if stop_event:
                 stop_event.wait(jitter)
@@ -915,99 +915,107 @@ class WhatsAppBot:
             if stop_event and stop_event.is_set():
                 return "STOPPED"
 
-            # 3. Send Content
-            # Strategy:
-            # - With attachments + message:
-            #   - send_text_with_image=False (default): send each attachment without message
-            #     caption, then send message as a separate chat message (press send twice).
-            #   - send_text_with_image=True: merge message into first attachment caption.
-            # - Without attachments: text only.
-            
-            if attachments:
-                use_caption_mode = bool(send_text_with_image and message)
-
-                for i, att in enumerate(attachments):
-                    if stop_event and stop_event.is_set():
-                        return "STOPPED"
-                        
-                    path = att.get("path")
-                    type_ = att.get("type", "image")
-                    
-                    # Caption: per-attachment only, or message on first item in caption mode
-                    raw_caption = att.get("caption")
-                    caption = None
-                    if raw_caption:
-                        caption = str(raw_caption).replace("{name}", name).strip()
-                    elif use_caption_mode and i == 0:
-                        caption = message
-                    
-                    res = self._send_attachment(path, type_, caption, stop_event=stop_event)
-                    if res != "SUCCESS":
-                        return res
-
-                    if (
-                        use_caption_mode
-                        and i == 0
-                        and caption
-                        and self._footer_chat_input_text()
-                    ):
-                        text_res = self._send_caption_fallback_text(
-                            caption, stop_event=stop_event
-                        )
-                        if text_res != "SUCCESS":
-                            return text_res
-                    
-                    if stop_event:
-                        stop_event.wait(2)
-                    else:
-                        time.sleep(2)
-
-                if message and not send_text_with_image:
-                    ready = self._wait_for_chat_ready_after_attachments(stop_event=stop_event)
-                    if ready == "STOPPED":
-                        return "STOPPED"
-                    if ready != "SUCCESS":
-                        return ready
-                    text_res = self._send_text(message, stop_event=stop_event)
-                    if text_res != "SUCCESS":
-                        return text_res
-                # Send extra messages (if any)
-                if extra_messages:
-                    for m in extra_messages:
-                        if stop_event and stop_event.is_set():
-                            return "STOPPED"
-                        if not m:
-                            continue
-                        text_res = self._send_text(m, stop_event=stop_event)
-                        if text_res != "SUCCESS":
-                            return text_res
-                        if stop_event:
-                            stop_event.wait(0.4)
-                        else:
-                            time.sleep(0.4)
-                return "SUCCESS"
-            else:
-                # Text Only
-                res = self._send_text(message, stop_event=stop_event)
-                if res != "SUCCESS":
-                    return res
-                if extra_messages:
-                    for m in extra_messages:
-                        if stop_event and stop_event.is_set():
-                            return "STOPPED"
-                        if not m:
-                            continue
-                        text_res = self._send_text(m, stop_event=stop_event)
-                        if text_res != "SUCCESS":
-                            return text_res
-                        if stop_event:
-                            stop_event.wait(0.4)
-                        else:
-                            time.sleep(0.4)
-                return "SUCCESS"
-
+            return self._send_message_content(
+                name,
+                message,
+                attachments,
+                extra_messages,
+                stop_event,
+                send_text_with_image,
+            )
         except Exception as e:
             return f"ERR_GENERAL: {str(e)[:250]}"
+
+    def _send_message_content(
+        self,
+        name,
+        message,
+        attachments,
+        extra_messages,
+        stop_event,
+        send_text_with_image,
+    ):
+        """Send attachments and/or text in an already-open chat."""
+        if attachments:
+            use_caption_mode = bool(send_text_with_image and message)
+
+            for i, att in enumerate(attachments):
+                if stop_event and stop_event.is_set():
+                    return "STOPPED"
+
+                path = att.get("path")
+                type_ = att.get("type", "image")
+
+                raw_caption = att.get("caption")
+                caption = None
+                if raw_caption:
+                    caption = str(raw_caption).replace("{name}", name).strip()
+                elif use_caption_mode and i == 0:
+                    caption = message
+
+                res = self._send_attachment(path, type_, caption, stop_event=stop_event)
+                if res != "SUCCESS":
+                    return res
+
+                if (
+                    use_caption_mode
+                    and i == 0
+                    and caption
+                    and self._footer_chat_input_text()
+                ):
+                    text_res = self._send_caption_fallback_text(
+                        caption, stop_event=stop_event
+                    )
+                    if text_res != "SUCCESS":
+                        return text_res
+
+                if stop_event:
+                    stop_event.wait(2)
+                else:
+                    time.sleep(2)
+
+            if message and not send_text_with_image:
+                ready = self._wait_for_chat_ready_after_attachments(stop_event=stop_event)
+                if ready == "STOPPED":
+                    return "STOPPED"
+                if ready != "SUCCESS":
+                    return ready
+                text_res = self._send_text(message, stop_event=stop_event)
+                if text_res != "SUCCESS":
+                    return text_res
+
+            if extra_messages:
+                for m in extra_messages:
+                    if stop_event and stop_event.is_set():
+                        return "STOPPED"
+                    if not m:
+                        continue
+                    text_res = self._send_text(m, stop_event=stop_event)
+                    if text_res != "SUCCESS":
+                        return text_res
+                    if stop_event:
+                        stop_event.wait(0.4)
+                    else:
+                        time.sleep(0.4)
+            return "SUCCESS"
+
+        res = self._send_text(message, stop_event=stop_event)
+        if res != "SUCCESS":
+            return res
+        if extra_messages:
+            for m in extra_messages:
+                if stop_event and stop_event.is_set():
+                    return "STOPPED"
+                if not m:
+                    continue
+                text_res = self._send_text(m, stop_event=stop_event)
+                if text_res != "SUCCESS":
+                    return text_res
+                if stop_event:
+                    stop_event.wait(0.4)
+                else:
+                    time.sleep(0.4)
+        return "SUCCESS"
 
     def check_number(self, phone, stop_event=None):
         """Checks if a phone number has WhatsApp without sending a message."""
@@ -1122,7 +1130,7 @@ class WhatsAppBot:
         return False
 
     def _send_attachment(self, path, media_type, caption=None, stop_event=None):
-        """Send a file: direct hidden-input injection first, then attach-menu fallback."""
+        """Upload file via attach menu; send preview/doc; never touch footer chat during media step."""
         if stop_event and stop_event.is_set():
             return "STOPPED"
 
@@ -1134,26 +1142,41 @@ class WhatsAppBot:
 
         input_kind = "document" if media_type == "document" else "media"
 
-        direct_result = self._try_direct_file_injection(path, input_kind, stop_event=stop_event)
-        if direct_result == "STOPPED":
-            return "STOPPED"
-        if not direct_result:
-            menu_result = self._send_attachment_via_attach_menu(
+        if input_kind == "media":
+            upload_result = self._send_attachment_via_attach_menu(
                 path, input_kind, stop_event=stop_event
             )
-            if menu_result != "SUCCESS":
-                return menu_result
+        else:
+            upload_result = self._try_direct_file_injection(
+                path, input_kind, stop_event=stop_event
+            )
+            if upload_result is False:
+                upload_result = self._send_attachment_via_attach_menu(
+                    path, input_kind, stop_event=stop_event
+                )
+            elif upload_result is True:
+                upload_result = "SUCCESS"
+
+        if upload_result == "STOPPED":
+            return "STOPPED"
+        if upload_result != "SUCCESS":
+            return upload_result
 
         try:
             if media_type == "document":
                 send_btn = (
                     self._find_best_clickable(self.SEND_BUTTON_LOCATORS)
-                    or self._wait_for_any(self.SEND_BUTTON_LOCATORS, timeout=15, stop_event=stop_event)
+                    or self._wait_for_any(
+                        self.SEND_BUTTON_LOCATORS, timeout=15, stop_event=stop_event
+                    )
                 )
                 if not send_btn:
                     return "ERR_DOC_SEND_BTN_NOT_FOUND"
             else:
-                self._wait_for_any(self.MEDIA_PREVIEW_LOCATORS, timeout=40, stop_event=stop_event)
+                if not self._wait_for_any(
+                    self.MEDIA_PREVIEW_LOCATORS, timeout=40, stop_event=stop_event
+                ):
+                    return "ERR_FILE_INPUT_NOT_FOUND"
                 if stop_event and stop_event.is_set():
                     return "STOPPED"
 
@@ -1180,15 +1203,7 @@ class WhatsAppBot:
 
                 send_btn = self._find_preview_send_button(stop_event=stop_event)
                 if not send_btn:
-                    send_btn = (
-                        self._find_best_clickable(self.SEND_BUTTON_LOCATORS)
-                        or self._wait_for_any(
-                            self.SEND_BUTTON_LOCATORS, timeout=15, stop_event=stop_event
-                        )
-                    )
-
-            if not send_btn:
-                return "ERR_SEND_BTN_NOT_FOUND"
+                    return "ERR_SEND_BTN_NOT_FOUND"
 
             if stop_event and stop_event.is_set():
                 return "STOPPED"
@@ -1203,7 +1218,7 @@ class WhatsAppBot:
                 time.sleep(wait_time)
 
             if media_type != "document":
-                self._wait_for_preview_close(timeout=10, stop_event=stop_event)
+                self._wait_for_preview_close(timeout=12, stop_event=stop_event)
                 if caption and (not caption_applied or self._footer_chat_input_text()):
                     fallback = self._send_caption_fallback_text(
                         caption, stop_event=stop_event
@@ -1343,6 +1358,10 @@ class WhatsAppBot:
     def _send_text(self, message, stop_event=None):
         if stop_event and stop_event.is_set():
             return "STOPPED"
+        if self._media_preview_visible():
+            self._wait_for_preview_close(timeout=12, stop_event=stop_event)
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
         try:
             chat_input = self._wait_for_any(self.CHAT_INPUT_LOCATORS, timeout=30, stop_event=stop_event)
             if not chat_input:

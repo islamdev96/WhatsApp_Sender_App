@@ -19,9 +19,10 @@ DEFAULT_CONFIG = {
     "batch_size": 30,
     "batch_pause_min": 180,
     "batch_pause_max": 240,
-    "max_retries": 2,
+    "max_retries": 1,
     "retry_delay_min": 3,
     "retry_delay_max": 6,
+    "retry_full_navigation": False,
     "max_consecutive_failures": 5,
     "enable_spintax": True,
     "auto_open_login": True,
@@ -51,6 +52,9 @@ class ConfigManager:
                 with open(self.config_path, 'r', encoding='utf-8') as f:
                     saved = json.load(f)
                 self.config.update(saved)
+                # Prefer two-step send; merged caption mode is unreliable in automation.
+                if self.config.get("send_text_with_image"):
+                    self.config["send_text_with_image"] = False
         except Exception:
             pass
 
