@@ -78,16 +78,11 @@ class WhatsAppBot:
             (By.XPATH, '//input[@type="file" and contains(@accept,"video/quicktime")]'),
         ]
         self.STICKER_PANEL_LOCATORS = [
-            (By.XPATH, '//span[@data-icon="sticker"]'),
-            (By.XPATH, '//span[@data-icon="sticker-add"]'),
-            (By.XPATH, '//span[@data-icon="wds-ic-sticker"]'),
             (By.XPATH, '//div[@data-testid="sticker-panel"]'),
             (By.XPATH, '//*[@data-testid="sticker-maker"]'),
         ]
         self.MEDIA_PREVIEW_LOCATORS = [
             (By.XPATH, '//div[@data-testid="media-viewer"]'),
-            (By.XPATH, '//div[@role="dialog"]//img'),
-            (By.XPATH, '//img[contains(@src,"blob:")]'),
         ]
         self.INVALID_NUMBER_LOCATORS = [
             (By.XPATH, '//*[contains(text(),"phone number shared via url is invalid")]'),
@@ -475,7 +470,7 @@ class WhatsAppBot:
         }
         var want = labels.map(norm);
         var candidates = document.querySelectorAll(
-            'li, div[role="button"], div[tabindex="0"], span[dir="auto"]'
+            'li, div[role="button"], div[tabindex="0"], span[dir="auto"], button, [role="menuitem"]'
         );
         for (var i = 0; i < candidates.length; i++) {
             var el = candidates[i];
@@ -486,6 +481,8 @@ class WhatsAppBot:
                 if (t === want[j] || t.indexOf(want[j]) >= 0 || want[j].indexOf(t) >= 0) {
                     var row = el.closest('li')
                         || el.closest('[role="button"]')
+                        || el.closest('button')
+                        || el.closest('[role="menuitem"]')
                         || el.closest('div[tabindex]')
                         || el;
                     if (!isVisible(row)) continue;
@@ -570,18 +567,20 @@ class WhatsAppBot:
                 f"//li[.//*[contains(normalize-space(.),'{label}')]]",
                 f"//*[@role='button'][.//*[contains(normalize-space(.),'{label}')]]",
                 f"//div[contains(@class,'x1n2onr6')][.//*[contains(normalize-space(.),'{label}')]]",
+                f"//button[.//*[contains(normalize-space(.),'{label}')] or contains(normalize-space(.),'{label}')]",
+                f"//*[@role='menuitem'][.//*[contains(normalize-space(.),'{label}')] or contains(normalize-space(.),'{label}')]",
             ]
             for xpath in fragments:
                 try:
                     for el in self.driver.find_elements(By.XPATH, xpath):
                         if el.is_displayed():
-                            if self._click_element(el):
-                                return True
+                            # Prioritize direct JS click on the menu option to ensure React triggers the input injection
                             try:
                                 self.driver.execute_script("arguments[0].click();", el)
                                 return True
                             except Exception:
-                                continue
+                                if self._click_element(el):
+                                    return True
                 except Exception:
                     continue
         return False
@@ -633,8 +632,13 @@ class WhatsAppBot:
             if input_kind == "document"
             else [
                 "الصور ومقاطع الفيديو",
+                "الصور والفيديو",
+                "صور وفيديو",
+                "معرض",
+                "gallery",
                 "Photos & videos",
                 "Photos and videos",
+                "Photos & Videos",
             ]
         )
 
@@ -650,41 +654,47 @@ class WhatsAppBot:
         if input_el:
             return input_el
 
+        # Attempt 1: Resilient Selenium Click on menu row
         self._click_attach_menu_row_by_text(labels)
-        if stop_event:
-            stop_event.wait(0.6)
-        else:
-            time.sleep(0.6)
+        
+        # Check if click injected the file input in the DOM immediately
+        input_el = self._wait_for_new_file_input(
+            input_kind,
+            existing_signatures,
+            timeout=3.0,
+            stop_event=stop_event,
+        )
+        if input_el:
+            return input_el
 
         input_el = self._find_visible_menu_file_input(input_kind)
         if input_el:
             return input_el
 
         input_el = self._wait_for_file_input_in_attach_menu(
-            input_kind, timeout=2.5, stop_event=stop_event
+            input_kind, timeout=1.0, stop_event=stop_event
         )
         if input_el:
             return input_el
 
+        # Attempt 2: JS Click fallback
         self._js_activate_attach_menu_option_by_text(labels)
-        if stop_event:
-            stop_event.wait(0.5)
-        else:
-            time.sleep(0.5)
-
-        input_el = self._find_visible_menu_file_input(input_kind)
-        if input_el:
-            return input_el
-
+        
+        # Check if JS click injected the file input in the DOM immediately
         input_el = self._wait_for_new_file_input(
             input_kind,
             existing_signatures,
-            timeout=5,
+            timeout=4.0,
             stop_event=stop_event,
         )
         if input_el:
             return input_el
 
+        input_el = self._find_visible_menu_file_input(input_kind)
+        if input_el:
+            return input_el
+
+        # Last resort fallback: check any file input on the page matching kind
         return self._find_file_input(input_kind)
 
     def _wait_for_new_file_input(self, kind, existing_signatures, timeout=8, stop_event=None):
@@ -950,7 +960,12 @@ class WhatsAppBot:
                 self._emit("ERROR", "زر الإرفاق (+) غير موجود")
                 return "ERR_ATTACH_BTN_NOT_FOUND"
 
-            self._click_element(attach_btn)
+            # Use JavaScript click to ensure React synthetic event handlers trigger and the menu opens
+            try:
+                self.driver.execute_script("arguments[0].click();", attach_btn)
+            except Exception:
+                self._click_element(attach_btn)
+                
             self._emit("STEP", "تم فتح قائمة الإرفاق (+)")
             if stop_event:
                 stop_event.wait(1.2)
@@ -1362,14 +1377,7 @@ class WhatsAppBot:
         if force_url:
             self._force_url_next = False
 
-        can_search = (
-            not force_url
-            and self.is_logged_in()
-            and (
-                not self._last_opened_phone
-                or phone != self._last_opened_phone
-            )
-        )
+        can_search = False
         if can_search and self._open_chat_via_search(phone, stop_event=stop_event):
             self._last_opened_phone = phone
             self._emit("STEP", "فتح المحادثة عبر البحث", phone)
@@ -1377,9 +1385,10 @@ class WhatsAppBot:
             self._emit("INFO", f"حالة المحادثة: {state}", phone)
             return state
 
-        # Mark the current session state so we can detect when the page actually unloads and reloads
+        # Get reference to the current HTML element to detect when the page actually unloads
+        old_html = None
         try:
-            self.driver.execute_script("window.__old_page = true;")
+            old_html = self.driver.find_element(By.TAG_NAME, "html")
         except Exception:
             pass
 
@@ -1387,32 +1396,52 @@ class WhatsAppBot:
         url = f"https://web.whatsapp.com/send?phone={phone}&t={int(time.time())}"
         self._emit("STEP", "فتح المحادثة عبر الرابط", phone)
         self.driver.get(url)
+        
+        # Force a complete refresh to discard all client-side cache, bfcache, and SPA router state
+        try:
+            self.driver.refresh()
+        except Exception:
+            pass
+
+        # Wait for the old HTML element to become stale (indicating that the browser has fully unloaded the old page)
+        if old_html:
+            try:
+                from selenium.webdriver.support.ui import WebDriverWait
+                from selenium.webdriver.support import expected_conditions as EC
+                WebDriverWait(self.driver, 10).until(EC.staleness_of(old_html))
+                self._emit("INFO", "تم تأكيد إلغاء تحميل الصفحة السابقة وتفريغ الذاكرة بنجاح.")
+            except Exception:
+                time.sleep(3.0)
+        else:
+            time.sleep(3.0)
+
         self._last_opened_phone = phone
 
-        # Wait until the page unloads and clears the window.__old_page variable, or timeout
-        start_unload = time.time()
-        unloaded = False
-        while time.time() - start_unload < 5:
+        # Wait for the main app layout (search box) to become visible, indicating that the SPA has fully booted and stabilized
+        self._emit("INFO", "انتظار اكتمال تحميل تطبيق واتساب واستقرار الواجهة...")
+        start_wait = time.time()
+        booted = False
+        while time.time() - start_wait < 45:
+            if stop_event and stop_event.is_set():
+                return "STOPPED"
             try:
-                is_old = self.driver.execute_script("return window.__old_page;")
-                if is_old is not True:
-                    unloaded = True
+                search_box = self._find_any(self.SEARCH_BOX_LOCATORS)
+                if search_box and search_box.is_displayed():
+                    booted = True
                     break
             except Exception:
-                # If an exception is thrown, the page is in the middle of unloading, which is what we want!
-                unloaded = True
-                break
-            time.sleep(0.2)
+                pass
+            time.sleep(0.5)
         
-        if unloaded:
-            self._emit("INFO", "تم كشف بدء تحميل الصفحة الجديدة وإلغاء الصفحة السابقة بنجاح.")
+        if booted:
+            self._emit("INFO", "اكتمل تحميل تطبيق واتساب واستقرار الواجهة بنجاح.")
         else:
-            self._emit("WARN", "تنبيه: لم يتم كشف إلغاء الصفحة السابقة في الوقت المحدد.")
+            self._emit("WARN", "تنبيه: انتهت مهلة استقرار الواجهة، مواصلة الانتظار...")
         
-        # Give a small buffer for the startup loader screen to take over
+        # Additional small buffer (1.5s) for React routing transition to take effect
         time.sleep(1.5)
 
-        state = self._wait_for_chat_or_invalid(timeout=20, stop_event=stop_event)
+        state = self._wait_for_chat_or_invalid(timeout=45, stop_event=stop_event)
         self._emit("INFO", f"حالة المحادثة: {state}", phone)
         return state
 
