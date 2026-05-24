@@ -443,6 +443,33 @@ class WhatsAppBot:
             return bool(self.driver.execute_script(script, data_icon))
         except Exception:
             return False
+        # JS fallback: search for visible elements containing Arabic 'تجاهل' and click nearest clickable
+        try:
+            script = """
+            function visible(el){ if(!el) return false; var s = window.getComputedStyle(el); return s.display !== 'none' && s.visibility !== 'hidden' && el.offsetParent !== null; }
+            var phrases = ['تجاهل', 'تجاهل الإخطار', 'تجاهل الإشعارات'];
+            var all = document.querySelectorAll('*');
+            for(var i=0;i<all.length;i++){
+                var el = all[i];
+                try{
+                    var txt = (el.innerText||'').trim();
+                    if(!txt) continue;
+                    for(var j=0;j<phrases.length;j++){
+                        if(txt.indexOf(phrases[j])>=0 && visible(el)){
+                            var btn = el.closest('button') || el.closest('[role="button"]') || el.querySelector('button') || el;
+                            if(btn){ btn.click(); return {clicked:true, via:'js-phrase', phrase:phrases[j]}; }
+                        }
+                    }
+                }catch(e){}
+            }
+            return {clicked:false};
+            """
+            res = self.driver.execute_script(script)
+            if res and isinstance(res, dict) and res.get('clicked'):
+                self._emit("INFO", f"[MODAL-JS] clicked dismiss via phrase")
+                return True
+        except Exception:
+            pass
 
     def _js_activate_attach_menu_option_by_text(self, labels):
         """Finds row by text, blocks its nested file input click/mousedown, and dispatch click events on the row."""
@@ -515,6 +542,17 @@ class WhatsAppBot:
         exclude_signatures = exclude_signatures or set()
         try:
             inputs = self.driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
+        except Exception:
+            return None
+        # Final global-JS fallback: look for any visible span[data-icon*='send'] anywhere on page
+        try:
+            gs = '''
+            var spans = document.querySelectorAll('span[data-icon]');
+            function visible(el){ if(!el) return false; var s=window.getComputedStyle(el); return s.display!=='none' && s.visibility!=='hidden' && el.offsetParent!==null; }
+            for(var i=0;i<spans.length;i++){ var d = spans[i].getAttribute('data-icon')||''; if(d.indexOf('send')>=0 && visible(spans[i])) return spans[i].closest('button')||spans[i].closest('[role="button"]')||spans[i]; }
+            return null;
+            '''
+            return self.driver.execute_script(gs)
         except Exception:
             return None
         for el in inputs:
@@ -1707,9 +1745,56 @@ class WhatsAppBot:
         send_btn = self._find_best_clickable(self.MEDIA_PREVIEW_SEND_BUTTON_LOCATORS)
         if send_btn:
             return send_btn
-        return self._wait_for_any(
+
+        # Try waiting for the configured locators first
+        waited = self._wait_for_any(
             self.MEDIA_PREVIEW_SEND_BUTTON_LOCATORS, timeout=10, stop_event=stop_event
         )
+        if waited:
+            return waited
+
+        # JS fallback: search inside the preview/dialog or globally for any visible send-like control
+        if not self.driver:
+            return None
+        try:
+            script = """
+            function visible(el){ if(!el) return false; var st=window.getComputedStyle(el); return st.display!=='none' && st.visibility!=='hidden' && el.offsetParent!==null; }
+            var preview = document.querySelector('[data-testid="media-viewer"]') || document.querySelector('[role="dialog"]');
+            var containers = [];
+            if (preview) {
+                containers.push(preview);
+            } else {
+                containers.push(document);
+            }
+            var selectors = [
+                'span[data-icon*="send"]',
+                'span[data-icon*="send-light"]',
+                'button[aria-label*="Send"]',
+                'button[aria-label*="إرسال"]',
+                '[role="button"][aria-label*="Send"]',
+                '[role="button"][aria-label*="إرسال"]'
+            ];
+            for (var ci = 0; ci < containers.length; ci++) {
+                var container = containers[ci];
+                for (var si = 0; si < selectors.length; si++) {
+                    var els = container.querySelectorAll(selectors[si]);
+                    for (var ei = 0; ei < els.length; ei++) {
+                        if (visible(els[ei])) {
+                            var el = els[ei];
+                            if (el.tagName.toLowerCase() === 'span') {
+                                var clickable = el.closest('button') || el.closest('[role="button"]') || el;
+                                if (clickable) return clickable;
+                            }
+                            return el;
+                        }
+                    }
+                }
+            }
+            return null;
+            """
+            return self.driver.execute_script(script)
+        except Exception:
+            return None
 
     def _send_caption_fallback_text(self, caption, stop_event=None):
         if stop_event and stop_event.is_set():
@@ -1744,6 +1829,44 @@ class WhatsAppBot:
             return True
         except Exception:
             pass
+        return False
+
+    def _dismiss_modal_if_present(self, stop_event=None):
+        """Dismiss common dialog/modals that can block the media preview (e.g. discard/ignore prompts)."""
+        if stop_event and stop_event.is_set():
+            return False
+        if not self.driver:
+            return False
+        try:
+            dialogs = self.driver.find_elements(By.XPATH, "//div[@role='dialog'] | //div[contains(@class,'modal')]")
+            for d in dialogs:
+                try:
+                    if not d.is_displayed():
+                        continue
+                    # Prefer buttons with text 'إلغاء' / 'Cancel' / 'لا' to dismiss the dialog without discarding
+                    cand_buttons = d.find_elements(By.XPATH, ".//button | .//*[@role='button']")
+                    for b in cand_buttons:
+                        try:
+                            txt = (b.text or "").strip()
+                            aria = (b.get_attribute('aria-label') or "").strip()
+                            if any(k in txt for k in ('إلغاء', 'Cancel', 'لا', 'تجاهل')) or any(k in aria for k in ('إلغاء', 'Cancel', 'لا', 'تجاهل')):
+                                self._emit("INFO", f"[MODAL] Dismissing dialog via button text='{txt}' aria='{aria}'")
+                                self._click_element(b)
+                                return True
+                        except Exception:
+                            continue
+                    # Fallback: click any visible close control inside the dialog
+                    try:
+                        close = d.find_element(By.XPATH, ".//span[@data-icon='x'] | .//button[contains(@aria-label,'Close')] | .//button[contains(., '×')]")
+                        if close.is_displayed():
+                            self._click_element(close)
+                            return True
+                    except Exception:
+                        pass
+                except Exception:
+                    continue
+        except Exception:
+            return False
         return False
 
     def _send_attachment(self, path, media_type, caption=None, stop_event=None, phone=None):
@@ -1795,6 +1918,12 @@ class WhatsAppBot:
                 if not send_btn:
                     return "ERR_DOC_SEND_BTN_NOT_FOUND"
             else:
+                # Dismiss any blocking modal that may overlay the preview area (e.g. discard/ignore prompts)
+                try:
+                    self._dismiss_modal_if_present(stop_event=stop_event)
+                except Exception:
+                    pass
+
                 if not self._wait_for_any(
                     self.MEDIA_PREVIEW_LOCATORS, timeout=40, stop_event=stop_event
                 ):
@@ -1825,6 +1954,54 @@ class WhatsAppBot:
 
                 send_btn = self._find_preview_send_button(stop_event=stop_event)
                 if not send_btn:
+                    # Final-resort JS click: try to find & click send inside preview via JS (avoids Selenium click issues)
+                    try:
+                        js_click = '''
+                        var preview = document.querySelector('[data-testid="media-viewer"]') || document.querySelector('[role="dialog"]');
+                        function visible(el){ if(!el) return false; var s=window.getComputedStyle(el); return s.display!=='none' && s.visibility!=='hidden' && el.offsetParent!==null; }
+                        if(preview){
+                            var spans = preview.querySelectorAll('span[data-icon]');
+                            for(var i=0;i<spans.length;i++){ var d=spans[i].getAttribute('data-icon')||''; if(d.indexOf('send')>=0 && visible(spans[i])){ var btn=spans[i].closest('button')||spans[i].closest('[role="button"]')||spans[i]; try{ btn.click(); }catch(e){} return {clicked:true, why:'span-send'}; } }
+                            var btns = preview.querySelectorAll('button, [role="button"]');
+                            for(var j=0;j<btns.length;j++){ var b=btns[j]; var txt=(b.getAttribute('aria-label')||b.textContent||'').toLowerCase(); if((txt.indexOf('send')>=0 || txt.indexOf('إرسال')>=0) && visible(b)){ try{ b.click(); }catch(e){} return {clicked:true, why:'aria-text'}; } }
+                            // Try dispatching Enter on preview
+                            try{ var ev = new KeyboardEvent('keydown', {key:'Enter', code:'Enter', bubbles:true}); preview.dispatchEvent(ev); }catch(e){}
+                            return {clicked:false, why:'none'};
+                        }
+                        return {clicked:false, why:'no-preview'};
+                        '''
+                        res = self.driver.execute_script(js_click)
+                        if res and isinstance(res, dict) and res.get('clicked'):
+                            self._emit('INFO', f"[JS-SEND] clicked preview send via {res.get('why')}")
+                            send_btn = True
+                    except Exception:
+                        pass
+
+                if not send_btn:
+                    # Diagnostic: dump preview/dialog DOM to logs to help identify blocking overlays
+                    try:
+                        diag = self.driver.execute_script("""
+                        var preview = document.querySelector('[data-testid="media-viewer"]') || document.querySelector('[role="dialog"]');
+                        if(!preview) return {error:'NO_PREVIEW'};
+                        var buttons = [];
+                        preview.querySelectorAll('button, [role="button"]').forEach(function(b){
+                            var txt = (b.textContent||'').trim().slice(0,80);
+                            var aria = b.getAttribute('aria-label')||'';
+                            var icons = Array.from(b.querySelectorAll('span[data-icon]')).map(s=>s.getAttribute('data-icon'));
+                            var vis = window.getComputedStyle(b).display!=='none' && b.offsetParent!==null;
+                            buttons.push({tag:b.tagName, text:txt, aria:aria, icons:icons, visible:vis});
+                        });
+                        var dialogs = [];
+                        document.querySelectorAll('div[role="dialog"], div[class*="modal"]').forEach(function(d){
+                            if(window.getComputedStyle(d).display==='none') return;
+                            dialogs.push({text:d.textContent.trim().slice(0,200)});
+                        });
+                        return {buttons:buttons, dialogs:dialogs};
+                        """
+                        )
+                        self._emit("ERROR", f"[DIAG-PREVIEW] {diag}")
+                    except Exception as e:
+                        self._emit("ERROR", f"[DIAG-PREVIEW] dump failed: {e}")
                     self._emit("ERROR", "زر إرسال المعاينة غير موجود")
                     return "ERR_SEND_BTN_NOT_FOUND"
 
