@@ -272,10 +272,28 @@ class RichTextFrame(ctk.CTkFrame):
         self.text_box.pack(fill="both", expand=True, padx=5, pady=(5, 2))
         
         # Enable undo in the underlying tk.Text widget
+        tb = self.text_box._textbox
         try:
-            self.text_box._textbox.configure(undo=True)
+            tb.configure(undo=True)
         except Exception:
             pass
+
+        # Configure premium typography fonts and tag options
+        try:
+            self.font_bold = ctk.CTkFont(family="Segoe UI", size=14, weight="bold")
+            self.font_italic = ctk.CTkFont(family="Segoe UI", size=14, slant="italic")
+            self.font_bold_italic = ctk.CTkFont(family="Segoe UI", size=14, weight="bold", slant="italic")
+            
+            tb.tag_configure("bold", font=self.font_bold)
+            tb.tag_configure("italic", font=self.font_italic)
+            tb.tag_configure("bold_italic", font=self.font_bold_italic)
+            tb.tag_configure("strike", overstrike=True)
+            tb.tag_configure("variable", font=self.font_bold)
+        except Exception:
+            pass
+
+        # Bind mouse click event for visual offset correction in right alignment
+        tb.bind("<Button-1>", self._on_click)
 
         # Context Menu for Right-Click
         self.context_menu = tk.Menu(self, tearoff=0, font=("Segoe UI", 11))
@@ -289,8 +307,8 @@ class RichTextFrame(ctk.CTkFrame):
         self.context_menu.add_separator()
         self.context_menu.add_command(label="تحديد الكل (Select All)", command=self._select_all)
         self.context_menu.add_separator()
-        self.context_menu.add_command(label="اتجاه القراءة من اليمين لليسار (RTL)", command=lambda: self.text_box._textbox.configure(justify="right"))
-        self.context_menu.add_command(label="اتجاه القراءة من اليسار لليمين (LTR)", command=lambda: self.text_box._textbox.configure(justify="left"))
+        self.context_menu.add_command(label="اتجاه القراءة من اليمين لليسار (RTL)", command=self._align_right)
+        self.context_menu.add_command(label="اتجاه القراءة من اليسار لليمين (LTR)", command=self._align_left)
 
         self.text_box.bind("<Button-3>", self._show_context_menu)
 
@@ -345,6 +363,7 @@ class RichTextFrame(ctk.CTkFrame):
     def _insert_var(self, value):
         self.text_box.insert("insert", f" {value} ")
         self.var_option.set("متغير")
+        self._update_char_count()
 
     def _insert_wrap(self, char):
         try:
@@ -355,13 +374,14 @@ class RichTextFrame(ctk.CTkFrame):
                 text = self.text_box.get(sel_start, sel_end)
                 self.text_box.delete(sel_start, sel_end)
                 self.text_box.insert(sel_start, f"{char}{text}{char}")
+                self._update_char_count()
                 return
         except tk.TclError:
             pass
         
         # If no selection, just insert chars
         self.text_box.insert("insert", f"{char}{char}")
-        # Move cursor back one char? (Not easy in CTkTextbox without index math)
+        self._update_char_count()
 
     def get_text(self):
         return self.text_box.get("1.0", "end").strip()
@@ -371,10 +391,118 @@ class RichTextFrame(ctk.CTkFrame):
         self.text_box.insert("1.0", text)
         self._update_char_count()
 
+    def _on_click(self, event):
+        """Corrects index mapping coordinate error when the text is right-justified."""
+        if not getattr(self, "align_right_enabled", False):
+            return
+            
+        tb = self.text_box._textbox
+        try:
+            line_start_idx = tb.index(f"@0,{event.y}")
+            line_num = int(line_start_idx.split('.')[0])
+        except Exception:
+            return
+            
+        line_text = tb.get(f"{line_num}.0", f"{line_num}.end")
+        num_chars = len(line_text)
+        
+        if num_chars == 0:
+            tb.mark_set("insert", f"{line_num}.0")
+            tb.focus_set()
+            return "break"
+            
+        closest_idx = None
+        min_dist = float('inf')
+        matched = False
+        
+        # Look for exact character bounding box click match
+        for col in range(num_chars + 1):
+            idx = f"{line_num}.{col}"
+            bbox = tb.bbox(idx)
+            if bbox:
+                x, y, w, h = bbox
+                if x <= event.x <= x + w:
+                    closest_idx = idx
+                    matched = True
+                    break
+                    
+        # Fallback to the closest character edge
+        if not matched:
+            for col in range(num_chars + 1):
+                idx = f"{line_num}.{col}"
+                bbox = tb.bbox(idx)
+                if bbox:
+                    x, y, w, h = bbox
+                    dist_left = abs(event.x - x)
+                    if dist_left < min_dist:
+                        min_dist = dist_left
+                        closest_idx = idx
+                    dist_right = abs(event.x - (x + w))
+                    if dist_right < min_dist:
+                        min_dist = dist_right
+                        closest_idx = f"{line_num}.{col + 1}"
+                        
+        if closest_idx:
+            tb.mark_set("insert", closest_idx)
+            tb.focus_set()
+            return "break"
+
+    def _align_right(self):
+        self.align_right_enabled = True
+        try:
+            self.text_box._textbox.tag_configure("align_right", justify="right")
+            self.text_box._textbox.tag_add("align_right", "1.0", "end")
+        except Exception:
+            pass
+
+    def _align_left(self):
+        self.align_right_enabled = False
+        try:
+            self.text_box._textbox.tag_remove("align_right", "1.0", "end")
+        except Exception:
+            pass
+
+    def _update_visual_styling(self):
+        """Highlights variables and formatting syntaxes dynamically in the textbox."""
+        import re
+        tb = self.text_box._textbox
+        
+        # Remove old tags
+        for tag in ["bold", "italic", "bold_italic", "strike", "variable"]:
+            try:
+                tb.tag_remove(tag, "1.0", "end")
+            except Exception:
+                pass
+                
+        text = tb.get("1.0", "end")
+        
+        # 1. Variables {name}, {phone}, etc.
+        for match in re.finditer(r"\{[^{}]+\}", text):
+            tb.tag_add("variable", f"1.0 + {match.start()} chars", f"1.0 + {match.end()} chars")
+            
+        # 2. Bold *text*
+        for match in re.finditer(r"\*([^*]+)\*", text):
+            tb.tag_add("bold", f"1.0 + {match.start(1)} chars", f"1.0 + {match.end(1)} chars")
+            
+        # 3. Italic _text_
+        for match in re.finditer(r"_([^_]+)_", text):
+            tb.tag_add("italic", f"1.0 + {match.start(1)} chars", f"1.0 + {match.end(1)} chars")
+            
+        # 4. Strike ~text~
+        for match in re.finditer(r"~([^~]+)~", text):
+            tb.tag_add("strike", f"1.0 + {match.start(1)} chars", f"1.0 + {match.end(1)} chars")
+
     def _update_char_count(self, event=None):
         text = self.text_box.get("1.0", "end").strip()
         count = len(text)
         self.char_counter.configure(text=f"{count} حرف")
+        self._update_visual_styling()
+        if getattr(self, "align_right_enabled", False):
+            try:
+                self.text_box._textbox.tag_configure("align_right", justify="right")
+                self.text_box._textbox.tag_add("align_right", "1.0", "end")
+            except Exception:
+                pass
 
     def _c(self, key, fallback=None):
         return self.colors.get(key, fallback)
@@ -402,3 +530,13 @@ class RichTextFrame(ctk.CTkFrame):
             border_color=self._c("border", None),
         )
         self.char_counter.configure(text_color=self._c("text_muted", "#888888"))
+        
+        # Configure variable tag coloring dynamically based on active theme
+        tb = self.text_box._textbox
+        is_dark = self._c("appearance_mode", "dark") == "dark"
+        var_bg = "#1b3f27" if is_dark else "#e2fbe8"
+        var_fg = "#7effa3" if is_dark else "#155724"
+        try:
+            tb.tag_configure("variable", background=var_bg, foreground=var_fg)
+        except Exception:
+            pass

@@ -64,17 +64,23 @@ class WhatsAppBot:
             (By.XPATH, '//div[@aria-label="إرسال"]'),
         ]
         self.ATTACH_BUTTON_LOCATORS = [
+            # Most specific: exact attach-menu-plus icon (modern WhatsApp Web)
+            (By.XPATH, '//span[@data-icon="attach-menu-plus"]'),
+            # Clip icons (older WhatsApp versions)
             (By.XPATH, '//span[@data-icon="clip"]'),
             (By.XPATH, '//span[@data-icon="clip-light"]'),
-            (By.XPATH, '//span[@data-icon="plus"]'),
-            (By.XPATH, '//span[@data-icon="plus-large"]'),
-            (By.XPATH, '//span[@data-icon="attach-menu-plus"]'),
-            (By.XPATH, '//div[@title="Attach"]'),
-            (By.XPATH, '//div[@title="إرفاق"]'),
-            (By.XPATH, '//*[@aria-label="Attach"]'),
-            (By.XPATH, '//*[@aria-label="إرفاق"]'),
-            (By.CSS_SELECTOR, 'span[data-icon*="clip"]'),
-            (By.CSS_SELECTOR, 'span[data-icon*="plus"]'),
+            # Plus icons - SCOPED to footer to avoid hitting the emoji button
+            (By.XPATH, '//footer//span[@data-icon="plus"]'),
+            (By.XPATH, '//footer//span[@data-icon="plus-large"]'),
+            # Aria labels - SCOPED to footer
+            (By.XPATH, '//footer//*[@aria-label="Attach"]'),
+            (By.XPATH, '//footer//*[@aria-label="إرفاق"]'),
+            # Title attributes - SCOPED to footer
+            (By.XPATH, '//footer//div[@title="Attach"]'),
+            (By.XPATH, '//footer//div[@title="إرفاق"]'),
+            # data-testid based
+            (By.CSS_SELECTOR, 'footer span[data-icon="attach-menu-plus"]'),
+            (By.CSS_SELECTOR, 'footer span[data-icon*="clip"]'),
             (By.CSS_SELECTOR, 'button[data-testid*="clip"]'),
         ]
         self.FILE_INPUT_LOCATORS = [
@@ -531,7 +537,7 @@ class WhatsAppBot:
                 return "SUCCESS"
 
         except Exception as e:
-            return f"ERR_GENERAL: {str(e)[:100]}"
+            return f"ERR_GENERAL: {str(e)[:250]}"
 
     def check_number(self, phone, stop_event=None):
         """Checks if a phone number has WhatsApp without sending a message."""
@@ -551,7 +557,7 @@ class WhatsAppBot:
                 return "STOPPED"
             return "ERR_TIMEOUT"
         except Exception as e:
-            return f"ERR_GENERAL: {str(e)[:100]}"
+            return f"ERR_GENERAL: {str(e)[:250]}"
 
     def _send_attachment(self, path, media_type, caption=None, stop_event=None):
         """Internal method to upload a single file."""
@@ -665,7 +671,7 @@ class WhatsAppBot:
                             time.sleep(0.5)
                         if stop_event and stop_event.is_set():
                             return "STOPPED"
-                        caption_box.send_keys(caption)
+                        self._enter_text(caption_box, caption, stop_event=stop_event)
                         if stop_event:
                             stop_event.wait(1.0)
                         else:
@@ -696,7 +702,103 @@ class WhatsAppBot:
             return "SUCCESS"
             
         except Exception as e:
-            return f"ERR_ATTACH_{media_type.upper()}: {str(e)[:50]}"
+            return f"ERR_ATTACH_{media_type.upper()}: {str(e)[:250]}"
+
+    def _set_clipboard_text(self, text):
+        """Sets Unicode text to the Windows clipboard using ctypes."""
+        import ctypes
+        from ctypes import wintypes
+        
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        
+        OpenClipboard = user32.OpenClipboard
+        OpenClipboard.argtypes = [wintypes.HWND]
+        OpenClipboard.restype = wintypes.BOOL
+        
+        EmptyClipboard = user32.EmptyClipboard
+        EmptyClipboard.argtypes = []
+        EmptyClipboard.restype = wintypes.BOOL
+        
+        SetClipboardData = user32.SetClipboardData
+        SetClipboardData.argtypes = [wintypes.UINT, wintypes.HANDLE]
+        SetClipboardData.restype = wintypes.HANDLE
+        
+        CloseClipboard = user32.CloseClipboard
+        CloseClipboard.argtypes = []
+        CloseClipboard.restype = wintypes.BOOL
+        
+        GlobalAlloc = kernel32.GlobalAlloc
+        GlobalAlloc.argtypes = [wintypes.UINT, ctypes.c_size_t]
+        GlobalAlloc.restype = wintypes.HGLOBAL
+        
+        GlobalLock = kernel32.GlobalLock
+        GlobalLock.argtypes = [wintypes.HGLOBAL]
+        GlobalLock.restype = ctypes.c_void_p
+        
+        GlobalUnlock = kernel32.GlobalUnlock
+        GlobalUnlock.argtypes = [wintypes.HGLOBAL]
+        GlobalUnlock.restype = wintypes.BOOL
+        
+        GMEM_MOVEABLE = 0x0002
+        CF_UNICODETEXT = 13
+        
+        if not OpenClipboard(None):
+            return False
+        try:
+            EmptyClipboard()
+            data = text.encode('utf-16-le') + b'\x00\x00'
+            h_mem = GlobalAlloc(GMEM_MOVEABLE, len(data))
+            if not h_mem:
+                return False
+            p_mem = GlobalLock(h_mem)
+            if not p_mem:
+                return False
+            ctypes.memmove(p_mem, data, len(data))
+            GlobalUnlock(h_mem)
+            SetClipboardData(CF_UNICODETEXT, h_mem)
+        except Exception:
+            return False
+        finally:
+            CloseClipboard()
+        return True
+
+    def _enter_text(self, element, text, stop_event=None):
+        """Types or pastes text to ensure non-BMP characters like emojis send successfully."""
+        if not text:
+            return
+            
+        try:
+            element.click()
+        except:
+            try:
+                self.driver.execute_script("arguments[0].click();", element)
+            except:
+                pass
+                
+        if stop_event:
+            stop_event.wait(0.2)
+        else:
+            time.sleep(0.2)
+            
+        has_non_bmp = any(ord(char) > 0xffff for char in text)
+        if has_non_bmp or len(text) >= 200:
+            if self._set_clipboard_text(text):
+                try:
+                    element.send_keys(Keys.CONTROL, 'v')
+                    if stop_event:
+                        stop_event.wait(0.5)
+                    else:
+                        time.sleep(0.5)
+                    return
+                except Exception:
+                    pass
+                    
+        # Fallback to direct send_keys or human type
+        if len(text) < 200:
+            self._human_type(element, text, stop_event=stop_event)
+        else:
+            element.send_keys(text)
 
     def _human_type(self, element, text, stop_event=None):
         """Types text like a human with random delays."""
@@ -745,11 +847,7 @@ class WhatsAppBot:
             
             if stop_event and stop_event.is_set():
                 return "STOPPED"
-            # Use human typing for shorter messages to avoid detection
-            if len(message) < 200:
-                self._human_type(chat_input, message, stop_event=stop_event)
-            else:
-                chat_input.send_keys(message) # Paste long messages
+            self._enter_text(chat_input, message, stop_event=stop_event)
                 
             if stop_event:
                 stop_event.wait(0.5)
@@ -776,7 +874,7 @@ class WhatsAppBot:
             self._random_scroll(stop_event=stop_event) # Scroll a bit after sending
             return "SUCCESS"
         except Exception as e:
-            return f"ERR_TEXT_SEND: {str(e)[:50]}"
+            return f"ERR_TEXT_SEND: {str(e)[:250]}"
 
     def close(self):
         """Safely close the browser, ensuring session data is saved."""

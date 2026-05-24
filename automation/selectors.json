@@ -36,18 +36,18 @@
     { "by": "xpath", "value": "//div[@role=\"dialog\"]//div[@role=\"button\" and contains(@aria-label,\"Send\")]" }
   ],
   "ATTACH_BUTTON_LOCATORS": [
-    { "by": "xpath", "value": "//span[@data-icon=\"clip\"]" },
-    { "by": "xpath", "value": "//span[@data-icon=\"clip-light\"]" },
-    { "by": "xpath", "value": "//span[@data-icon=\"plus\"]" },
-    { "by": "xpath", "value": "//span[@data-icon=\"plus-large\"]" },
-    { "by": "xpath", "value": "//span[@data-icon=\"attach-menu-plus\"]" },
-    { "by": "xpath", "value": "//div[@title=\"Attach\"]" },
-    { "by": "xpath", "value": "//div[@title=\"إرفاق\"]" },
-    { "by": "xpath", "value": "//*[@aria-label=\"Attach\"]" },
-    { "by": "xpath", "value": "//*[@aria-label=\"إرفاق\"]" },
-    { "by": "css",  "value": "span[data-icon*=\"clip\"]" },
-    { "by": "css",  "value": "span[data-icon*=\"plus\"]" },
-    { "by": "css",  "value": "button[data-testid*=\"clip\"]" }
+    { "by": "xpath", "value": "//footer//span[@data-icon=\"attach-menu-plus\"]" },
+    { "by": "xpath", "value": "//footer//span[@data-icon=\"plus\"]" },
+    { "by": "xpath", "value": "//footer//span[@data-icon=\"plus-large\"]" },
+    { "by": "xpath", "value": "//footer//span[@data-icon=\"clip\"]" },
+    { "by": "xpath", "value": "//footer//span[@data-icon=\"clip-light\"]" },
+    { "by": "xpath", "value": "//footer//div[@title=\"Attach\"]" },
+    { "by": "xpath", "value": "//footer//div[@title=\"إرفاق\"]" },
+    { "by": "xpath", "value": "//footer//*[@aria-label=\"Attach\"]" },
+    { "by": "xpath", "value": "//footer//*[@aria-label=\"إرفاق\"]" },
+    { "by": "css",  "value": "footer span[data-icon=\"attach-menu-plus\"]" },
+    { "by": "css",  "value": "footer span[data-icon*=\"clip\"]" },
+    { "by": "css",  "value": "footer button[data-testid*=\"clip\"]" }
   ],
   "FILE_INPUT_LOCATORS": [
     { "by": "xpath", "value": "//input[@accept=\"image/*,video/mp4,video/3gpp,video/quicktime\"]" },
