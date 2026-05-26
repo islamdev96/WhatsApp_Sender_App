@@ -119,7 +119,14 @@ class WhatsAppNavigator:
             };
             """)
             if dom_status['hasMain'] or dom_status['editablesCount'] > 0:
-                self._emit("INFO", f"[DIAG-DOM-READY] hasMain={dom_status['hasMain']} mainTag={dom_status['mainTag']} hasFooter={dom_status['hasFooter']} hasMainFooter={dom_status['hasMainFooter']} editables={dom_status['editablesCount']}")
+                logger.debug(
+                    "DOM ready diagnostic: hasMain=%s mainTag=%s hasFooter=%s hasMainFooter=%s editables=%s",
+                    dom_status["hasMain"],
+                    dom_status["mainTag"],
+                    dom_status["hasFooter"],
+                    dom_status["hasMainFooter"],
+                    dom_status["editablesCount"],
+                )
         except Exception as exc:
             logger.debug("Could not collect active chat DOM diagnostics: %s", exc)
 
