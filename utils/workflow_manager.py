@@ -6,6 +6,7 @@ import json
 import os
 import datetime
 from utils.db import SQLiteStore
+from utils.logger import logger
 
 
 class WorkflowManager:
@@ -52,7 +53,8 @@ class WorkflowManager:
             if r.get("attachments_json"):
                 try:
                     attachments = json.loads(r["attachments_json"])
-                except Exception:
+                except json.JSONDecodeError as exc:
+                    logger.warning("Ignoring invalid workflow attachments JSON for step %s: %s", r.get("id"), exc)
                     attachments = []
             steps.append({
                 "id": r["id"],

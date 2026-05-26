@@ -5,6 +5,7 @@ Not a guarantee against WhatsApp restrictions; users must follow WhatsApp Terms 
 from __future__ import annotations
 
 import os
+from utils.logger import logger
 
 # Conservative defaults (seconds)
 MIN_DELAY_SECONDS = 15
@@ -39,8 +40,8 @@ def extra_delay_after_attachment(att_type: str, path: str = "") -> float:
         try:
             size_mb = os.path.getsize(path) / (1024 * 1024)
             base += min(20.0, size_mb * 2.0)
-        except OSError:
-            pass
+        except OSError as exc:
+            logger.debug("Could not inspect attachment size for %s: %s", path, exc)
         return base
     if t == "image":
         return 5.0

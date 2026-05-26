@@ -527,7 +527,8 @@ class WhatsAppBot:
         """
         try:
             return bool(self.driver.execute_script(script, labels))
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not activate attach menu option by text: %s", exc)
             return False
 
     def _find_file_input_for_kind(self, kind, exclude_signatures=None):
@@ -599,10 +600,12 @@ class WhatsAppBot:
                             try:
                                 self.driver.execute_script("arguments[0].click();", el)
                                 return True
-                            except Exception:
+                            except Exception as exc:
+                                logger.debug("Could not JS-click attach menu row %r: %s", label, exc)
                                 if self._click_element(el):
                                     return True
-                except Exception:
+                except Exception as exc:
+                    logger.debug("Could not inspect attach menu row %r: %s", label, exc)
                     continue
         return False
 
@@ -643,7 +646,8 @@ class WhatsAppBot:
         """
         try:
             return self.driver.execute_script(script, kind)
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not find visible menu file input for %s: %s", kind, exc)
             return None
 
     def _expose_attach_file_input(self, input_kind, existing_signatures, stop_event=None):
@@ -986,7 +990,8 @@ class WhatsAppBot:
             # Use JavaScript click to ensure React synthetic event handlers trigger and the menu opens
             try:
                 self.driver.execute_script("arguments[0].click();", attach_btn)
-            except Exception:
+            except Exception as exc:
+                logger.debug("Could not JS-click attach button; using fallback click: %s", exc)
                 self._click_element(attach_btn)
                 
             self._emit("STEP", "تم فتح قائمة الإرفاق (+)")
@@ -1268,7 +1273,8 @@ class WhatsAppBot:
             self.background_mode = start_minimized
             self._just_launched = True
             return self.driver
-        except Exception:
+        except Exception as exc:
+            logger.debug("Native Chrome driver initialization failed; trying webdriver-manager: %s", exc)
             # Fallback to slower webdriver-manager if local environment lacks native support
             try:
                 service = Service(ChromeDriverManager().install())
@@ -1784,7 +1790,8 @@ class WhatsAppBot:
             return null;
             """
             return self.driver.execute_script(script)
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not locate media preview send button: %s", exc)
             return None
 
     def _send_caption_fallback_text(self, caption, stop_event=None):
@@ -2337,7 +2344,8 @@ class WhatsAppBot:
                     text = (el.text or "").strip()
                     if text and len(text) < 120:
                         return text
-            except Exception:
+            except Exception as exc:
+                logger.debug("Could not read active chat title with locator %s: %s", value, exc)
                 continue
         return ""
 
@@ -2396,7 +2404,8 @@ class WhatsAppBot:
                 return " ".join([span.text for span in text_spans]).strip()
             else:
                 return ""
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not read last incoming message: %s", exc)
             return ""
 
     def reply_to_current_chat(self, message):

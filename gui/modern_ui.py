@@ -1275,7 +1275,8 @@ class ModernWhatsAppApp(ctk.CTk):
                             else:
                                 logged = self.bot.is_logged_in()
                                 status = "connected" if logged else "waiting"
-                        except Exception:
+                        except Exception as exc:
+                            logger.debug("Session status monitor could not inspect browser state: %s", exc)
                             status = "closed"
                     else:
                         status = "offline"
@@ -1699,12 +1700,14 @@ class ModernWhatsAppApp(ctk.CTk):
                         try:
                             dialect = csv.Sniffer().sniff(sample, delimiters=[",", ";", "\t", "|"])
                             delim = dialect.delimiter
-                        except Exception:
+                        except Exception as exc:
+                            logger.debug("Could not sniff CSV delimiter for %s: %s", path, exc)
                             delim = ","
                     reader = csv.reader(f, delimiter=delim)
                     for row in reader:
                         rows.append(row)
-            except Exception:
+            except Exception as exc:
+                logger.warning("Could not read CSV preview from %s: %s", path, exc)
                 rows = []
             return rows
 
@@ -1718,7 +1721,8 @@ class ModernWhatsAppApp(ctk.CTk):
                     rows.append([str(c) if c is not None else "" for c in row])
                 wb.close()
                 return rows
-            except Exception:
+            except Exception as exc:
+                logger.warning("Could not read Excel preview from %s: %s", path, exc)
                 return []
 
         def _load_preview():
@@ -1899,7 +1903,8 @@ class ModernWhatsAppApp(ctk.CTk):
                 pad = int(pad_var.get().strip() or "0")
                 start = int(start_var.get().strip())
                 end = int(end_var.get().strip())
-            except Exception:
+            except Exception as exc:
+                logger.debug("Invalid generated-number range input: %s", exc)
                 messagebox.showerror("خطأ", "تحقق من القيم المدخلة.")
                 return []
             if start > end:
@@ -2416,7 +2421,8 @@ class ModernWhatsAppApp(ctk.CTk):
         if self.bot and self.bot.driver:
             try:
                 is_active = len(self.bot.driver.window_handles) > 0
-            except Exception:
+            except Exception as exc:
+                logger.debug("Could not inspect browser window handles: %s", exc)
                 is_active = False
 
         if is_active:
@@ -3556,7 +3562,8 @@ class ModernWhatsAppApp(ctk.CTk):
                         writer.writerow({"phone": r.get("phone"), "name": r.get("name"), "error_code": r.get("error_code")})
 
             return filepath, valid_path, invalid_path
-        except Exception:
+        except Exception as exc:
+            logger.warning("Could not export validation reports: %s", exc)
             return None, None, None
 
     # ═══════════════════════════════════════════════════════════════════════
