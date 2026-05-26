@@ -2286,6 +2286,11 @@ class WhatsAppBot:
                 logger.debug("Could not close browser cleanly: %s", exc)
             finally:
                 self.driver = None
+                try:
+                    from utils.helpers import cleanup_proxy_extension
+                    cleanup_proxy_extension(self.user_data_dir)
+                except Exception as cleanup_exc:
+                    logger.debug("Proxy extension cleanup skipped: %s", cleanup_exc)
     # â”€â”€â”€ Chatbot Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def get_unread_chats(self):
         """Returns a list of unread chat elements."""

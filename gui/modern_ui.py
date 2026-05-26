@@ -2333,6 +2333,11 @@ class ModernWhatsAppApp(ctk.CTk):
         self._save_current_state()
         if self.bot:
             self.bot.close()
+        try:
+            from utils.helpers import cleanup_old_reports
+            cleanup_old_reports(max_age_days=30)
+        except Exception as cleanup_exc:
+            logger.debug("Automatic report cleanup failed: %s", cleanup_exc)
         self.destroy()
 
 

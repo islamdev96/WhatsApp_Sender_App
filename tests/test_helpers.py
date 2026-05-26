@@ -68,6 +68,38 @@ class TestHelpers(unittest.TestCase):
             self.assertTrue(os.path.exists(path))
             self.assertEqual(read_contacts(path)[0]["phone"], "2010XXXXXXXX")
 
+    def test_cleanup_proxy_extension(self):
+        from utils.helpers import create_proxy_extension, cleanup_proxy_extension
+        with tempfile.TemporaryDirectory() as tmp:
+            ext_dir = create_proxy_extension(tmp, "http", "127.0.0.1", "8080", "user", "pass")
+            self.assertTrue(os.path.isdir(ext_dir))
+            cleanup_proxy_extension(tmp)
+            self.assertFalse(os.path.exists(ext_dir))
+
+    def test_cleanup_old_reports(self):
+        from utils.helpers import cleanup_old_reports
+        import time
+        with tempfile.TemporaryDirectory() as tmp:
+            # Create old and new files
+            old_file = os.path.join(tmp, "report_old.csv")
+            new_file = os.path.join(tmp, "report_new.csv")
+            
+            with open(old_file, "w") as f:
+                f.write("old data")
+            with open(new_file, "w") as f:
+                f.write("new data")
+
+            # Set old file mtime to 40 days ago
+            past = time.time() - (40 * 86400)
+            os.utime(old_file, (past, past))
+
+            # Run cleanup with max_age_days = 30
+            removed = cleanup_old_reports(reports_base_dir=tmp, max_age_days=30)
+            
+            self.assertEqual(removed, 1)
+            self.assertFalse(os.path.exists(old_file))
+            self.assertTrue(os.path.exists(new_file))
+
 
 if __name__ == "__main__":
     unittest.main()

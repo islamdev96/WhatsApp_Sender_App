@@ -5,6 +5,7 @@ Uses SQLite for scalability and migrates from campaigns.json once.
 import json
 import os
 import datetime
+import tempfile
 from utils.db import SQLiteStore
 from utils.logger import logger, log_exception
 
@@ -44,9 +45,25 @@ class CampaignManager:
             self.campaigns = []
 
     def _save_to_json(self):
+        """Atomically persist campaigns list to JSON.
+
+        Writes to a temporary file first then renames, so a crash during
+        write never leaves a half-written (corrupt) campaigns file.
+        """
         try:
-            with open(self.campaigns_path, "w", encoding="utf-8") as f:
-                json.dump(self.campaigns, f, ensure_ascii=False, indent=2)
+            dir_name = os.path.dirname(self.campaigns_path) or "."
+            fd, tmp_path = tempfile.mkstemp(suffix=".tmp", dir=dir_name)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(self.campaigns, f, ensure_ascii=False, indent=2)
+                os.replace(tmp_path, self.campaigns_path)
+            except BaseException:
+                # Clean up temp file on any failure
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise
         except OSError as exc:
             logger.error("Could not write campaigns file %s: %s", self.campaigns_path, exc)
         except Exception as exc:
@@ -74,53 +91,64 @@ class CampaignManager:
             log_exception(f"Unexpected error reading campaigns migration source {self.campaigns_path}", exc)
             campaigns = []
 
-        for c in campaigns:
-            if not isinstance(c, dict):
-                logger.warning("Skipping malformed campaign entry during migration")
-                continue
-            name = c.get("name")
-            try:
-                date = c.get("date") or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                total = int(c.get("total", 0))
-                sent = int(c.get("sent", 0))
-                failed = int(c.get("failed", 0))
-                invalid = int(c.get("invalid", 0))
-                duration_seconds = int(c.get("duration_seconds", 0))
-                success_rate = float(c.get("success_rate", 0))
-                csv_path = c.get("csv_path")
+        # Batch all migration inserts in a single transaction for performance.
+        try:
+            self.store.execute("BEGIN", commit=False)
+            for c in campaigns:
+                if not isinstance(c, dict):
+                    logger.warning("Skipping malformed campaign entry during migration")
+                    continue
+                name = c.get("name")
+                try:
+                    date = c.get("date") or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    total = int(c.get("total", 0))
+                    sent = int(c.get("sent", 0))
+                    failed = int(c.get("failed", 0))
+                    invalid = int(c.get("invalid", 0))
+                    duration_seconds = int(c.get("duration_seconds", 0))
+                    success_rate = float(c.get("success_rate", 0))
+                    csv_path = c.get("csv_path")
 
-                cur = self.store.execute(
-                    "INSERT INTO wa_campaigns(name, date, total, sent, failed, invalid, duration_seconds, success_rate, csv_path) "
-                    "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (name, date, total, sent, failed, invalid, duration_seconds, success_rate, csv_path),
-                    commit=True,
-                )
-                campaign_id = cur.lastrowid
-                results = c.get("results", [])
-                if isinstance(results, list) and results:
-                    params = [
-                        (
-                            campaign_id,
-                            r.get("phone"),
-                            r.get("name"),
-                            r.get("status"),
-                            r.get("error_code"),
-                            r.get("timestamp"),
-                        )
-                        for r in results
-                        if isinstance(r, dict)
-                    ]
-                    if params:
-                        self.store.executemany(
-                            "INSERT INTO wa_campaign_results(campaign_id, phone, name, status, error_code, timestamp) "
-                            "VALUES(?, ?, ?, ?, ?, ?)",
-                            params,
-                            commit=True,
-                        )
-            except (ValueError, TypeError) as exc:
-                logger.warning("Skipping campaign with invalid numeric fields during migration: %s", exc)
-            except Exception as exc:
-                log_exception("Unexpected error migrating campaign entry", exc)
+                    cur = self.store.execute(
+                        "INSERT INTO wa_campaigns(name, date, total, sent, failed, invalid, duration_seconds, success_rate, csv_path) "
+                        "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (name, date, total, sent, failed, invalid, duration_seconds, success_rate, csv_path),
+                        commit=False,
+                    )
+                    campaign_id = cur.lastrowid
+                    results = c.get("results", [])
+                    if isinstance(results, list) and results:
+                        params = [
+                            (
+                                campaign_id,
+                                r.get("phone"),
+                                r.get("name"),
+                                r.get("status"),
+                                r.get("error_code"),
+                                r.get("timestamp"),
+                            )
+                            for r in results
+                            if isinstance(r, dict)
+                        ]
+                        if params:
+                            self.store.executemany(
+                                "INSERT INTO wa_campaign_results(campaign_id, phone, name, status, error_code, timestamp) "
+                                "VALUES(?, ?, ?, ?, ?, ?)",
+                                params,
+                                commit=False,
+                            )
+                except (ValueError, TypeError) as exc:
+                    logger.warning("Skipping campaign with invalid numeric fields during migration: %s", exc)
+                except Exception as exc:
+                    log_exception("Unexpected error migrating campaign entry", exc)
+            self.store.execute("COMMIT", commit=False)
+        except Exception as exc:
+            # Rollback on any catastrophic failure to avoid partial state
+            try:
+                self.store.execute("ROLLBACK", commit=False)
+            except Exception:
+                pass
+            log_exception("Migration transaction failed", exc)
         self.store.set_meta("campaigns_migrated", "1")
 
     def add_campaign(self, name, total, sent, failed, invalid,
@@ -146,31 +174,43 @@ class CampaignManager:
             self._save_to_json()
             return campaign
 
-        cur = self.store.execute(
-            "INSERT INTO wa_campaigns(name, date, total, sent, failed, invalid, duration_seconds, success_rate, csv_path) "
-            "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (name, now, total, sent, failed, invalid, int(duration_seconds), success_rate, csv_path),
-            commit=True,
-        )
-        campaign_id = cur.lastrowid
-        if results_log:
-            params = [
-                (
-                    campaign_id,
-                    r.get("phone"),
-                    r.get("name"),
-                    r.get("status"),
-                    r.get("error_code"),
-                    r.get("timestamp"),
-                )
-                for r in results_log
-            ]
-            self.store.executemany(
-                "INSERT INTO wa_campaign_results(campaign_id, phone, name, status, error_code, timestamp) "
-                "VALUES(?, ?, ?, ?, ?, ?)",
-                params,
-                commit=True,
+        # Wrap campaign + results in a single transaction so they
+        # are never partially written (atomicity).
+        try:
+            self.store.execute("BEGIN", commit=False)
+            cur = self.store.execute(
+                "INSERT INTO wa_campaigns(name, date, total, sent, failed, invalid, duration_seconds, success_rate, csv_path) "
+                "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (name, now, total, sent, failed, invalid, int(duration_seconds), success_rate, csv_path),
+                commit=False,
             )
+            campaign_id = cur.lastrowid
+            if results_log:
+                params = [
+                    (
+                        campaign_id,
+                        r.get("phone"),
+                        r.get("name"),
+                        r.get("status"),
+                        r.get("error_code"),
+                        r.get("timestamp"),
+                    )
+                    for r in results_log
+                ]
+                self.store.executemany(
+                    "INSERT INTO wa_campaign_results(campaign_id, phone, name, status, error_code, timestamp) "
+                    "VALUES(?, ?, ?, ?, ?, ?)",
+                    params,
+                    commit=False,
+                )
+            self.store.execute("COMMIT", commit=False)
+        except Exception as exc:
+            try:
+                self.store.execute("ROLLBACK", commit=False)
+            except Exception:
+                pass
+            log_exception("Failed to save campaign", exc)
+            campaign_id = None
         return {
             "id": campaign_id,
             "name": name,

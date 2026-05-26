@@ -35,5 +35,20 @@
   "default_country_code": "20",
   "last_video_file": "",
   "last_doc_file": "",
-  "enable_auto_responder": false
+  "enable_auto_responder": false,
+  "rotation_enabled": false,
+  "rotation_interval": 50,
+  "profile_proxies": {
+    "Default": {
+      "enabled": false,
+      "type": "HTTP",
+      "host": "",
+      "port": "",
+      "username": "",
+      "password": "",
+      "fingerprint_enabled": true,
+      "user_agent": "",
+      "resolution": ""
+    }
+  }
 }

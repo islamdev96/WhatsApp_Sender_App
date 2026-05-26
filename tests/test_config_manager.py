@@ -115,6 +115,44 @@ class TestConfigManager(unittest.TestCase):
             reloaded = ConfigManager(config_path=path)
             self.assertEqual(reloaded.get("last_message"), "hello")
 
+    def test_type_coercion_on_set(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "config.json")
+            manager = ConfigManager(config_path=path)
+
+            # Test integer key coercion
+            manager.set("batch_size", "45")
+            self.assertEqual(manager.get("batch_size"), 45)
+
+            # Test float key coercion
+            manager.set("delay_max", "150.5")
+            self.assertEqual(manager.get("delay_max"), 150.5)
+
+            # Test boolean key coercion
+            manager.set("background_mode", "True")
+            self.assertTrue(manager.get("background_mode"))
+            manager.set("background_mode", 0)
+            self.assertFalse(manager.get("background_mode"))
+
+            # Test error fallback to default on invalid inputs
+            manager.set("batch_size", "not-a-number")
+            self.assertEqual(manager.get("batch_size"), DEFAULT_CONFIG["batch_size"])
+
+    def test_safety_limits_enforced_on_set(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "config.json")
+            manager = ConfigManager(config_path=path)
+
+            # Set delay_min aggressively (e.g. 5 seconds)
+            manager.set("delay_min", 5)
+            # Should be clamped to MIN_DELAY_SECONDS (15s)
+            self.assertEqual(manager.get("delay_min"), MIN_DELAY_SECONDS)
+
+            # Set max_retries excessively
+            manager.set("max_retries", 10)
+            # Should be clamped to 1
+            self.assertEqual(manager.get("max_retries"), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -136,7 +136,42 @@ class ConfigManager:
         return self.config.get(key, default)
 
     def set(self, key, value):
+        # Stricter type enforcement and parsing for configuration values
+        int_keys = {
+            "batch_size", "max_retries", "max_consecutive_failures", 
+            "window_width", "window_height"
+        }
+        float_keys = {
+            "delay_min", "delay_max", "batch_pause_min", "batch_pause_max",
+            "retry_delay_min", "retry_delay_max"
+        }
+        bool_keys = {
+            "send_text_with_image", "background_mode", "retry_full_navigation",
+            "enable_spintax", "auto_open_login", "use_valid_after_check", "use_workflow"
+        }
+
+        try:
+            if key in int_keys and value is not None:
+                value = int(float(value))
+            elif key in float_keys and value is not None:
+                value = float(value)
+            elif key in bool_keys and value is not None:
+                if isinstance(value, str):
+                    value = value.lower() in ("true", "1", "yes")
+                else:
+                    value = bool(value)
+        except (ValueError, TypeError) as exc:
+            logger.warning("Type coercion failed for key '%s' with value '%r': %s", key, value, exc)
+            # Revert to default/fallback instead of crashing or storing bad type
+            from utils.config_manager import DEFAULT_CONFIG
+            value = DEFAULT_CONFIG.get(key, value)
+
         self.config[key] = value
+
+        # Automatically clamp safety settings on live updates
+        safety_keys = {"delay_min", "delay_max", "batch_pause_min", "max_retries", "retry_full_navigation"}
+        if key in safety_keys:
+            self._enforce_safe_limits(persist=False)
 
     def set_and_save(self, key, value):
         self.set(key, value)
