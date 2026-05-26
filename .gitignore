@@ -16,6 +16,8 @@ dist/
 data/profiles/
 chrome_profile/
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 
 # Logs & Reports
