@@ -3,6 +3,7 @@ import customtkinter as ctk
 import tkinter as tk
 from tkinter import filedialog
 import os
+from utils.logger import logger
 
 class AttachmentItem(ctk.CTkFrame):
     def __init__(self, master, path, type_="image", caption="", remove_callback=None, colors=None, **kwargs):
@@ -275,8 +276,8 @@ class RichTextFrame(ctk.CTkFrame):
         tb = self.text_box._textbox
         try:
             tb.configure(undo=True)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not enable undo for rich text box: %s", exc)
 
         # Configure premium typography fonts and tag options
         try:
@@ -289,8 +290,8 @@ class RichTextFrame(ctk.CTkFrame):
             tb.tag_configure("bold_italic", font=self.font_bold_italic)
             tb.tag_configure("strike", overstrike=True)
             tb.tag_configure("variable", font=self.font_bold)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not configure rich text tags: %s", exc)
 
         # Bind mouse click event for visual offset correction in right alignment
         tb.bind("<Button-1>", self._on_click)
@@ -327,14 +328,14 @@ class RichTextFrame(ctk.CTkFrame):
     def _undo(self):
         try:
             self.text_box._textbox.edit_undo()
-        except tk.TclError:
-            pass
+        except tk.TclError as exc:
+            logger.debug("Undo ignored: %s", exc)
 
     def _redo(self):
         try:
             self.text_box._textbox.edit_redo()
-        except tk.TclError:
-            pass
+        except tk.TclError as exc:
+            logger.debug("Redo ignored: %s", exc)
 
     def _cut(self):
         self.text_box._textbox.event_generate("<<Cut>>")
@@ -348,8 +349,8 @@ class RichTextFrame(ctk.CTkFrame):
     def _delete(self):
         try:
             self.text_box._textbox.delete("sel.first", "sel.last")
-        except tk.TclError:
-            pass
+        except tk.TclError as exc:
+            logger.debug("Delete ignored because no text is selected: %s", exc)
 
     def _select_all(self):
         self.text_box._textbox.tag_add("sel", "1.0", "end")
@@ -376,8 +377,8 @@ class RichTextFrame(ctk.CTkFrame):
                 self.text_box.insert(sel_start, f"{char}{text}{char}")
                 self._update_char_count()
                 return
-        except tk.TclError:
-            pass
+        except tk.TclError as exc:
+            logger.debug("Text wrap inserted without selection: %s", exc)
         
         # If no selection, just insert chars
         self.text_box.insert("insert", f"{char}{char}")
@@ -400,7 +401,8 @@ class RichTextFrame(ctk.CTkFrame):
         try:
             line_start_idx = tb.index(f"@0,{event.y}")
             line_num = int(line_start_idx.split('.')[0])
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not map right-aligned text click: %s", exc)
             return
             
         line_text = tb.get(f"{line_num}.0", f"{line_num}.end")
@@ -452,15 +454,15 @@ class RichTextFrame(ctk.CTkFrame):
         try:
             self.text_box._textbox.tag_configure("align_right", justify="right")
             self.text_box._textbox.tag_add("align_right", "1.0", "end")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not apply right alignment tag: %s", exc)
 
     def _align_left(self):
         self.align_right_enabled = False
         try:
             self.text_box._textbox.tag_remove("align_right", "1.0", "end")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not remove right alignment tag: %s", exc)
 
     def _update_visual_styling(self):
         """Highlights variables and formatting syntaxes dynamically in the textbox."""
@@ -471,8 +473,8 @@ class RichTextFrame(ctk.CTkFrame):
         for tag in ["bold", "italic", "bold_italic", "strike", "variable"]:
             try:
                 tb.tag_remove(tag, "1.0", "end")
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not remove rich text tag %s: %s", tag, exc)
                 
         text = tb.get("1.0", "end")
         
@@ -501,8 +503,8 @@ class RichTextFrame(ctk.CTkFrame):
             try:
                 self.text_box._textbox.tag_configure("align_right", justify="right")
                 self.text_box._textbox.tag_add("align_right", "1.0", "end")
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not maintain right alignment tag: %s", exc)
 
     def _c(self, key, fallback=None):
         return self.colors.get(key, fallback)
@@ -538,5 +540,5 @@ class RichTextFrame(ctk.CTkFrame):
         var_fg = "#7effa3" if is_dark else "#155724"
         try:
             tb.tag_configure("variable", background=var_bg, foreground=var_fg)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not configure variable tag colors: %s", exc)

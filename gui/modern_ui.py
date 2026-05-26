@@ -24,6 +24,7 @@ from utils.templates_manager import TemplatesManager
 from utils.contacts_manager import ContactsManager
 from utils.campaign_manager import CampaignManager
 from utils.event_log import format_event
+from utils.logger import logger
 
 # ─── Color Palette (Premium) ────────────────────────────────────────────────
 PALETTE_DARK = {
@@ -206,8 +207,8 @@ class ModernWhatsAppApp(ctk.CTk):
         style = ttk.Style()
         try:
             style.theme_use("clam")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not apply ttk clam theme: %s", exc)
 
         bg_color = COLORS["bg_dark"]
         fg_color = COLORS["text_main"]
@@ -1282,8 +1283,8 @@ class ModernWhatsAppApp(ctk.CTk):
                     if status != last_status:
                         last_status = status
                         self._run_on_ui(lambda s=status: self._update_session_status_from_monitor(s))
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Session status monitor iteration failed: %s", exc)
 
         threading.Thread(target=monitor_loop, daemon=True).start()
 
@@ -1306,8 +1307,8 @@ class ModernWhatsAppApp(ctk.CTk):
             try:
                 import sys
                 print(line, file=sys.stderr, flush=True)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not write UI log line to stderr: %s", exc)
 
         def _do():
             if not hasattr(self, "log_textbox"):
@@ -1321,8 +1322,8 @@ class ModernWhatsAppApp(ctk.CTk):
             os.makedirs(self.log_dir, exist_ok=True)
             with open(self.log_file_path, "a", encoding="utf-8") as f:
                 f.write(line + "\n")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not append UI log line to %s: %s", self.log_file_path, exc)
 
     def _on_bot_event(self, level, message, detail=None):
         """Callback from WhatsAppBot — same stream as UI log + terminal."""
@@ -1363,8 +1364,8 @@ class ModernWhatsAppApp(ctk.CTk):
                     )
                     + "\n"
                 )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not write agent debug log: %s", exc)
         # #endregion
 
     def _on_login_success(self):
@@ -1418,13 +1419,13 @@ class ModernWhatsAppApp(ctk.CTk):
                 self.stat_cards["success"].configure(text=str(self.sent))
                 self.stat_cards["failed"].configure(text=str(self.failed))
                 self.stat_cards["invalid"].configure(text=str(self.invalid))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not update stat cards: %s", exc)
         if hasattr(self, "counter_label") and self.counter_label and self.counter_label.winfo_exists():
             try:
                 self.counter_label.configure(text=f"✅ {self.sent} | ❌ {self.failed} | 🚫 {self.invalid}")
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not update counter label: %s", exc)
 
     def _update_total_counts(self, total=0, contacts_count=0, groups_count=0):
         if hasattr(self, "total_counts_label"):
@@ -1655,8 +1656,8 @@ class ModernWhatsAppApp(ctk.CTk):
                                     val = str(r[col_idx]).strip()
                                     if any(c.isalpha() for c in val) and not val.replace("+","").replace("-","").isdigit():
                                         alpha_score += 1
-                            except:
-                                pass
+                            except Exception as exc:
+                                logger.debug("Could not inspect preview row for name-column guess: %s", exc)
                         if alpha_score >= 2:
                             guessed["name"] = col
                             break
@@ -2344,8 +2345,8 @@ class ModernWhatsAppApp(ctk.CTk):
         if self.progress_win and self.progress_win.winfo_exists():
             try:
                 self.progress_win.destroy()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not destroy progress window: %s", exc)
         self.progress_win = None
         self.popup_progress_tree = None
         self.progress_count_label = None
@@ -2505,7 +2506,8 @@ class ModernWhatsAppApp(ctk.CTk):
             if os.path.exists(self.legacy_profile_dir) and "Legacy" not in profiles:
                 profiles.append("Legacy")
             return profiles
-        except:
+        except Exception as exc:
+            logger.debug("Could not list profiles, falling back to Default: %s", exc)
             return ["Default"]
 
     def _on_profile_change(self, choice):
@@ -3086,8 +3088,8 @@ class ModernWhatsAppApp(ctk.CTk):
                 self.bot.recover_compose_state(stop_event=self.stop_event)
             if attachments and not self.bg_mode_var.get():
                 self.bot.bring_to_front()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not recover bot before retry: %s", exc)
 
     def _map_bot_error(self, res):
         if not res:
@@ -3218,8 +3220,8 @@ class ModernWhatsAppApp(ctk.CTk):
                         try:
                             if self.bot:
                                 self.bot.close()
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            logger.debug("Could not close bot during profile rotation: %s", exc)
                         
                         # Wait a bit before opening the new one
                         if self.stop_event.wait(2.0):
@@ -3402,8 +3404,8 @@ class ModernWhatsAppApp(ctk.CTk):
                     self.bot.minimize()
                 else:
                     self.bot.bring_to_front()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not restore browser window state after campaign: %s", exc)
 
             if self.stop_event.is_set():
                 self.log("🛑 تم إيقاف العملية.")
@@ -3643,8 +3645,8 @@ class ModernWhatsAppApp(ctk.CTk):
             if self.progress_win and self.progress_win.winfo_exists():
                 try:
                     self.progress_win.destroy()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Could not destroy existing progress window: %s", exc)
             title_map = {
                 "send": "متابعة الإرسال",
                 "workflow": "متابعة سير العمل",
@@ -3744,8 +3746,8 @@ class ModernWhatsAppApp(ctk.CTk):
             style = ttk.Style(self.progress_win)
             try:
                 style.theme_use("clam")
-            except:
-                pass
+            except Exception as exc:
+                logger.debug("Could not apply progress Treeview theme: %s", exc)
             
             bg_color = COLORS["bg_dark"]
             fg_color = COLORS["text_main"]
@@ -3818,8 +3820,8 @@ class ModernWhatsAppApp(ctk.CTk):
             try:
                 if self.popup_progress_tree and self.popup_progress_tree.winfo_exists():
                     self.popup_progress_tree.insert("", "0", values=new_values, tags=(tag,))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not add row to progress tree: %s", exc)
         self._run_on_ui(_do)
 
     def _update_progress_header_blind(self, processed, total, current_phone=None, current_name=None, eta=None, status_text=None):
@@ -3853,8 +3855,8 @@ class ModernWhatsAppApp(ctk.CTk):
                     else:
                         text = "جاري العمل..."
                     self.progress_status_label.configure(text=text)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not update progress header: %s", exc)
         self._run_on_ui(_do)
 
     def _load_profile_proxy_settings(self, profile_name):
@@ -3993,8 +3995,8 @@ class ModernWhatsAppApp(ctk.CTk):
             x = self.btn_tbl_menu.winfo_rootx()
             y = self.btn_tbl_menu.winfo_rooty() + self.btn_tbl_menu.winfo_height()
             menu.post(x, y)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not show import popup menu: %s", exc)
 
     def _remove_selected_table_number(self):
         selected = self.progress_tree.selection()
@@ -4072,8 +4074,8 @@ class ModernWhatsAppApp(ctk.CTk):
     def _show_numbers_context_menu(self, event):
         try:
             self.numbers_context_menu.post(event.x_root, event.y_root)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not show numbers context menu: %s", exc)
 
     def _clear_numbers_table(self):
         for item in self.progress_tree.get_children():
@@ -4108,8 +4110,8 @@ class ModernWhatsAppApp(ctk.CTk):
         # Enable undo
         try:
             textbox._textbox.configure(undo=True)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not enable undo for bulk manual textbox: %s", exc)
 
         # Right-click context menu
         import tkinter as tk
@@ -4125,14 +4127,20 @@ class ModernWhatsAppApp(ctk.CTk):
         ctx_menu.add_command(label="تحديد الكل (Select All)", command=lambda: textbox._textbox.tag_add("sel", "1.0", "end"))
 
         def _ctx_undo():
-            try: textbox._textbox.edit_undo()
-            except: pass
+            try:
+                textbox._textbox.edit_undo()
+            except Exception as exc:
+                logger.debug("Bulk manual undo ignored: %s", exc)
         def _ctx_redo():
-            try: textbox._textbox.edit_redo()
-            except: pass
+            try:
+                textbox._textbox.edit_redo()
+            except Exception as exc:
+                logger.debug("Bulk manual redo ignored: %s", exc)
         def _ctx_delete():
-            try: textbox._textbox.delete("sel.first", "sel.last")
-            except: pass
+            try:
+                textbox._textbox.delete("sel.first", "sel.last")
+            except Exception as exc:
+                logger.debug("Bulk manual delete ignored: %s", exc)
         def _show_ctx(event):
             try: ctx_menu.tk_popup(event.x_root, event.y_root)
             finally: ctx_menu.grab_release()
@@ -4288,8 +4296,8 @@ class ModernWhatsAppApp(ctk.CTk):
             x = self.btn_atts_menu.winfo_rootx()
             y = self.btn_atts_menu.winfo_rooty() + self.btn_atts_menu.winfo_height()
             menu.post(x, y)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not show attachments popup menu: %s", exc)
 
     def _show_help_dialog(self):
         self._show_dialog("info", "دليل الاستخدام والمساعدة", "دليل الاستخدام:\n1. قم بفتح تطبيق WhatsApp وسجل الدخول باستخدام رمز الاستجابة السريعة (QR Code).\n2. استورد الأرقام باستخدام زر الاستيراد أو قم بإدخالها يدوياً.\n3. اكتب الرسالة في المحرر وأضف أي ملفات مرفقة إن وجدت.\n4. اضغط على زر 'ارسل الآن' لبدء الحملة الإعلانية.")
@@ -4301,8 +4309,8 @@ class ModernWhatsAppApp(ctk.CTk):
         if self.bot:
             try:
                 self.bot.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not close bot during logout: %s", exc)
             self.bot = None
             self.session_status_label.configure(text="Disconnected | Not Ready | Account: N/A")
             self.status_indicator.configure(text_color=COLORS["danger"])

@@ -5,6 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
+from utils.logger import logger
 
 class GMapsScraper:
     def __init__(self, driver):
@@ -90,15 +91,15 @@ class GMapsScraper:
                             })
                             if update_callback:
                                 update_callback("FOUND", {"name": title, "phone": clean_phone, "count": len(results)})
-                except Exception as e:
-                    pass
+                except Exception as exc:
+                    logger.debug("Skipping Google Maps result item %s: %s", i, exc)
 
             # Scroll down the feed container to load more
             if not stop_event.is_set():
                 try:
                     self.driver.execute_script("arguments[0].scrollTop = arguments[0].scrollHeight", feed)
                     time.sleep(2)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Could not scroll Google Maps results feed: %s", exc)
 
         return results
