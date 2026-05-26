@@ -14,7 +14,7 @@ def setup_logger(name="whatsapp_sender", level=logging.INFO):
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    if logger.hasHandlers():
+    if logger.handlers:
         return logger
 
     console_handler = logging.StreamHandler()
