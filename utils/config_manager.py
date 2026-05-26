@@ -74,19 +74,24 @@ class ConfigManager:
             from utils.safety import MIN_DELAY_SECONDS, MIN_BATCH_PAUSE_SECONDS
 
             changed = False
-            dmin = float(self.config.get("delay_min", 30))
-            dmax = float(self.config.get("delay_max", 120))
+            dmin, coerced = self._get_float_config("delay_min")
+            changed = changed or coerced
+            dmax, coerced = self._get_float_config("delay_max")
+            changed = changed or coerced
             if dmin < MIN_DELAY_SECONDS:
                 self.config["delay_min"] = MIN_DELAY_SECONDS
                 changed = True
             if dmax < float(self.config["delay_min"]):
                 self.config["delay_max"] = float(self.config["delay_min"]) + 30
                 changed = True
-            bpause = float(self.config.get("batch_pause_min", 180))
+            bpause, coerced = self._get_float_config("batch_pause_min")
+            changed = changed or coerced
             if bpause < MIN_BATCH_PAUSE_SECONDS:
                 self.config["batch_pause_min"] = MIN_BATCH_PAUSE_SECONDS
                 changed = True
-            if int(self.config.get("max_retries", 1)) > 2:
+            max_retries, coerced = self._get_int_config("max_retries")
+            changed = changed or coerced
+            if max_retries > 2:
                 self.config["max_retries"] = 1
                 changed = True
             if self.config.get("retry_full_navigation"):
@@ -98,6 +103,24 @@ class ConfigManager:
             logger.warning("Invalid safety-related config values, keeping defaults where possible: %s", exc)
         except Exception as exc:
             log_exception("Error enforcing safe limits", exc)
+
+    def _get_float_config(self, key):
+        default = DEFAULT_CONFIG[key]
+        try:
+            return float(self.config.get(key, default)), False
+        except (ValueError, TypeError):
+            logger.warning("Invalid numeric config value for %s; restoring default %r", key, default)
+            self.config[key] = default
+            return float(default), True
+
+    def _get_int_config(self, key):
+        default = DEFAULT_CONFIG[key]
+        try:
+            return int(self.config.get(key, default)), False
+        except (ValueError, TypeError):
+            logger.warning("Invalid integer config value for %s; restoring default %r", key, default)
+            self.config[key] = default
+            return int(default), True
 
     def save(self):
         """Persist current config to disk."""
