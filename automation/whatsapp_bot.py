@@ -10,6 +10,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
 from webdriver_manager.chrome import ChromeDriverManager
 from automation.whatsapp_navigator import WhatsAppNavigator
+from utils.logger import logger, log_exception
 
 class WhatsAppBot:
     def __init__(self, user_data_dir, proxy_config=None, on_event=None):
@@ -129,15 +130,22 @@ class WhatsAppBot:
         if self.on_event:
             try:
                 self.on_event(level, message, detail)
-            except Exception:
-                pass
+            except TypeError as exc:
+                logger.warning("on_event callback failed: %s", exc)
+            except Exception as exc:
+                log_exception("Unexpected error in on_event callback", exc)
             return
         try:
             from utils.event_log import print_event
-
             print_event(level, message, detail)
-        except Exception:
-            pass
+        except ImportError:
+            logger.debug("event_log module not available, logging to logger")
+            logger.log(
+                {"INFO": 20, "WARNING": 30, "ERROR": 40, "DEBUG": 10}.get(level, 20),
+                message
+            )
+        except Exception as exc:
+            log_exception(f"Error in _emit: {level} - {message}", exc)
 
     def _load_selectors_from_file(self):
         selectors_path = os.path.join(os.path.dirname(__file__), "selectors.json")
@@ -178,9 +186,12 @@ class WhatsAppBot:
                     else:
                         current = getattr(self, key)
                         setattr(self, key, current + parsed)
-        except Exception:
-            # If selectors file is malformed, ignore and use defaults.
-            return
+        except FileNotFoundError:
+            logger.debug("Selectors file not found: %s, using default selectors", selectors_path)
+        except json.JSONDecodeError as exc:
+            logger.error("Selectors file %s is invalid JSON: %s", selectors_path, exc)
+        except Exception as exc:
+            log_exception(f"Error loading selectors from {selectors_path}", exc)
 
     def _find_any(self, locators):
         if not self.driver:
@@ -188,7 +199,8 @@ class WhatsAppBot:
         for by, value in locators:
             try:
                 elements = self.driver.find_elements(by, value)
-            except Exception:
+            except Exception as exc:
+                logger.debug("Failed to find elements with %s=%r: %s", by, value, exc)
                 continue
             if elements:
                 return elements[0]
@@ -216,13 +228,15 @@ class WhatsAppBot:
         for by, value in locators:
             try:
                 elements = self.driver.find_elements(by, value)
-            except Exception:
+            except Exception as exc:
+                logger.debug("Failed to find elements with %s=%r: %s", by, value, exc)
                 continue
             for el in elements:
                 try:
                     if el.is_displayed() and el.get_attribute("aria-disabled") != "true":
                         return el
-                except Exception:
+                except Exception as exc:
+                    logger.debug("Error checking element visibility: %s", exc)
                     continue
         return None
 
@@ -234,7 +248,8 @@ class WhatsAppBot:
                 el.get_attribute("id") or "",
                 el.get_attribute("accept") or "",
             )
-        except Exception:
+        except Exception as exc:
+            logger.debug("Error getting file input signature: %s", exc)
             return None
 
     @staticmethod
@@ -274,7 +289,8 @@ class WhatsAppBot:
     def _snapshot_file_input_signatures(self):
         try:
             inputs = self.driver.find_elements(By.XPATH, '//input[@type="file"]')
-        except Exception:
+        except Exception as exc:
+            logger.debug("Error finding file inputs: %s", exc)
             return set()
         signatures = set()
         for el in inputs:
@@ -288,7 +304,8 @@ class WhatsAppBot:
             accept = el.get_attribute("accept") or ""
             name = (el.get_attribute("name") or "").lower()
             input_id = (el.get_attribute("id") or "").lower()
-        except Exception:
+        except Exception as exc:
+            logger.debug("Error classifying file input: %s", exc)
             return None
         if "sticker" in name or "sticker" in input_id or "sticker" in accept.lower():
             return "sticker"
@@ -304,7 +321,8 @@ class WhatsAppBot:
         exclude_signatures = exclude_signatures or set()
         try:
             inputs = self.driver.find_elements(By.XPATH, '//input[@type="file"]')
-        except Exception:
+        except Exception as exc:
+            logger.debug("Error finding file inputs: %s", exc)
             return None
 
         for el in inputs:
@@ -358,8 +376,8 @@ class WhatsAppBot:
             el = self.driver.execute_script(script, labels)
             if el:
                 return el
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Error executing label search script: %s", exc)
 
         # 2. Fallback to icons/xpaths if text search fails
         for icon in icons:
@@ -373,7 +391,8 @@ class WhatsAppBot:
                     for el in self.driver.find_elements(By.XPATH, xpath):
                         if self._classify_file_input(el) == kind:
                             return el
-                except Exception:
+                except Exception as exc:
+                    logger.debug("Error finding file input with xpath: %s", exc)
                     continue
         return None
 
@@ -441,35 +460,9 @@ class WhatsAppBot:
         """
         try:
             return bool(self.driver.execute_script(script, data_icon))
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not activate attach menu option %s: %s", data_icon, exc)
             return False
-        # JS fallback: search for visible elements containing Arabic 'تجاهل' and click nearest clickable
-        try:
-            script = """
-            function visible(el){ if(!el) return false; var s = window.getComputedStyle(el); return s.display !== 'none' && s.visibility !== 'hidden' && el.offsetParent !== null; }
-            var phrases = ['تجاهل', 'تجاهل الإخطار', 'تجاهل الإشعارات'];
-            var all = document.querySelectorAll('*');
-            for(var i=0;i<all.length;i++){
-                var el = all[i];
-                try{
-                    var txt = (el.innerText||'').trim();
-                    if(!txt) continue;
-                    for(var j=0;j<phrases.length;j++){
-                        if(txt.indexOf(phrases[j])>=0 && visible(el)){
-                            var btn = el.closest('button') || el.closest('[role="button"]') || el.querySelector('button') || el;
-                            if(btn){ btn.click(); return {clicked:true, via:'js-phrase', phrase:phrases[j]}; }
-                        }
-                    }
-                }catch(e){}
-            }
-            return {clicked:false};
-            """
-            res = self.driver.execute_script(script)
-            if res and isinstance(res, dict) and res.get('clicked'):
-                self._emit("INFO", f"[MODAL-JS] clicked dismiss via phrase")
-                return True
-        except Exception:
-            pass
 
     def _js_activate_attach_menu_option_by_text(self, labels):
         """Finds row by text, blocks its nested file input click/mousedown, and dispatch click events on the row."""
@@ -542,18 +535,8 @@ class WhatsAppBot:
         exclude_signatures = exclude_signatures or set()
         try:
             inputs = self.driver.find_elements(By.CSS_SELECTOR, 'input[type="file"]')
-        except Exception:
-            return None
-        # Final global-JS fallback: look for any visible span[data-icon*='send'] anywhere on page
-        try:
-            gs = '''
-            var spans = document.querySelectorAll('span[data-icon]');
-            function visible(el){ if(!el) return false; var s=window.getComputedStyle(el); return s.display!=='none' && s.visibility!=='hidden' && el.offsetParent!==null; }
-            for(var i=0;i<spans.length;i++){ var d = spans[i].getAttribute('data-icon')||''; if(d.indexOf('send')>=0 && visible(spans[i])) return spans[i].closest('button')||spans[i].closest('[role="button"]')||spans[i]; }
-            return null;
-            '''
-            return self.driver.execute_script(gs)
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not enumerate file inputs: %s", exc)
             return None
         for el in inputs:
             sig = self._file_input_signature(el)
@@ -759,8 +742,8 @@ class WhatsAppBot:
         try:
             self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
             time.sleep(0.4)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not dismiss sticker panel: %s", exc)
 
     def _reset_compose_overlays(self):
         """Close sticker panel, media preview, and attach menu before a new upload."""
@@ -772,8 +755,8 @@ class WhatsAppBot:
                 break
             try:
                 self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not reset compose overlay with Escape: %s", exc)
             time.sleep(0.35)
 
     def recover_compose_state(self, stop_event=None):
@@ -784,8 +767,8 @@ class WhatsAppBot:
         self._dismiss_attach_menu()
         try:
             self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not recover compose state with Escape: %s", exc)
         if stop_event:
             stop_event.wait(0.4)
         else:
@@ -807,7 +790,8 @@ class WhatsAppBot:
                 for el in footer.find_elements(By.XPATH, xpath):
                     if el.is_displayed() and el.get_attribute("aria-disabled") != "true":
                         return el
-            except Exception:
+            except Exception as exc:
+                logger.debug("Could not inspect compose footer element for %s: %s", xpath, exc)
                 continue
         return None
 
@@ -837,8 +821,8 @@ class WhatsAppBot:
                 "arguments[0].scrollIntoView({block:'center'}); arguments[0].focus();",
                 chat_input,
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not focus footer chat input: %s", exc)
 
     def _find_photo_video_input(self):
         return self._find_file_input("media")
@@ -867,20 +851,21 @@ class WhatsAppBot:
                 """,
                 input_el,
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not expose file input before send_keys: %s", exc)
         try:
             input_el.send_keys(abs_path)
             return True
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not send file path to input %s: %s", abs_path, exc)
             return False
 
     def _dismiss_attach_menu(self):
         try:
             self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
             time.sleep(0.3)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not dismiss attach menu: %s", exc)
 
     def _try_direct_file_injection(self, path, input_kind, stop_event=None):
         """Documents only — media must use attach menu to avoid sticker file inputs."""
@@ -1056,8 +1041,8 @@ class WhatsAppBot:
                 self._emit("INFO", "ظهرت معاينة الوسائط")
                 try:
                     self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Could not send Escape after media preview appeared: %s", exc)
                 if stop_event:
                     stop_event.wait(0.3)
                 else:
@@ -1105,7 +1090,8 @@ class WhatsAppBot:
         try:
             src = (self.driver.page_source or "").lower()
             return any(m.lower() in src for m in self._INVALID_PAGE_MARKERS)
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not inspect page source for invalid-number markers: %s", exc)
             return False
 
     def _invalid_number_modal_visible(self):
@@ -1150,15 +1136,15 @@ class WhatsAppBot:
                         """
                     )
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not dismiss invalid-number modal with JavaScript: %s", exc)
 
         if not dismissed:
             try:
                 self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
                 dismissed = True
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not dismiss invalid-number modal with Escape: %s", exc)
 
         if stop_event:
             stop_event.wait(0.5)
@@ -1309,11 +1295,12 @@ class WhatsAppBot:
             try:
                 if "web.whatsapp.com" not in self.driver.current_url:
                     self.driver.get("https://web.whatsapp.com")
-            except Exception:
+            except Exception as exc:
+                logger.debug("Could not inspect current browser URL: %s", exc)
                 try:
                     self.driver.get("https://web.whatsapp.com")
-                except:
-                    pass
+                except Exception as nav_exc:
+                    logger.debug("Could not navigate to WhatsApp Web: %s", nav_exc)
 
     def wait_for_login(self, timeout=900):
         """Waits until the chat list is visible, indicating successful login or browser is closed."""
@@ -1341,16 +1328,16 @@ class WhatsAppBot:
                     return  # Don't bring to front in background mode
                 self.driver.execute_script("window.focus();")
                 self.driver.maximize_window()
-            except:
-                pass
+            except Exception as exc:
+                logger.debug("Could not bring browser window to front: %s", exc)
 
     def minimize(self):
         """Minimizes the browser window."""
         if self.driver:
             try:
                 self.driver.minimize_window()
-            except:
-                pass
+            except Exception as exc:
+                logger.debug("Could not minimize browser window: %s", exc)
 
     def _open_chat_via_search(self, phone, stop_event=None):
         """Open a chat from the side search box without reloading the page."""
@@ -1371,8 +1358,8 @@ class WhatsAppBot:
             try:
                 search_box.send_keys(Keys.CONTROL, "a")
                 search_box.send_keys(Keys.BACKSPACE)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not clear search box before typing phone: %s", exc)
             query = phone.lstrip("+")
             search_box.send_keys(query)
             if stop_event:
@@ -1386,8 +1373,8 @@ class WhatsAppBot:
                 time.sleep(0.8)
             try:
                 self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not close search overlay with Escape: %s", exc)
             if stop_event:
                 stop_event.wait(0.4)
             else:
@@ -1397,7 +1384,8 @@ class WhatsAppBot:
             else:
                 time.sleep(0.5)
             return self._is_active_chat_ready()
-        except Exception:
+        except Exception as exc:
+            logger.debug("Opening chat via search failed for %s: %s", phone, exc)
             return False
 
     def open_chat(self, phone, stop_event=None):
@@ -1427,8 +1415,8 @@ class WhatsAppBot:
         old_html = None
         try:
             old_html = self.driver.find_element(By.TAG_NAME, "html")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not capture current html element before navigation: %s", exc)
 
         # Force a full reload by appending a unique timestamp to avoid URL-navigation cache/routing locks in WhatsApp Web
         url = f"https://web.whatsapp.com/send?phone={phone}&t={int(time.time())}"
@@ -1438,8 +1426,8 @@ class WhatsAppBot:
         # Force a complete refresh to discard all client-side cache, bfcache, and SPA router state
         try:
             self.driver.refresh()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not refresh WhatsApp page after navigation: %s", exc)
 
         # Wait for the old HTML element to become stale (indicating that the browser has fully unloaded the old page)
         if old_html:
@@ -1448,7 +1436,8 @@ class WhatsAppBot:
                 from selenium.webdriver.support import expected_conditions as EC
                 WebDriverWait(self.driver, 10).until(EC.staleness_of(old_html))
                 self._emit("INFO", "تم تأكيد إلغاء تحميل الصفحة السابقة وتفريغ الذاكرة بنجاح.")
-            except Exception:
+            except Exception as exc:
+                logger.debug("Old page did not become stale in time: %s", exc)
                 time.sleep(3.0)
         else:
             time.sleep(3.0)
@@ -1467,8 +1456,8 @@ class WhatsAppBot:
                 if search_box and search_box.is_displayed():
                     booted = True
                     break
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not inspect WhatsApp boot search box: %s", exc)
             time.sleep(0.5)
         
         if booted:
@@ -1621,7 +1610,8 @@ class WhatsAppBot:
                     from utils.safety import extra_delay_after_attachment
 
                     extra = extra_delay_after_attachment(type_, path)
-                except Exception:
+                except Exception as exc:
+                    logger.debug("Could not calculate attachment safety delay: %s", exc)
                     extra = 5.0 if type_ in ("image", "video") else 2.0
                 if stop_event:
                     stop_event.wait(2 + extra)
@@ -1706,7 +1696,8 @@ class WhatsAppBot:
                 "return (arguments[0].innerText || arguments[0].textContent || '').trim();",
                 element,
             ) or "").strip()
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not read contenteditable text: %s", exc)
             return ""
 
     def _find_footer_chat_input(self):
@@ -1816,19 +1807,19 @@ class WhatsAppBot:
         try:
             element.click()
             return True
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Native element click failed: %s", exc)
         try:
             from selenium.webdriver.common.action_chains import ActionChains
             ActionChains(self.driver).move_to_element(element).click().perform()
             return True
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("ActionChains element click failed: %s", exc)
         try:
             self.driver.execute_script("arguments[0].click();", element)
             return True
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("JavaScript element click failed: %s", exc)
         return False
 
     def _dismiss_modal_if_present(self, stop_event=None):
@@ -1853,7 +1844,8 @@ class WhatsAppBot:
                                 self._emit("INFO", f"[MODAL] Dismissing dialog via button text='{txt}' aria='{aria}'")
                                 self._click_element(b)
                                 return True
-                        except Exception:
+                        except Exception as exc:
+                            logger.debug("Could not inspect modal button: %s", exc)
                             continue
                     # Fallback: click any visible close control inside the dialog
                     try:
@@ -1861,11 +1853,13 @@ class WhatsAppBot:
                         if close.is_displayed():
                             self._click_element(close)
                             return True
-                    except Exception:
-                        pass
-                except Exception:
+                    except Exception as exc:
+                        logger.debug("Could not click modal close control: %s", exc)
+                except Exception as exc:
+                    logger.debug("Could not inspect modal dialog: %s", exc)
                     continue
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not enumerate modal dialogs: %s", exc)
             return False
         return False
 
@@ -1921,8 +1915,8 @@ class WhatsAppBot:
                 # Dismiss any blocking modal that may overlay the preview area (e.g. discard/ignore prompts)
                 try:
                     self._dismiss_modal_if_present(stop_event=stop_event)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Could not dismiss blocking modal before media send: %s", exc)
 
                 if not self._wait_for_any(
                     self.MEDIA_PREVIEW_LOCATORS, timeout=40, stop_event=stop_event
@@ -1974,8 +1968,8 @@ class WhatsAppBot:
                         if res and isinstance(res, dict) and res.get('clicked'):
                             self._emit('INFO', f"[JS-SEND] clicked preview send via {res.get('why')}")
                             send_btn = True
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("Preview send JavaScript fallback failed: %s", exc)
 
                 if not send_btn:
                     # Diagnostic: dump preview/dialog DOM to logs to help identify blocking overlays
@@ -2085,7 +2079,8 @@ class WhatsAppBot:
             ctypes.memmove(p_mem, data, len(data))
             GlobalUnlock(h_mem)
             SetClipboardData(CF_UNICODETEXT, h_mem)
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not set clipboard text: %s", exc)
             return False
         finally:
             CloseClipboard()
@@ -2098,11 +2093,12 @@ class WhatsAppBot:
             
         try:
             element.click()
-        except:
+        except Exception as exc:
+            logger.debug("Could not focus text element with native click: %s", exc)
             try:
                 self.driver.execute_script("arguments[0].click();", element)
-            except:
-                pass
+            except Exception as js_exc:
+                logger.debug("Could not focus text element with JavaScript click: %s", js_exc)
                 
         if stop_event:
             stop_event.wait(0.2)
@@ -2119,8 +2115,8 @@ class WhatsAppBot:
                     else:
                         time.sleep(0.5)
                     return
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Could not paste text from clipboard: %s", exc)
                     
         # Fallback to direct send_keys or human type
         if len(text) < 200:
@@ -2154,8 +2150,8 @@ class WhatsAppBot:
                 else:
                     time.sleep(random.uniform(0.5, 1.5))
                 self.driver.execute_script("arguments[0].scrollTop -= arguments[1]", pane, random.randint(50, 150))
-        except:
-            pass
+        except Exception as exc:
+            logger.debug("Random chat scroll failed: %s", exc)
 
     def _send_text(self, message, stop_event=None):
         if stop_event and stop_event.is_set():
@@ -2232,8 +2228,8 @@ class WhatsAppBot:
                 sent = True
             except ElementClickInterceptedException:
                 return "ERR_TEXT_SEND_RETRY"
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Enter key send failed, trying send button fallback: %s", exc)
 
             if not sent:
                 send_btn = self._find_footer_send_button(stop_event=stop_event)
@@ -2279,8 +2275,8 @@ class WhatsAppBot:
                 # Give Chrome a moment to flush any pending writes
                 time.sleep(0.5)
                 self.driver.quit()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Could not close browser cleanly: %s", exc)
             finally:
                 self.driver = None
     # â”€â”€â”€ Chatbot Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -2309,12 +2305,13 @@ class WhatsAppBot:
                         # try to find the closest ancestor with role="listitem" or just return the element if it's clickable
                         if el.is_displayed():
                             valid_elements.append(el)
-                    except:
-                        pass
+                    except Exception as exc:
+                        logger.debug("Could not inspect unread chat element: %s", exc)
                 if valid_elements:
                     return valid_elements
             return []
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not find unread chats: %s", exc)
             return []
 
     def open_chat_element(self, chat_element):
@@ -2323,7 +2320,8 @@ class WhatsAppBot:
             self.driver.execute_script("arguments[0].click();", chat_element)
             time.sleep(1)
             return True
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not open chat element: %s", exc)
             return False
 
     def get_active_chat_name(self):
@@ -2359,8 +2357,8 @@ class WhatsAppBot:
                               "Phone number shared via url is invalid." in d.page_source or
                               "رقم الهاتف الذي تمت مشاركته عبر الرابط غير صحيح" in d.page_source
                 )
-            except:
-                pass # Timeout, let's check page source directly
+            except Exception as exc:
+                logger.debug("Number validity wait timed out or failed: %s", exc)
 
             time.sleep(1) # Give it a moment to render
             
@@ -2371,7 +2369,8 @@ class WhatsAppBot:
                 
             # Otherwise, assume valid (chat input is probably visible)
             return True
-        except Exception as e:
+        except Exception as exc:
+            logger.debug("Could not check number validity for %s: %s", phone, exc)
             return False
 
     def read_last_message(self):

@@ -4,6 +4,7 @@ Saves and loads all user preferences to/from config.json.
 """
 import json
 import os
+from utils.logger import logger, log_exception
 
 DEFAULT_CONFIG = {
     "appearance_mode": "dark",
@@ -51,13 +52,21 @@ class ConfigManager:
             if os.path.exists(self.config_path):
                 with open(self.config_path, 'r', encoding='utf-8') as f:
                     saved = json.load(f)
-                self.config.update(saved)
+                if isinstance(saved, dict):
+                    self.config.update(saved)
+                else:
+                    logger.warning("Ignoring config file because it does not contain an object: %s", self.config_path)
+                    return
                 # Prefer two-step send; merged caption mode is unreliable in automation.
                 if self.config.get("send_text_with_image"):
                     self.config["send_text_with_image"] = False
                 self._enforce_safe_limits(persist=True)
-        except Exception:
-            pass
+        except json.JSONDecodeError as exc:
+            logger.error("Invalid config JSON in %s: %s", self.config_path, exc)
+        except OSError as exc:
+            logger.error("Could not read config file %s: %s", self.config_path, exc)
+        except Exception as exc:
+            log_exception(f"Unexpected error loading config from {self.config_path}", exc)
 
     def _enforce_safe_limits(self, persist=False):
         """Clamp aggressive settings that increase ban risk."""
@@ -85,16 +94,20 @@ class ConfigManager:
                 changed = True
             if persist and changed:
                 self.save()
-        except Exception:
-            pass
+        except (ValueError, TypeError) as exc:
+            logger.warning("Invalid safety-related config values, keeping defaults where possible: %s", exc)
+        except Exception as exc:
+            log_exception("Error enforcing safe limits", exc)
 
     def save(self):
         """Persist current config to disk."""
         try:
             with open(self.config_path, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
+        except OSError as exc:
+            logger.error("Could not write config file %s: %s", self.config_path, exc)
+        except Exception as exc:
+            log_exception(f"Unexpected error saving config to {self.config_path}", exc)
 
     def get(self, key, default=None):
         return self.config.get(key, default)

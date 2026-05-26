@@ -1,6 +1,7 @@
 import csv
 import os
 import re
+from utils.logger import logger, log_exception
 
 
 def _normalize_phone(phone, default_country_code="20"):
@@ -56,6 +57,7 @@ def read_contacts(file_path, default_country_code="20"):
     contacts = []
     try:
         if not os.path.exists(file_path):
+            logger.warning(f"Contacts file not found: {file_path}")
             return []
 
         with open(file_path, 'r', encoding='utf-8-sig') as f:
@@ -81,8 +83,13 @@ def read_contacts(file_path, default_country_code="20"):
                     if var4: c['var4'] = var4
                     if var5: c['var5'] = var5
                     contacts.append(c)
-    except Exception as e:
-        print(f"Error reading CSV: {e}")
+        logger.info(f"Loaded {len(contacts)} contacts from {file_path}")
+    except FileNotFoundError as exc:
+        logger.error(f"Contacts file not found: {file_path}")
+    except csv.Error as exc:
+        logger.error(f"CSV parsing error in {file_path}: {exc}")
+    except Exception as exc:
+        log_exception(f"Error reading contacts from {file_path}", exc)
 
     return contacts
 
@@ -93,6 +100,7 @@ def read_contacts_excel(file_path, default_country_code="20"):
     try:
         import openpyxl
         if not os.path.exists(file_path):
+            logger.warning(f"Excel file not found: {file_path}")
             return []
 
         wb = openpyxl.load_workbook(file_path, read_only=True)
@@ -133,6 +141,7 @@ def read_contacts_excel(file_path, default_country_code="20"):
                 phone_col = 0
 
         if phone_col is None:
+            logger.warning(f"No phone column found in Excel file: {file_path}")
             return []
 
         for row in ws.iter_rows(min_row=2):
@@ -150,8 +159,13 @@ def read_contacts_excel(file_path, default_country_code="20"):
                 contacts.append(c)
 
         wb.close()
-    except Exception as e:
-        print(f"Error reading Excel: {e}")
+        logger.info(f"Loaded {len(contacts)} contacts from Excel file: {file_path}")
+    except FileNotFoundError as exc:
+        logger.error(f"Excel file not found: {file_path}")
+    except ImportError:
+        logger.error("openpyxl library is not installed, cannot read Excel files")
+    except Exception as exc:
+        log_exception(f"Error reading Excel file {file_path}", exc)
 
     return contacts
 
@@ -166,6 +180,7 @@ def read_contacts_txt(file_path, default_country_code="20"):
     contacts = []
     try:
         if not os.path.exists(file_path):
+            logger.warning(f"Text file not found: {file_path}")
             return []
         
         # Try UTF-8 first, then fallback to cp1256 (Arabic Windows)
@@ -179,6 +194,7 @@ def read_contacts_txt(file_path, default_country_code="20"):
                 continue
         
         if not content:
+            logger.warning(f"Could not read text file {file_path} with any supported encoding")
             return []
         
         seen = set()
@@ -204,9 +220,12 @@ def read_contacts_txt(file_path, default_country_code="20"):
                 if phone and phone not in seen:
                     seen.add(phone)
                     contacts.append({'phone': phone, 'name': 'عميل'})
-                
-    except Exception as e:
-        print(f"Error reading TXT: {e}")
+
+        logger.info(f"Loaded {len(contacts)} contacts from text file: {file_path}")
+    except FileNotFoundError as exc:
+        logger.error(f"Text file not found: {file_path}")
+    except Exception as exc:
+        log_exception(f"Error reading text file {file_path}", exc)
 
     return contacts
 
@@ -232,7 +251,11 @@ def create_contacts_template(file_path):
             writer.writerow(['Name', 'Phone', 'Var1', 'Var2', 'Var3', 'Var4', 'Var5'])
             writer.writerow(['Client Name', '010XXXXXXXX', 'Value1', 'Value2', 'Value3', 'Value4', 'Value5'])
         return True
-    except Exception:
+    except OSError as exc:
+        logger.error(f"Could not create contacts template {file_path}: {exc}")
+        return False
+    except Exception as exc:
+        log_exception(f"Unexpected error creating contacts template {file_path}", exc)
         return False
 
 

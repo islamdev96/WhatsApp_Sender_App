@@ -6,6 +6,7 @@ import json
 import os
 import datetime
 from utils.db import SQLiteStore
+from utils.logger import logger, log_exception
 
 
 class TemplatesManager:
@@ -25,8 +26,22 @@ class TemplatesManager:
         try:
             if os.path.exists(self.templates_path):
                 with open(self.templates_path, 'r', encoding='utf-8') as f:
-                    self.templates = json.load(f)
-        except Exception:
+                    templates = json.load(f)
+                if isinstance(templates, list):
+                    self.templates = [item for item in templates if isinstance(item, dict)]
+                    if len(self.templates) != len(templates):
+                        logger.warning("Skipped malformed template entries while loading %s", self.templates_path)
+                else:
+                    logger.warning("Ignoring templates file with unexpected format: %s", self.templates_path)
+                    self.templates = []
+        except json.JSONDecodeError as exc:
+            logger.error("Invalid templates JSON in %s: %s", self.templates_path, exc)
+            self.templates = []
+        except OSError as exc:
+            logger.error("Could not read templates file %s: %s", self.templates_path, exc)
+            self.templates = []
+        except Exception as exc:
+            log_exception(f"Unexpected error loading templates from {self.templates_path}", exc)
             self.templates = []
 
     def save(self):
@@ -34,8 +49,10 @@ class TemplatesManager:
         try:
             with open(self.templates_path, 'w', encoding='utf-8') as f:
                 json.dump(self.templates, f, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
+        except OSError as exc:
+            logger.error("Could not write templates file %s: %s", self.templates_path, exc)
+        except Exception as exc:
+            log_exception(f"Unexpected error saving templates to {self.templates_path}", exc)
 
     def _migrate_from_json_once(self):
         if self.store.get_meta("templates_migrated") == "1":
@@ -46,9 +63,22 @@ class TemplatesManager:
         try:
             with open(self.templates_path, 'r', encoding='utf-8') as f:
                 templates = json.load(f)
-        except Exception:
+            if not isinstance(templates, list):
+                logger.warning("Skipping templates migration because JSON root is not a list: %s", self.templates_path)
+                templates = []
+        except json.JSONDecodeError as exc:
+            logger.error("Invalid templates JSON during migration from %s: %s", self.templates_path, exc)
+            templates = []
+        except OSError as exc:
+            logger.error("Could not read templates file during migration %s: %s", self.templates_path, exc)
+            templates = []
+        except Exception as exc:
+            log_exception(f"Unexpected error reading templates migration source {self.templates_path}", exc)
             templates = []
         for t in templates:
+            if not isinstance(t, dict):
+                logger.warning("Skipping malformed template during migration")
+                continue
             name = t.get("name")
             body = t.get("body", "")
             created = t.get("created") or datetime.datetime.now().strftime("%Y-%m-%d %H:%M")

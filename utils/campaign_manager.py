@@ -6,6 +6,7 @@ import json
 import os
 import datetime
 from utils.db import SQLiteStore
+from utils.logger import logger, log_exception
 
 
 class CampaignManager:
@@ -24,16 +25,32 @@ class CampaignManager:
         try:
             if os.path.exists(self.campaigns_path):
                 with open(self.campaigns_path, "r", encoding="utf-8") as f:
-                    self.campaigns = json.load(f)
-        except Exception:
+                    campaigns = json.load(f)
+                if isinstance(campaigns, list):
+                    self.campaigns = [item for item in campaigns if isinstance(item, dict)]
+                    if len(self.campaigns) != len(campaigns):
+                        logger.warning("Skipped malformed campaign entries while loading %s", self.campaigns_path)
+                else:
+                    logger.warning("Ignoring campaigns file with unexpected format: %s", self.campaigns_path)
+                    self.campaigns = []
+        except json.JSONDecodeError as exc:
+            logger.error("Invalid campaigns JSON in %s: %s", self.campaigns_path, exc)
+            self.campaigns = []
+        except OSError as exc:
+            logger.error("Could not read campaigns file %s: %s", self.campaigns_path, exc)
+            self.campaigns = []
+        except Exception as exc:
+            log_exception(f"Unexpected error loading campaigns from {self.campaigns_path}", exc)
             self.campaigns = []
 
     def _save_to_json(self):
         try:
             with open(self.campaigns_path, "w", encoding="utf-8") as f:
                 json.dump(self.campaigns, f, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
+        except OSError as exc:
+            logger.error("Could not write campaigns file %s: %s", self.campaigns_path, exc)
+        except Exception as exc:
+            log_exception(f"Unexpected error saving campaigns to {self.campaigns_path}", exc)
 
     def _migrate_from_json_once(self):
         if self.store.get_meta("campaigns_migrated") == "1":
@@ -44,46 +61,66 @@ class CampaignManager:
         try:
             with open(self.campaigns_path, "r", encoding="utf-8") as f:
                 campaigns = json.load(f)
-        except Exception:
+            if not isinstance(campaigns, list):
+                logger.warning("Skipping campaigns migration because JSON root is not a list: %s", self.campaigns_path)
+                campaigns = []
+        except json.JSONDecodeError as exc:
+            logger.error("Invalid campaigns JSON during migration from %s: %s", self.campaigns_path, exc)
+            campaigns = []
+        except OSError as exc:
+            logger.error("Could not read campaigns file during migration %s: %s", self.campaigns_path, exc)
+            campaigns = []
+        except Exception as exc:
+            log_exception(f"Unexpected error reading campaigns migration source {self.campaigns_path}", exc)
             campaigns = []
 
         for c in campaigns:
+            if not isinstance(c, dict):
+                logger.warning("Skipping malformed campaign entry during migration")
+                continue
             name = c.get("name")
-            date = c.get("date") or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            total = int(c.get("total", 0))
-            sent = int(c.get("sent", 0))
-            failed = int(c.get("failed", 0))
-            invalid = int(c.get("invalid", 0))
-            duration_seconds = int(c.get("duration_seconds", 0))
-            success_rate = float(c.get("success_rate", 0))
-            csv_path = c.get("csv_path")
+            try:
+                date = c.get("date") or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                total = int(c.get("total", 0))
+                sent = int(c.get("sent", 0))
+                failed = int(c.get("failed", 0))
+                invalid = int(c.get("invalid", 0))
+                duration_seconds = int(c.get("duration_seconds", 0))
+                success_rate = float(c.get("success_rate", 0))
+                csv_path = c.get("csv_path")
 
-            cur = self.store.execute(
-                "INSERT INTO wa_campaigns(name, date, total, sent, failed, invalid, duration_seconds, success_rate, csv_path) "
-                "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (name, date, total, sent, failed, invalid, duration_seconds, success_rate, csv_path),
-                commit=True,
-            )
-            campaign_id = cur.lastrowid
-            results = c.get("results", [])
-            if results:
-                params = [
-                    (
-                        campaign_id,
-                        r.get("phone"),
-                        r.get("name"),
-                        r.get("status"),
-                        r.get("error_code"),
-                        r.get("timestamp"),
-                    )
-                    for r in results
-                ]
-                self.store.executemany(
-                    "INSERT INTO wa_campaign_results(campaign_id, phone, name, status, error_code, timestamp) "
-                    "VALUES(?, ?, ?, ?, ?, ?)",
-                    params,
+                cur = self.store.execute(
+                    "INSERT INTO wa_campaigns(name, date, total, sent, failed, invalid, duration_seconds, success_rate, csv_path) "
+                    "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (name, date, total, sent, failed, invalid, duration_seconds, success_rate, csv_path),
                     commit=True,
                 )
+                campaign_id = cur.lastrowid
+                results = c.get("results", [])
+                if isinstance(results, list) and results:
+                    params = [
+                        (
+                            campaign_id,
+                            r.get("phone"),
+                            r.get("name"),
+                            r.get("status"),
+                            r.get("error_code"),
+                            r.get("timestamp"),
+                        )
+                        for r in results
+                        if isinstance(r, dict)
+                    ]
+                    if params:
+                        self.store.executemany(
+                            "INSERT INTO wa_campaign_results(campaign_id, phone, name, status, error_code, timestamp) "
+                            "VALUES(?, ?, ?, ?, ?, ?)",
+                            params,
+                            commit=True,
+                        )
+            except (ValueError, TypeError) as exc:
+                logger.warning("Skipping campaign with invalid numeric fields during migration: %s", exc)
+            except Exception as exc:
+                log_exception("Unexpected error migrating campaign entry", exc)
         self.store.set_meta("campaigns_migrated", "1")
 
     def add_campaign(self, name, total, sent, failed, invalid,

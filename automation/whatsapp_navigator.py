@@ -1,5 +1,6 @@
 import time
 from selenium.webdriver.common.by import By
+from utils.logger import logger
 
 class WhatsAppNavigator:
     def __init__(self, bot):
@@ -76,8 +77,8 @@ class WhatsAppNavigator:
             for el in self.driver.find_elements(By.XPATH, '//*[@id="main"]//footer'):
                 if el.is_displayed():
                     return el
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not locate main compose footer: %s", exc)
         return None
 
     def _find_compose_footer(self):
@@ -92,7 +93,8 @@ class WhatsAppNavigator:
                 for el in self.driver.find_elements(By.XPATH, xpath):
                     if el.is_displayed():
                         return el
-            except Exception:
+            except Exception as exc:
+                logger.debug("Could not inspect compose footer candidate: %s", exc)
                 continue
         return None
 
@@ -118,8 +120,8 @@ class WhatsAppNavigator:
             """)
             if dom_status['hasMain'] or dom_status['editablesCount'] > 0:
                 self._emit("INFO", f"[DIAG-DOM-READY] hasMain={dom_status['hasMain']} mainTag={dom_status['mainTag']} hasFooter={dom_status['hasFooter']} hasMainFooter={dom_status['hasMainFooter']} editables={dom_status['editablesCount']}")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not collect active chat DOM diagnostics: %s", exc)
 
         footer = self._find_compose_footer()
         if not footer:
@@ -134,8 +136,8 @@ class WhatsAppNavigator:
             for inp in inputs:
                 if inp.is_displayed():
                     return True
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not inspect footer compose inputs: %s", exc)
         return False
 
     def _find_attach_button_js(self):
@@ -178,7 +180,8 @@ class WhatsAppNavigator:
         """
         try:
             return self.driver.execute_script(script)
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not find attach button with JavaScript: %s", exc)
             return None
 
     def find_attach_button(self):
@@ -190,7 +193,8 @@ class WhatsAppNavigator:
                     for el in footer.find_elements(By.XPATH, xpath):
                         if el.is_displayed() and el.get_attribute("aria-disabled") != "true":
                             return el
-                except Exception:
+                except Exception as exc:
+                    logger.debug("Could not inspect attach button candidate: %s", exc)
                     continue
 
         attach_btn = self.bot._find_best_clickable(self.ATTACH_BUTTON_LOCATORS)
@@ -306,8 +310,8 @@ class WhatsAppNavigator:
                                 ' | .//div[@contenteditable="true"][@data-tab="10"]'
                                 ' | .//div[@contenteditable="true" and contains(@class,"copyable-text")]')
                             has_textbox = any(inp.is_displayed() for inp in inputs)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("Could not collect wait diagnostics: %s", exc)
                     self._emit("WARN", f"[DIAG-WAIT] chat_ready=False! main={has_main} footer={has_footer} textbox={has_textbox}")
                     
                     # Run the exact JS query requested by the user to see all contenteditables on screen!

@@ -6,6 +6,15 @@ import json
 import os
 import datetime
 from utils.db import SQLiteStore
+from utils.logger import logger, log_exception
+
+
+def _clean_contacts(contacts):
+    return [c for c in contacts or [] if isinstance(c, dict) and c.get("phone")]
+
+
+def _contact_params(group_id, contacts):
+    return [(group_id, c.get("phone"), c.get("name", "")) for c in _clean_contacts(contacts)]
 
 
 class ContactsManager:
@@ -25,8 +34,22 @@ class ContactsManager:
         try:
             if os.path.exists(self.groups_path):
                 with open(self.groups_path, 'r', encoding='utf-8') as f:
-                    self.groups = json.load(f)
-        except Exception:
+                    groups = json.load(f)
+                if isinstance(groups, list):
+                    self.groups = [item for item in groups if isinstance(item, dict)]
+                    if len(self.groups) != len(groups):
+                        logger.warning("Skipped malformed contact group entries while loading %s", self.groups_path)
+                else:
+                    logger.warning("Ignoring contact groups file with unexpected format: %s", self.groups_path)
+                    self.groups = []
+        except json.JSONDecodeError as exc:
+            logger.error("Invalid contact groups JSON in %s: %s", self.groups_path, exc)
+            self.groups = []
+        except OSError as exc:
+            logger.error("Could not read contact groups file %s: %s", self.groups_path, exc)
+            self.groups = []
+        except Exception as exc:
+            log_exception(f"Unexpected error loading contact groups from {self.groups_path}", exc)
             self.groups = []
 
     def save(self):
@@ -34,8 +57,10 @@ class ContactsManager:
         try:
             with open(self.groups_path, 'w', encoding='utf-8') as f:
                 json.dump(self.groups, f, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
+        except OSError as exc:
+            logger.error("Could not write contact groups file %s: %s", self.groups_path, exc)
+        except Exception as exc:
+            log_exception(f"Unexpected error saving contact groups to {self.groups_path}", exc)
 
     def _migrate_from_json_once(self):
         if self.store.get_meta("contacts_migrated") == "1":
@@ -46,10 +71,23 @@ class ContactsManager:
         try:
             with open(self.groups_path, 'r', encoding='utf-8') as f:
                 groups = json.load(f)
-        except Exception:
+            if not isinstance(groups, list):
+                logger.warning("Skipping contacts migration because JSON root is not a list: %s", self.groups_path)
+                groups = []
+        except json.JSONDecodeError as exc:
+            logger.error("Invalid contact groups JSON during migration from %s: %s", self.groups_path, exc)
+            groups = []
+        except OSError as exc:
+            logger.error("Could not read contact groups file during migration %s: %s", self.groups_path, exc)
+            groups = []
+        except Exception as exc:
+            log_exception(f"Unexpected error reading contact groups migration source {self.groups_path}", exc)
             groups = []
 
         for g in groups:
+            if not isinstance(g, dict):
+                logger.warning("Skipping malformed contact group during migration")
+                continue
             name = g.get("name")
             if not name:
                 continue
@@ -66,8 +104,8 @@ class ContactsManager:
             else:
                 group_id = existing["id"]
             contacts = g.get("contacts", [])
-            if contacts:
-                params = [(group_id, c.get("phone"), c.get("name", "")) for c in contacts if c.get("phone")]
+            if isinstance(contacts, list) and contacts:
+                params = _contact_params(group_id, contacts)
                 if params:
                     self.store.executemany(
                         "INSERT OR IGNORE INTO wa_contacts(group_id, phone, name) VALUES(?, ?, ?)",
@@ -124,7 +162,7 @@ class ContactsManager:
             return False  # Already exists
         created = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         if not self.store:
-            group = {"name": name, "contacts": contacts or [], "created": created, "updated": created}
+            group = {"name": name, "contacts": _clean_contacts(contacts), "created": created, "updated": created}
             self.groups.append(group)
             self.save()
             return True
@@ -135,7 +173,7 @@ class ContactsManager:
         )
         group_id = cur.lastrowid
         if contacts:
-            params = [(group_id, c.get("phone"), c.get("name", "")) for c in contacts if c.get("phone")]
+            params = _contact_params(group_id, contacts)
             if params:
                 self.store.executemany(
                     "INSERT OR IGNORE INTO wa_contacts(group_id, phone, name) VALUES(?, ?, ?)",
@@ -149,7 +187,7 @@ class ContactsManager:
         if not self.store:
             g = self.get_by_name(name)
             if g:
-                g["contacts"] = contacts
+                g["contacts"] = _clean_contacts(contacts)
                 g["updated"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
                 self.save()
                 return True
@@ -159,7 +197,7 @@ class ContactsManager:
             return False
         group_id = g["id"]
         self.store.execute("DELETE FROM wa_contacts WHERE group_id = ?", (group_id,), commit=True)
-        params = [(group_id, c.get("phone"), c.get("name", "")) for c in contacts if c.get("phone")]
+        params = _contact_params(group_id, contacts)
         if params:
             self.store.executemany(
                 "INSERT OR IGNORE INTO wa_contacts(group_id, phone, name) VALUES(?, ?, ?)",
@@ -179,9 +217,9 @@ class ContactsManager:
             g = self.get_by_name(name)
             if not g:
                 return False
-            existing_phones = {c.get("phone") for c in g["contacts"]}
+            existing_phones = {c.get("phone") for c in _clean_contacts(g.get("contacts", []))}
             added = 0
-            for c in new_contacts:
+            for c in _clean_contacts(new_contacts):
                 if c.get("phone") not in existing_phones:
                     g["contacts"].append(c)
                     existing_phones.add(c.get("phone"))
@@ -195,7 +233,7 @@ class ContactsManager:
             return False
         group_id = g["id"]
         before = self.store.query_one("SELECT COUNT(*) AS c FROM wa_contacts WHERE group_id = ?", (group_id,))["c"]
-        params = [(group_id, c.get("phone"), c.get("name", "")) for c in new_contacts if c.get("phone")]
+        params = _contact_params(group_id, new_contacts)
         if params:
             self.store.executemany(
                 "INSERT OR IGNORE INTO wa_contacts(group_id, phone, name) VALUES(?, ?, ?)",
@@ -218,7 +256,7 @@ class ContactsManager:
             g = self.get_by_name(group_name)
             if g:
                 before = len(g["contacts"])
-                g["contacts"] = [c for c in g["contacts"] if c.get("phone") != phone]
+                g["contacts"] = [c for c in _clean_contacts(g.get("contacts", [])) if c.get("phone") != phone]
                 if len(g["contacts"]) < before:
                     g["updated"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
                     self.save()
@@ -272,7 +310,7 @@ class ContactsManager:
         """Get the number of contacts in a group."""
         if not self.store:
             g = self.get_by_name(name)
-            return len(g["contacts"]) if g else 0
+            return len(_clean_contacts(g.get("contacts", []))) if g else 0
         g = self.store.query_one("SELECT id FROM wa_groups WHERE name = ?", (name,))
         if not g:
             return 0
