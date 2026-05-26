@@ -1245,16 +1245,14 @@ class WhatsAppBot:
             options.add_argument("--disable-extensions")
             
         # Apply custom fingerprint or premium default app-window size if enabled
-        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         if self.proxy_config and self.proxy_config.get("fingerprint_enabled"):
-            user_agent = self.proxy_config.get("user_agent", user_agent)
-            resolution = self.proxy_config.get("resolution", "1000,750")
+            user_agent = self.proxy_config.get("user_agent") or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
+            options.add_argument(f"user-agent={user_agent}")
+            resolution = self.proxy_config.get("resolution") or "1000,750"
             options.add_argument(f"--window-size={resolution}")
         else:
             if not start_minimized:
                 options.add_argument("--window-size=1000,750")
-            
-        options.add_argument(f"user-agent={user_agent}")
         options.add_argument("--remote-allow-origins=*")
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option('useAutomationExtension', False)

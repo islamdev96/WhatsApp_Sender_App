@@ -90,21 +90,31 @@ class WorkflowManager:
             )
             wf_id = cur.lastrowid
 
-        # Replace steps
-        self.store.execute("DELETE FROM wa_workflow_steps WHERE workflow_id = ?", (wf_id,), commit=True)
-        order = 1
-        for s in steps or []:
-            body = s.get("body", "")
-            attachments = s.get("attachments", [])
-            delay_min = int(s.get("delay_min", 0) or 0)
-            delay_max = int(s.get("delay_max", 0) or 0)
-            self.store.execute(
-                "INSERT INTO wa_workflow_steps(workflow_id, step_order, body, attachments_json, delay_min, delay_max) "
-                "VALUES(?, ?, ?, ?, ?, ?)",
-                (wf_id, order, body, json.dumps(attachments, ensure_ascii=False), delay_min, delay_max),
-                commit=True,
-            )
-            order += 1
+        # Replace steps atomically in a single transaction
+        try:
+            self.store.execute("BEGIN", commit=False)
+            self.store.execute("DELETE FROM wa_workflow_steps WHERE workflow_id = ?", (wf_id,), commit=False)
+            order = 1
+            for s in steps or []:
+                body = s.get("body", "")
+                attachments = s.get("attachments", [])
+                delay_min = int(s.get("delay_min", 0) or 0)
+                delay_max = int(s.get("delay_max", 0) or 0)
+                self.store.execute(
+                    "INSERT INTO wa_workflow_steps(workflow_id, step_order, body, attachments_json, delay_min, delay_max) "
+                    "VALUES(?, ?, ?, ?, ?, ?)",
+                    (wf_id, order, body, json.dumps(attachments, ensure_ascii=False), delay_min, delay_max),
+                    commit=False,
+                )
+                order += 1
+            self.store.execute("COMMIT", commit=False)
+        except Exception as exc:
+            try:
+                self.store.execute("ROLLBACK", commit=False)
+            except Exception:
+                pass
+            logger.error("Failed to save workflow steps atomically: %s", exc)
+            return False, "Failed to save workflow steps."
         return True, wf_id
 
     def delete(self, workflow_id):

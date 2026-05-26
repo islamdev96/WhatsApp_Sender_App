@@ -84,34 +84,44 @@ class ContactsManager:
             log_exception(f"Unexpected error reading contact groups migration source {self.groups_path}", exc)
             groups = []
 
-        for g in groups:
-            if not isinstance(g, dict):
-                logger.warning("Skipping malformed contact group during migration")
-                continue
-            name = g.get("name")
-            if not name:
-                continue
-            created = g.get("created") or datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-            updated = g.get("updated") or created
-            existing = self.store.query_one("SELECT id FROM wa_groups WHERE name = ?", (name,))
-            if not existing:
-                cur = self.store.execute(
-                    "INSERT INTO wa_groups(name, created, updated) VALUES(?, ?, ?)",
-                    (name, created, updated),
-                    commit=True,
-                )
-                group_id = cur.lastrowid
-            else:
-                group_id = existing["id"]
-            contacts = g.get("contacts", [])
-            if isinstance(contacts, list) and contacts:
-                params = _contact_params(group_id, contacts)
-                if params:
-                    self.store.executemany(
-                        "INSERT OR IGNORE INTO wa_contacts(group_id, phone, name) VALUES(?, ?, ?)",
-                        params,
-                        commit=True,
+        # Batch all migration inserts in a single transaction for performance.
+        try:
+            self.store.execute("BEGIN", commit=False)
+            for g in groups:
+                if not isinstance(g, dict):
+                    logger.warning("Skipping malformed contact group during migration")
+                    continue
+                name = g.get("name")
+                if not name:
+                    continue
+                created = g.get("created") or datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                updated = g.get("updated") or created
+                existing = self.store.query_one("SELECT id FROM wa_groups WHERE name = ?", (name,))
+                if not existing:
+                    cur = self.store.execute(
+                        "INSERT INTO wa_groups(name, created, updated) VALUES(?, ?, ?)",
+                        (name, created, updated),
+                        commit=False,
                     )
+                    group_id = cur.lastrowid
+                else:
+                    group_id = existing["id"]
+                contacts = g.get("contacts", [])
+                if isinstance(contacts, list) and contacts:
+                    params = _contact_params(group_id, contacts)
+                    if params:
+                        self.store.executemany(
+                            "INSERT OR IGNORE INTO wa_contacts(group_id, phone, name) VALUES(?, ?, ?)",
+                            params,
+                            commit=False,
+                        )
+            self.store.execute("COMMIT", commit=False)
+        except Exception as exc:
+            try:
+                self.store.execute("ROLLBACK", commit=False)
+            except Exception:
+                pass
+            log_exception("Contact groups migration transaction failed", exc)
         self.store.set_meta("contacts_migrated", "1")
 
     def get_all(self):
@@ -196,19 +206,30 @@ class ContactsManager:
         if not g:
             return False
         group_id = g["id"]
-        self.store.execute("DELETE FROM wa_contacts WHERE group_id = ?", (group_id,), commit=True)
-        params = _contact_params(group_id, contacts)
-        if params:
-            self.store.executemany(
-                "INSERT OR IGNORE INTO wa_contacts(group_id, phone, name) VALUES(?, ?, ?)",
-                params,
-                commit=True,
+        # Wrap delete+insert+update in one transaction for atomicity
+        try:
+            self.store.execute("BEGIN", commit=False)
+            self.store.execute("DELETE FROM wa_contacts WHERE group_id = ?", (group_id,), commit=False)
+            params = _contact_params(group_id, contacts)
+            if params:
+                self.store.executemany(
+                    "INSERT OR IGNORE INTO wa_contacts(group_id, phone, name) VALUES(?, ?, ?)",
+                    params,
+                    commit=False,
+                )
+            self.store.execute(
+                "UPDATE wa_groups SET updated = ? WHERE id = ?",
+                (datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), group_id),
+                commit=False,
             )
-        self.store.execute(
-            "UPDATE wa_groups SET updated = ? WHERE id = ?",
-            (datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), group_id),
-            commit=True,
-        )
+            self.store.execute("COMMIT", commit=False)
+        except Exception as exc:
+            try:
+                self.store.execute("ROLLBACK", commit=False)
+            except Exception:
+                pass
+            log_exception("Failed to update contacts atomically", exc)
+            return False
         return True
 
     def add_contacts(self, name, new_contacts):

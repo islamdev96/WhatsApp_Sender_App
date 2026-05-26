@@ -128,3 +128,11 @@ class SQLiteStore:
             cur = self.conn.execute(sql, params)
             row = cur.fetchone()
             return dict(row) if row else None
+
+    def close(self):
+        """Explicitly close the database connection."""
+        with _DB_LOCK:
+            try:
+                self.conn.close()
+            except Exception:
+                pass

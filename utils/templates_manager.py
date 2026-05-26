@@ -75,23 +75,33 @@ class TemplatesManager:
         except Exception as exc:
             log_exception(f"Unexpected error reading templates migration source {self.templates_path}", exc)
             templates = []
-        for t in templates:
-            if not isinstance(t, dict):
-                logger.warning("Skipping malformed template during migration")
-                continue
-            name = t.get("name")
-            body = t.get("body", "")
-            created = t.get("created") or datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-            updated = t.get("updated") or created
-            if not name:
-                continue
-            existing = self.store.query_one("SELECT id FROM wa_templates WHERE name = ?", (name,))
-            if not existing:
-                self.store.execute(
-                    "INSERT INTO wa_templates(name, body, created, updated) VALUES(?, ?, ?, ?)",
-                    (name, body, created, updated),
-                    commit=True,
-                )
+        # Batch all migration inserts in a single transaction for performance.
+        try:
+            self.store.execute("BEGIN", commit=False)
+            for t in templates:
+                if not isinstance(t, dict):
+                    logger.warning("Skipping malformed template during migration")
+                    continue
+                name = t.get("name")
+                body = t.get("body", "")
+                created = t.get("created") or datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                updated = t.get("updated") or created
+                if not name:
+                    continue
+                existing = self.store.query_one("SELECT id FROM wa_templates WHERE name = ?", (name,))
+                if not existing:
+                    self.store.execute(
+                        "INSERT INTO wa_templates(name, body, created, updated) VALUES(?, ?, ?, ?)",
+                        (name, body, created, updated),
+                        commit=False,
+                    )
+            self.store.execute("COMMIT", commit=False)
+        except Exception as exc:
+            try:
+                self.store.execute("ROLLBACK", commit=False)
+            except Exception:
+                pass
+            log_exception("Templates migration transaction failed", exc)
         self.store.set_meta("templates_migrated", "1")
 
     def get_all(self):
