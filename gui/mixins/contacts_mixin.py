@@ -1,10 +1,8 @@
 """WhatsApp Sender Pro — Contact loading, filtering, template application, and spintax."""
-import customtkinter as ctk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox
 import re
 import random
 import os
-import csv
 
 from utils.helpers import read_contacts_auto
 
@@ -27,7 +25,6 @@ class ContactsMixin:
                 path = self.contacts_entry.get()
             if not path or not os.path.exists(path):
                 return
-            from utils.helpers import read_contacts_auto
             contacts = read_contacts_auto(path, default_country_code=self.config.get("default_country_code", "20"))
             
             # Refresh the Treeview numbers table
@@ -101,7 +98,6 @@ class ContactsMixin:
                     return None
                 contacts = g["contacts"]
             elif os.path.exists(contacts_input):
-                from utils.helpers import read_contacts_auto
                 contacts = read_contacts_auto(contacts_input, default_country_code=self.config.get("default_country_code", "20"))
             
             if not contacts:

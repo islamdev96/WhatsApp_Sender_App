@@ -1,11 +1,10 @@
 """WhatsApp Sender Pro — Tab builder methods (main, groups, templates, settings, log)."""
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, ttk
-import os
-import csv
 
 from gui.theme import COLORS
 from utils.logger import logger
+from utils.helpers import read_contacts_auto
 from gui.components import RichTextFrame, AttachmentManager
 
 

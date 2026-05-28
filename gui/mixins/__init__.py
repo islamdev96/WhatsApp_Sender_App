@@ -5,3 +5,12 @@ from .contacts_mixin import ContactsMixin
 from .reporting_mixin import ReportingMixin
 from .dialogs_mixin import DialogsMixin
 from .progress_mixin import ProgressMixin
+
+__all__ = [
+    "TabBuildersMixin",
+    "AutomationMixin",
+    "ContactsMixin",
+    "ReportingMixin",
+    "DialogsMixin",
+    "ProgressMixin",
+]

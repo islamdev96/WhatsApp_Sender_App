@@ -1,8 +1,6 @@
 """Proxy configuration, extension generation, and cleanup."""
 import os
-import json
-import urllib.request
-from utils.logger import logger
+from utils.logger import logger, log_exception
 
 
 def check_proxy(proxy_type, host, port, username=None, password=None, timeout=10):

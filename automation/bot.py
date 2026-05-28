@@ -7,8 +7,9 @@ import os
 import json
 
 
-from utils.logger import logger
-from utils.event_log import print_event
+from selenium.webdriver.common.by import By
+
+from utils.logger import logger, log_exception
 from automation.whatsapp_navigator import WhatsAppNavigator
 from automation.browser_setup import BrowserSetupMixin
 from automation.chat_navigation import ChatNavigationMixin
@@ -253,8 +254,6 @@ class WhatsAppBot(
                     logger.debug("Error checking element visibility: %s", exc)
                     continue
         return None
-
-    @staticmethod
 
     def close(self):
         """Safely close the browser, ensuring session data is saved."""

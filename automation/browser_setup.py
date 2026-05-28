@@ -4,12 +4,6 @@ import time
 from automation.constants import WHATSAPP_URL, LOGIN_TIMEOUT
 import os
 
-from selenium.common.exceptions import (
-    TimeoutException, NoSuchElementException, StaleElementReferenceException,
-    WebDriverException, ElementClickInterceptedException,
-    ElementNotInteractableException, JavascriptException,
-)
-
 from utils.logger import logger
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -91,6 +85,7 @@ class BrowserSetupMixin:
             logger.debug("Native Chrome driver initialization failed; trying webdriver-manager: %s", exc)
             # Fallback to slower webdriver-manager if local environment lacks native support
             try:
+                from webdriver_manager.chrome import ChromeDriverManager
                 service = Service(ChromeDriverManager().install())
                 self.driver = webdriver.Chrome(service=service, options=options)
                 self.background_mode = start_minimized

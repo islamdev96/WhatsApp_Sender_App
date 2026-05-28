@@ -1,6 +1,6 @@
 """WhatsApp Sender Pro — Automation control methods (send, stop, pause, error mapping)."""
 import customtkinter as ctk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import messagebox
 import threading
 import random
 import os
@@ -584,9 +584,6 @@ class AutomationMixin:
             # Save Campaign
             csv_path = self._generate_final_report(duration)
             self.last_report_path = csv_path
-            
-            # Determine status
-            c_status = "Completed" if not self.stop_event.is_set() else "Stopped"
             
             # Save to history
             self.campaign_manager.add_campaign(

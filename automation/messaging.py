@@ -4,12 +4,7 @@ import random
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.common.exceptions import (
-    TimeoutException, NoSuchElementException, StaleElementReferenceException,
-    WebDriverException, ElementClickInterceptedException,
-    ElementNotInteractableException, JavascriptException,
-)
+from selenium.common.exceptions import ElementClickInterceptedException
 
 from utils.logger import logger
 
@@ -222,7 +217,7 @@ class MessagingMixin:
                 return result
             self.recover_compose_state(stop_event=stop_event)
 
-        return f"ERR_TEXT_SEND: click intercepted after retry"
+        return "ERR_TEXT_SEND: click intercepted after retry"
 
     def _send_text_once(self, message, stop_event=None):
         if self._handle_invalid_if_present(stop_event=stop_event):

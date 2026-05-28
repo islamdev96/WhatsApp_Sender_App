@@ -3,12 +3,11 @@ WhatsApp Sender Pro — Main Application Window.
 Built with CustomTkinter for a professional UI.
 """
 import customtkinter as ctk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import messagebox, ttk
 import threading
 import queue
 import time
 import os
-import csv
 import datetime
 import json
 
@@ -140,7 +139,6 @@ class ModernWhatsAppApp(
         bg_color = COLORS["bg_dark"]
         fg_color = COLORS["text_main"]
         card_bg = COLORS["card_bg"]
-        border_color = COLORS["border"]
         primary_color = COLORS["primary"]
 
         style.configure(
@@ -196,8 +194,6 @@ class ModernWhatsAppApp(
 
     def _build_layout(self):
         """Build the main application layout: sidebar menu + content area."""
-        import tkinter as tk
-        import json
 
         # Instantiate backward compatibility state variables
         self.bg_mode_var = ctk.BooleanVar(value=self.config.get("background_mode", False))

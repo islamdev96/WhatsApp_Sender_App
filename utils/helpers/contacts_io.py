@@ -3,7 +3,7 @@ import csv
 import os
 import re
 from utils.logger import logger, log_exception
-from utils.helpers.phone import normalize_phone, _normalize_phone
+from utils.helpers.phone import _normalize_phone
 
 
 def read_contacts(file_path, default_country_code="20"):
@@ -38,7 +38,7 @@ def read_contacts(file_path, default_country_code="20"):
                     if var5: c['var5'] = var5
                     contacts.append(c)
         logger.info(f"Loaded {len(contacts)} contacts from {file_path}")
-    except FileNotFoundError as exc:
+    except FileNotFoundError:
         logger.error(f"Contacts file not found: {file_path}")
     except csv.Error as exc:
         logger.error(f"CSV parsing error in {file_path}: {exc}")
@@ -115,7 +115,7 @@ def read_contacts_excel(file_path, default_country_code="20"):
 
         wb.close()
         logger.info(f"Loaded {len(contacts)} contacts from Excel file: {file_path}")
-    except FileNotFoundError as exc:
+    except FileNotFoundError:
         logger.error(f"Excel file not found: {file_path}")
     except ImportError:
         logger.error("openpyxl library is not installed, cannot read Excel files")
@@ -178,7 +178,7 @@ def read_contacts_txt(file_path, default_country_code="20"):
                     contacts.append({'phone': phone, 'name': 'عميل'})
 
         logger.info(f"Loaded {len(contacts)} contacts from text file: {file_path}")
-    except FileNotFoundError as exc:
+    except FileNotFoundError:
         logger.error(f"Text file not found: {file_path}")
     except Exception as exc:
         log_exception(f"Error reading text file {file_path}", exc)

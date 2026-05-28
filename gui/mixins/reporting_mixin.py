@@ -1,6 +1,4 @@
 """WhatsApp Sender Pro — Report generation and CSV export."""
-import customtkinter as ctk
-from tkinter import filedialog, messagebox, ttk
 import os
 import csv
 import datetime

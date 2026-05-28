@@ -1,7 +1,6 @@
 """WhatsApp Sender Pro — Progress window and status updates."""
 import customtkinter as ctk
-from tkinter import filedialog, messagebox, ttk
-import time
+from tkinter import ttk
 
 from gui.theme import COLORS
 from utils.logger import logger

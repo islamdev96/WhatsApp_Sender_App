@@ -1,9 +1,7 @@
 """WhatsApp Sender Pro — Modal dialog windows (import, number generator, bulk add)."""
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, ttk
-import time
 import os
-import csv
 import datetime
 
 from gui.theme import COLORS

@@ -1,6 +1,5 @@
 """Report and temporary file cleanup utilities."""
 import os
-import time
 from utils.logger import logger
 
 

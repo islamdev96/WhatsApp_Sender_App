@@ -2,12 +2,6 @@
 import time
 
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import (
-    TimeoutException, NoSuchElementException, StaleElementReferenceException,
-    WebDriverException, ElementClickInterceptedException,
-    ElementNotInteractableException, JavascriptException,
-)
-
 from utils.logger import logger
 
 

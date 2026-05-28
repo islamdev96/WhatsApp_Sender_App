@@ -4,18 +4,13 @@ import os
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from selenium.common.exceptions import (
-    TimeoutException, NoSuchElementException, StaleElementReferenceException,
-    WebDriverException, ElementClickInterceptedException,
-    ElementNotInteractableException, JavascriptException,
-)
-
 from utils.logger import logger
 
 
 class MediaHandlerMixin:
     """Mixin: File inputs, attachment menus, media preview handling."""
 
+    @staticmethod
     def _file_input_signature(el):
         try:
             return (
@@ -28,7 +23,6 @@ class MediaHandlerMixin:
             return None
 
     @staticmethod
-
     def _accept_is_sticker_only(accept):
         """Sticker maker accepts images only — never video/mp4/3gpp/quicktime."""
         accept = (accept or "").lower()
@@ -44,7 +38,6 @@ class MediaHandlerMixin:
         return False
 
     @staticmethod
-
     def _accept_is_photo_video(accept):
         accept = (accept or "").lower()
         return any(
@@ -53,14 +46,13 @@ class MediaHandlerMixin:
         )
 
     @staticmethod
-
     def _accept_is_document(accept):
         accept = (accept or "").lower().strip()
         if not accept:
             return False
-        if WhatsAppBot._accept_is_sticker_only(accept):
+        if MediaHandlerMixin._accept_is_sticker_only(accept):
             return False
-        if WhatsAppBot._accept_is_photo_video(accept):
+        if MediaHandlerMixin._accept_is_photo_video(accept):
             return False
         return accept in ("*", "*/*") or ("image" not in accept and "video" not in accept)
 
