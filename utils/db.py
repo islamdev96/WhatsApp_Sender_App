@@ -84,6 +84,18 @@ class SQLiteStore:
             delay_max INTEGER,
             FOREIGN KEY(workflow_id) REFERENCES wa_workflows(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS wa_scheduled_campaigns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            scheduled_time TEXT,
+            message TEXT,
+            attachments_json TEXT,
+            group_name TEXT,
+            contacts_json TEXT,
+            sending_mode TEXT,
+            status TEXT,
+            created_at TEXT
+        );
         """
         with _DB_LOCK:
             self.conn.executescript(schema)

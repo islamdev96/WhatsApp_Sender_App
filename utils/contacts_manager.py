@@ -271,6 +271,11 @@ class ContactsManager:
             )
         return added
 
+    def add_contact(self, group_name: str, phone: str, name: str = "") -> bool:
+        """Add a single contact to a group. Returns True if successfully added."""
+        added = self.add_contacts(group_name, [{"phone": phone, "name": name}])
+        return bool(added)
+
     def remove_contact(self, group_name: str, phone: str):
         """Remove a contact by phone from a group."""
         if not self.store:

@@ -63,6 +63,9 @@ class ModernWhatsAppApp(
 
         # ── State Variables ──
         self.bot = None
+        self.active_bots = {}
+        self.parallel_stats = {}
+        self.stats_lock = threading.Lock()
         self.is_running = False
         self.stop_event = threading.Event()
         self.ui_queue = queue.Queue()
@@ -110,6 +113,11 @@ class ModernWhatsAppApp(
             print(f"Error loading locales: {e}")
             
         self.current_lang = ctk.StringVar(value=self.config.get("language", "ar"))
+
+        # ── Start Scheduler Engine ──
+        from utils.scheduler import Scheduler
+        self.scheduler = Scheduler()
+        self.scheduler.start(self._run_scheduled_campaign_callback)
 
         # ── Build Layout ──
         self._build_layout()
@@ -368,6 +376,15 @@ class ModernWhatsAppApp(
         )
         self.profile_combo.pack(side="left", padx=5, pady=8)
         
+        self.btn_add_profile = ctk.CTkButton(
+            tb_content, text="➕", font=("Segoe UI", 12, "bold"),
+            width=28, height=36, corner_radius=6,
+            fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+            text_color=COLORS["secondary_text"],
+            command=self._on_add_profile_click
+        )
+        self.btn_add_profile.pack(side="left", padx=2, pady=8)
+        
         lbl_profile = ctk.CTkLabel(tb_content, text="Account:", font=("Segoe UI", 11), text_color=COLORS["text_muted"])
         lbl_profile.pack(side="left", padx=2)
         
@@ -429,6 +446,17 @@ class ModernWhatsAppApp(
             command=self._start_action
         )
         self.btn_start.pack(side="right", padx=5)
+
+        # Schedule Button
+        self.btn_schedule = ctk.CTkButton(
+            actions_frame, text="📅 " + "جدولة الحملة",
+            font=("Segoe UI", 12, "bold"),
+            width=115, height=32, corner_radius=6,
+            fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+            text_color=COLORS["secondary_text"],
+            command=self._schedule_action
+        )
+        self.btn_schedule.pack(side="right", padx=5)
 
         # 4. Pause / Stop Button
         self.btn_stop = ctk.CTkButton(
@@ -823,9 +851,19 @@ class ModernWhatsAppApp(
 
     def _on_close(self):
         """Handle application shutdown: save state, cleanup, destroy window."""
+        if hasattr(self, "scheduler"):
+            self.scheduler.stop()
         self._save_current_state()
         if self.bot:
-            self.bot.close()
+            try:
+                self.bot.close()
+            except Exception:
+                pass
+        for p, active_bot in list(self.active_bots.items()):
+            try:
+                active_bot.close()
+            except Exception:
+                pass
         try:
             from utils.helpers import cleanup_old_reports
             cleanup_old_reports(max_age_days=30)
@@ -959,6 +997,29 @@ class ModernWhatsAppApp(
         except Exception as exc:
             logger.debug("Could not list profiles, falling back to Default: %s", exc)
             return ["Default"]
+
+    def _on_add_profile_click(self):
+        """Create a new browser profile folder and refresh combobox."""
+        dialog = ctk.CTkInputDialog(text="أدخل اسم الحساب الجديد (بالأحرف الإنجليزية فقط):", title="إضافة حساب جديد")
+        name = dialog.get_input()
+        if not name:
+            return
+        name = name.strip()
+        if not all(c.isalnum() or c in "-_" for c in name):
+            messagebox.showerror("خطأ", "اسم الحساب غير صالح. يرجى استخدام الحروف والأرقام فقط.")
+            return
+        profile_path = os.path.join(self.profiles_dir, name)
+        if os.path.exists(profile_path):
+            messagebox.showwarning("تنبيه", "هذا الحساب موجود بالفعل.")
+            return
+        try:
+            os.makedirs(profile_path, exist_ok=True)
+            self.profile_combo.configure(values=self._get_profiles())
+            self.profile_var.set(name)
+            self._on_profile_change(name)
+            messagebox.showinfo("تم", f"تم إنشاء الحساب '{name}' بنجاح وتبديل النشط إليه.")
+        except Exception as exc:
+            messagebox.showerror("خطأ", f"تعذر إنشاء الحساب: {exc}")
 
     def _on_profile_change(self, choice):
         """Handle profile selection change — update paths and proxy settings."""

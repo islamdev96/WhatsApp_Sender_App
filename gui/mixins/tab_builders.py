@@ -104,9 +104,53 @@ class TabBuildersMixin:
         self.contacts_entry.grid(row=0, column=0, sticky="w", padx=5)
         self.contacts_entry.grid_remove()  # Hidden but instantiated!
 
+        # ── Group Selection Row (Saved Groups) ──
+        source_frame = ctk.CTkFrame(col_mid, fg_color="transparent", height=35)
+        source_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(2, 5))
+        
+        # Segmented Button to choose between File/Manual and Saved Group
+        self.source_mode_var = ctk.StringVar(value="📂 ملف/يدوي")
+        self.source_mode_seg = ctk.CTkSegmentedButton(
+            source_frame,
+            values=["📂 ملف/يدوي", "👥 مجموعة محفوظة"],
+            variable=self.source_mode_var,
+            command=self._on_source_mode_change,
+            selected_color=COLORS["primary"],
+            selected_hover_color=COLORS["primary_hover"],
+            unselected_color=COLORS["secondary"],
+            text_color=COLORS["text_main"],
+            height=28
+        )
+        self.source_mode_seg.pack(side="left", padx=5)
+        
+        self.lbl_select_group = ctk.CTkLabel(source_frame, text="👥 المجموعات المحفوظة:", font=("Segoe UI", 11, "bold"))
+        # Initially hidden, will be shown if "مجموعة محفوظة" is selected
+        
+        self.main_group_select = ctk.CTkComboBox(
+            source_frame, width=180, height=28,
+            command=self._on_main_group_select,
+            fg_color=COLORS["card_bg"],
+            border_color=COLORS["border"],
+            button_color=COLORS["primary"],
+            button_hover_color=COLORS["primary_hover"],
+            text_color=COLORS["text_main"],
+            dropdown_fg_color=COLORS["card_bg"],
+            dropdown_text_color=COLORS["text_main"]
+        )
+        # Initially hidden
+        
+        self.btn_refresh_combo = ctk.CTkButton(
+            source_frame, text="🔄", font=("Segoe UI", 11),
+            width=28, height=28, corner_radius=6,
+            fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+            text_color=COLORS["secondary_text"],
+            command=self._refresh_main_group_combobox
+        )
+        # Initially hidden
+
         # Numbers Treeview Table
         table_frame = ctk.CTkFrame(col_mid, fg_color="transparent")
-        table_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=5)
+        table_frame.grid(row=3, column=0, sticky="nsew", padx=10, pady=5)
         
         columns = ("name", "phone", "var1", "status")
         self.progress_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15)
@@ -146,16 +190,16 @@ class TabBuildersMixin:
             col_mid, text=f"{self.tr('lbl_groups')} 0 | {self.tr('lbl_contacts')} 0 | {self.tr('lbl_total')} 0",
             font=("Segoe UI", 11), text_color=COLORS["text_muted"]
         )
-        self.total_counts_label.grid(row=3, column=0, sticky="ew", padx=15, pady=(2, 2))
+        self.total_counts_label.grid(row=4, column=0, sticky="ew", padx=15, pady=(2, 2))
 
         # Progress bar
         self.progress_bar = ctk.CTkProgressBar(col_mid, height=8, corner_radius=4, progress_color=COLORS["primary"])
-        self.progress_bar.grid(row=4, column=0, sticky="ew", padx=15, pady=(2, 2))
+        self.progress_bar.grid(row=5, column=0, sticky="ew", padx=15, pady=(2, 2))
         self.progress_bar.set(0)
 
         # Progress status and counter
         prog_detail_frame = ctk.CTkFrame(col_mid, fg_color="transparent")
-        prog_detail_frame.grid(row=5, column=0, sticky="ew", padx=15, pady=(2, 8))
+        prog_detail_frame.grid(row=6, column=0, sticky="ew", padx=15, pady=(2, 8))
         
         self.status_label = ctk.CTkLabel(
             prog_detail_frame, text="جاهز...",
@@ -328,8 +372,47 @@ class TabBuildersMixin:
         # Contacts preview
         ctk.CTkLabel(edit_frame, text="جهات الاتصال في المجموعة:",
                      font=ctk.CTkFont(size=13)).pack(anchor="e", padx=12, pady=(10, 3))
-        self.group_contacts_list = ctk.CTkScrollableFrame(edit_frame, corner_radius=8, height=150)
-        self.group_contacts_list.pack(fill="both", expand=True, padx=12, pady=(0, 5))
+                     
+        # Search & Single Contact Actions toolbar above Treeview
+        contact_tools = ctk.CTkFrame(edit_frame, fg_color="transparent", height=32)
+        contact_tools.pack(fill="x", padx=12, pady=(0, 5))
+        
+        self.group_contact_search = ctk.CTkEntry(
+            contact_tools, placeholder_text="🔍 بحث بالاسم أو الرقم...", height=28, font=("Segoe UI", 11)
+        )
+        self.group_contact_search.pack(side="right", fill="x", expand=True, padx=(0, 5))
+        self.group_contact_search.bind("<KeyRelease>", self._filter_group_contacts)
+        
+        self.btn_add_single_contact = ctk.CTkButton(
+            contact_tools, text="➕ إضافة رقم", font=("Segoe UI", 11, "bold"),
+            fg_color=COLORS["success"], hover_color=COLORS["primary_hover"],
+            text_color="#000000", width=95, height=28, corner_radius=6,
+            command=self._on_add_single_contact_click
+        )
+        self.btn_add_single_contact.pack(side="left", padx=2)
+        
+        self.btn_del_single_contact = ctk.CTkButton(
+            contact_tools, text="🗑️ حذف المحدد", font=("Segoe UI", 11, "bold"),
+            fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+            text_color="#FFFFFF", width=95, height=28, corner_radius=6,
+            command=self._on_delete_single_contact_click
+        )
+        self.btn_del_single_contact.pack(side="left", padx=2)
+
+        tree_frame = ctk.CTkFrame(edit_frame, fg_color="transparent")
+        tree_frame.pack(fill="both", expand=True, padx=12, pady=(0, 5))
+        
+        columns = ("name", "phone")
+        self.group_contacts_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=8)
+        self.group_contacts_tree.heading("name", text="الاسم")
+        self.group_contacts_tree.heading("phone", text="رقم الهاتف")
+        self.group_contacts_tree.column("name", width=150, anchor="e")
+        self.group_contacts_tree.column("phone", width=150, anchor="center")
+        
+        tree_scroll = ctk.CTkScrollbar(tree_frame, command=self.group_contacts_tree.yview)
+        self.group_contacts_tree.configure(yscrollcommand=tree_scroll.set)
+        tree_scroll.pack(side="right", fill="y")
+        self.group_contacts_tree.pack(side="left", fill="both", expand=True)
 
         self.group_info_label = ctk.CTkLabel(edit_frame, text="",
                                              font=ctk.CTkFont(size=11),
@@ -664,6 +747,9 @@ class TabBuildersMixin:
                       fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
                       command=self._save_settings).pack(fill="x", padx=10, pady=15)
 
+        # Scheduled Campaigns Queue Card
+        self._build_schedule_queue_card(scroll)
+
     # ─── Log Tab ──────────────────────────────────────────────────────────
 
     def _build_tab_log(self):
@@ -839,6 +925,7 @@ class TabBuildersMixin:
 
     def _refresh_groups_list(self):
         """Reload the contact groups list from storage."""
+        self._refresh_main_group_combobox()
         for w in self.groups_listbox.winfo_children():
             w.destroy()
         
@@ -862,21 +949,19 @@ class TabBuildersMixin:
             btn.pack(fill="x", pady=3)
 
     def _select_group(self, name):
-        """Select a group and display its contact count."""
+        """Select a group and display its contact count and load into the treeview."""
         self.group_name_entry.delete(0, "end")
         self.group_name_entry.insert(0, name)
         g = self.contacts_mgr.get_by_name(name)
         if g:
-            for w in self.group_contacts_list.winfo_children():
-                w.destroy()
-            for c in g["contacts"][:50]:  # Show first 50
-                ctk.CTkLabel(self.group_contacts_list,
-                             text=f"{c.get('name', '-')}  |  {c.get('phone', '-')}",
-                             font=ctk.CTkFont(size=11),
-                             anchor="e").pack(fill="x", padx=5, pady=1)
-            total = len(g["contacts"])
-            extra = f" (عرض أول 50 من {total})" if total > 50 else ""
-            self.group_info_label.configure(text=f"📊 {total} جهة اتصال{extra} | آخر تحديث: {g.get('updated', '-')}")
+            # Store full list for local filtering
+            self._current_group_contacts = g.get("contacts", [])
+            
+            # Clear search bar when selecting a new group
+            self.group_contact_search.delete(0, "end")
+            
+            # Refresh tree view
+            self._filter_group_contacts()
 
     def _browse_group_file(self):
         """Browse for a contacts file to import into a group."""
@@ -1036,4 +1121,308 @@ class TabBuildersMixin:
             menu.post(x, y)
         except Exception as exc:
             logger.debug("Could not show attachments popup menu: %s", exc)
+
+    def _build_schedule_queue_card(self, parent):
+        """Build the Scheduled Campaigns Queue table card inside Settings tab."""
+        queue_card = ctk.CTkFrame(parent, corner_radius=10)
+        queue_card.pack(fill="x", padx=10, pady=8)
+
+        # Header Row
+        hdr = ctk.CTkFrame(queue_card, fg_color="transparent")
+        hdr.pack(fill="x", padx=15, pady=(10, 5))
+
+        ctk.CTkLabel(hdr, text="📅 الحملات المجدولة وقائمة الانتظار",
+                     font=ctk.CTkFont(size=14, weight="bold")).pack(side="right")
+
+        refresh_btn = ctk.CTkButton(
+            hdr, text="🔄 تحديث القائمة", width=90, height=26,
+            fg_color="transparent", hover_color=COLORS["bg_dark"],
+            text_color=COLORS["text_main"], font=ctk.CTkFont(size=11),
+            command=self._refresh_schedule_queue
+        )
+        refresh_btn.pack(side="left")
+
+        # Table Row using ttk.Treeview
+        tbl_frame = ctk.CTkFrame(queue_card, fg_color="transparent")
+        tbl_frame.pack(fill="x", padx=15, pady=5)
+
+        columns = ("id", "name", "time", "target", "status")
+        self.schedule_tree = ttk.Treeview(tbl_frame, columns=columns, show="headings", height=5)
+        
+        self.schedule_tree.heading("id", text="ID")
+        self.schedule_tree.heading("name", text="اسم الحملة")
+        self.schedule_tree.heading("time", text="وقت الإرسال")
+        self.schedule_tree.heading("target", text="المستهدف")
+        self.schedule_tree.heading("status", text="الحالة")
+
+        self.schedule_tree.column("id", width=40, anchor="center")
+        self.schedule_tree.column("name", width=150, anchor="e")
+        self.schedule_tree.column("time", width=120, anchor="center")
+        self.schedule_tree.column("target", width=100, anchor="e")
+        self.schedule_tree.column("status", width=80, anchor="center")
+
+        # Scrollbar
+        scroll_y = ttk.Scrollbar(tbl_frame, orient="vertical", command=self.schedule_tree.yview)
+        self.schedule_tree.configure(yscrollcommand=scroll_y.set)
+        
+        self.schedule_tree.pack(side="right", fill="both", expand=True)
+        scroll_y.pack(side="left", fill="y")
+
+        # Action Buttons Row
+        btn_row = ctk.CTkFrame(queue_card, fg_color="transparent")
+        btn_row.pack(fill="x", padx=15, pady=(5, 12))
+
+        cancel_btn = ctk.CTkButton(
+            btn_row, text="🚫 إلغاء الحملة", width=110, height=30,
+            fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
+            text_color="#FFFFFF", font=ctk.CTkFont(size=12, weight="bold"),
+            command=self._cancel_selected_schedule
+        )
+        cancel_btn.pack(side="right", padx=5)
+
+        delete_btn = ctk.CTkButton(
+            btn_row, text="🗑️ حذف نهائي", width=100, height=30,
+            fg_color=COLORS["secondary"], hover_color=COLORS["danger_hover"],
+            text_color=COLORS["secondary_text"], font=ctk.CTkFont(size=12),
+            command=self._delete_selected_schedule
+        )
+        delete_btn.pack(side="right", padx=5)
+
+        self._refresh_schedule_queue()
+
+    def _refresh_schedule_queue(self):
+        """Reload scheduled campaigns from DB and populate the schedule_tree."""
+        if not hasattr(self, "schedule_tree"):
+            return
+        # Clear
+        for item in self.schedule_tree.get_children():
+            self.schedule_tree.delete(item)
+            
+        camps = self.scheduler.get_all_campaigns()
+        
+        # Color codes based on status
+        self.schedule_tree.tag_configure("pending", foreground=COLORS.get("info", "#0284C7"))
+        self.schedule_tree.tag_configure("sending", foreground=COLORS.get("primary", "#16A34A"))
+        self.schedule_tree.tag_configure("completed", foreground="#16A34A")
+        self.schedule_tree.tag_configure("failed", foreground=COLORS.get("danger", "#DC2626"))
+        self.schedule_tree.tag_configure("cancelled", foreground=COLORS.get("text_muted", "#94A3B8"))
+
+        for c in camps:
+            target = c["group_name"] if c["group_name"] else "أرقام مخصصة"
+            status_map = {
+                "pending": "⏳ قيد الانتظار",
+                "sending": "🔄 جاري الإرسال...",
+                "completed": "✅ مكتملة",
+                "failed": "❌ فشلت",
+                "cancelled": "🚫 ملغية"
+            }
+            status_txt = status_map.get(c["status"], c["status"])
+            self.schedule_tree.insert(
+                "", "end",
+                values=(c["id"], c["name"], c["scheduled_time"], target, status_txt),
+                tags=(c["status"],)
+            )
+
+    def _cancel_selected_schedule(self):
+        """Cancel the selected campaign in the schedule table."""
+        sel = self.schedule_tree.selection()
+        if not sel:
+            messagebox.showwarning("تنبيه", "يرجى تحديد حملة من الجدول أولاً.")
+            return
+        item_id = self.schedule_tree.item(sel[0], "values")[0]
+        if messagebox.askyesno("تأكيد", f"هل تريد إلغاء الحملة رقم {item_id}؟"):
+            self.scheduler.cancel_campaign(int(item_id))
+            self._refresh_schedule_queue()
+
+    def _delete_selected_schedule(self):
+        """Delete the selected campaign from the schedule queue permanently."""
+        sel = self.schedule_tree.selection()
+        if not sel:
+            messagebox.showwarning("تنبيه", "يرجى تحديد حملة من الجدول أولاً.")
+            return
+        item_id = self.schedule_tree.item(sel[0], "values")[0]
+        if messagebox.askyesno("تأكيد", f"هل تريد حذف الحملة رقم {item_id} نهائياً من القائمة؟"):
+            self.scheduler.delete_campaign(int(item_id))
+            self._refresh_schedule_queue()
+
+    def _on_main_group_select(self, group_name: str):
+        """Callback when a group is selected in the main tab dropdown."""
+        if not group_name or group_name == "-- اختر مجموعة --":
+            return
+        g = self.contacts_mgr.get_by_name(group_name)
+        if g and g.get("contacts"):
+            contacts = g["contacts"]
+            self.contacts_entry.delete(0, "end")
+            self.contacts_entry.insert(0, f"[GROUP:{group_name}]")
+            self._refresh_numbers_table(contacts)
+            self.log(f"👥 تم تحميل {len(contacts)} جهة اتصال من المجموعة المحفوظة: {group_name}")
+
+    def _refresh_main_group_combobox(self):
+        """Refresh the group selection combobox values in the main tab."""
+        if not hasattr(self, "main_group_select"):
+            return
+        group_names = ["-- اختر مجموعة --"] + self.contacts_mgr.get_names()
+        self.main_group_select.configure(values=group_names)
+        self.main_group_select.set("-- اختر مجموعة --")
+
+    def _on_source_mode_change(self, mode: str):
+        """Toggle UI elements based on selected source mode."""
+        if "مجموعة محفوظة" in mode:
+            # Show group combobox
+            self.lbl_select_group.pack(side="right", padx=5)
+            self.main_group_select.pack(side="right", padx=5)
+            self.btn_refresh_combo.pack(side="right", padx=2)
+            self._refresh_main_group_combobox()
+        else:
+            # Hide group combobox
+            self.lbl_select_group.pack_forget()
+            self.main_group_select.pack_forget()
+            self.btn_refresh_combo.pack_forget()
+            # Clear main group select value
+            self.main_group_select.set("-- اختر مجموعة --")
+            self.contacts_entry.delete(0, "end")
+
+    def _filter_group_contacts(self, event=None):
+        """Filter and refresh the group contacts Treeview dynamically."""
+        query = self.group_contact_search.get().strip().lower()
+        
+        # Clear Treeview
+        for item in self.group_contacts_tree.get_children():
+            self.group_contacts_tree.delete(item)
+            
+        if not hasattr(self, "_current_group_contacts") or not self._current_group_contacts:
+            self.group_info_label.configure(text="📊 0 جهة اتصال")
+            return
+            
+        filtered = []
+        for c in self._current_group_contacts:
+            name = c.get("name", "") or ""
+            phone = c.get("phone", "") or ""
+            if not query or query in name.lower() or query in phone:
+                filtered.append(c)
+                self.group_contacts_tree.insert("", "end", values=(name, phone))
+                
+        total = len(self._current_group_contacts)
+        filtered_count = len(filtered)
+        if query:
+            self.group_info_label.configure(text=f"🔍 تم تصفية {filtered_count} من {total} جهة اتصال")
+        else:
+            group_name = self.group_name_entry.get().strip()
+            g = self.contacts_mgr.get_by_name(group_name) if group_name else None
+            updated = g.get("updated", "-") if g else "-"
+            self.group_info_label.configure(text=f"📊 {total} جهة اتصال | آخر تحديث: {updated}")
+
+    def _on_add_single_contact_click(self):
+        """Open a small dialog to add a single contact to the currently selected group."""
+        group_name = self.group_name_entry.get().strip()
+        if not group_name or not self.contacts_mgr.get_by_name(group_name):
+            messagebox.showwarning("تنبيه", "يرجى اختيار مجموعة موجودة أولاً لإضافة جهة اتصال إليها.")
+            return
+            
+        win = ctk.CTkToplevel(self)
+        win.title("إضافة جهة اتصال فردية")
+        win.geometry("400x280")
+        win.resizable(False, False)
+        win.grab_set()
+        
+        # Center the window
+        win.update_idletasks()
+        width = win.winfo_width()
+        height = win.winfo_height()
+        x = (win.winfo_screenwidth() // 2) - (width // 2)
+        y = (win.winfo_screenheight() // 2) - (height // 2)
+        win.geometry(f"+{x}+{y}")
+        
+        # Label Title
+        ctk.CTkLabel(
+            win, text=f"👤 إضافة جهة اتصال للمجموعة:\n« {group_name} »",
+            font=("Segoe UI", 13, "bold"), text_color=COLORS["primary"], justify="center"
+        ).pack(pady=(15, 10))
+        
+        # Input Name
+        lbl_name = ctk.CTkLabel(win, text="الاسم:", font=("Segoe UI", 11, "bold"))
+        lbl_name.pack(anchor="e", padx=30, pady=(5, 2))
+        entry_name = ctk.CTkEntry(win, height=32, placeholder_text="الاسم بالكامل (مثال: محمد أحمد)")
+        entry_name.pack(fill="x", padx=30)
+        
+        # Input Phone
+        lbl_phone = ctk.CTkLabel(win, text="رقم الهاتف (مع رمز الدولة بدون +):", font=("Segoe UI", 11, "bold"))
+        lbl_phone.pack(anchor="e", padx=30, pady=(10, 2))
+        entry_phone = ctk.CTkEntry(win, height=32, placeholder_text="مثال: 201012345678")
+        entry_phone.pack(fill="x", padx=30)
+        
+        # Button Action
+        btn_row = ctk.CTkFrame(win, fg_color="transparent")
+        btn_row.pack(fill="x", padx=30, pady=(20, 10))
+        
+        def _save():
+            c_name = entry_name.get().strip()
+            c_phone = entry_phone.get().strip()
+            
+            # Simple validations
+            if not c_phone:
+                messagebox.showwarning("تنبيه", "يرجى إدخال رقم الهاتف.")
+                return
+            # Remove leading + if any
+            if c_phone.startswith("+"):
+                c_phone = c_phone[1:]
+            if not c_phone.isdigit():
+                messagebox.showwarning("تنبيه", "رقم الهاتف يجب أن يحتوي على أرقام فقط.")
+                return
+                
+            # If name is empty, use 'عميل'
+            if not c_name:
+                c_name = "عميل"
+                
+            # Call contact manager
+            success = self.contacts_mgr.add_contact(group_name, c_phone, c_name)
+            if success:
+                messagebox.showinfo("تم", f"تمت إضافة جهة الاتصال '{c_name}' بنجاح.")
+                win.destroy()
+                # Refresh group contacts list
+                self._refresh_groups_list()
+                self._select_group(group_name)
+            else:
+                messagebox.showwarning("تنبيه", "جهة الاتصال موجودة بالفعل في هذه المجموعة (نفس الرقم).")
+                
+        btn_save = ctk.CTkButton(
+            btn_row, text="💾 حفظ", width=120, height=34,
+            fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
+            command=_save
+        )
+        btn_save.pack(side="right", padx=5)
+        
+        btn_cancel = ctk.CTkButton(
+            btn_row, text="إلغاء", width=80, height=34,
+            fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+            text_color=COLORS["secondary_text"],
+            command=win.destroy
+        )
+        btn_cancel.pack(side="left", padx=5)
+
+    def _on_delete_single_contact_click(self):
+        """Delete the selected contact in the group contacts treeview."""
+        group_name = self.group_name_entry.get().strip()
+        if not group_name:
+            return
+            
+        selection = self.group_contacts_tree.selection()
+        if not selection:
+            messagebox.showwarning("تنبيه", "يرجى اختيار جهة اتصال من الجدول لحذفها.")
+            return
+            
+        # Get selected phone number from tree item values
+        vals = self.group_contacts_tree.item(selection[0], "values")
+        contact_name = vals[0]
+        phone = vals[1]
+        
+        if messagebox.askyesno("تأكيد الحذف", f"هل أنت متأكد من حذف جهة الاتصال '{contact_name}' ({phone}) من المجموعة؟"):
+            success = self.contacts_mgr.remove_contact(group_name, phone)
+            if success:
+                messagebox.showinfo("تم", "تم حذف جهة الاتصال بنجاح.")
+                # Refresh group contacts list
+                self._refresh_groups_list()
+                self._select_group(group_name)
+            else:
+                messagebox.showerror("خطأ", "تعذر حذف جهة الاتصال.")
 
