@@ -5,7 +5,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from utils.logger import logger
-from gui.modern_ui import ModernWhatsAppApp
+from gui.app import ModernWhatsAppApp
 
 
 def main():

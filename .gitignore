@@ -6,7 +6,7 @@ __pycache__/
 *.egg-info/
 
 # Build artifacts
-build/
+build_tmp/
 dist/
 *.spec
 *.exe
@@ -39,6 +39,7 @@ templates.json
 # IDE
 .vscode/
 .idea/
+.project/
 *.swp
 *.swo
 
@@ -46,3 +47,8 @@ templates.json
 Thumbs.db
 .DS_Store
 desktop.ini
+
+# Temp / debug
+diff.txt
+error_log.txt
+debug-*.log
