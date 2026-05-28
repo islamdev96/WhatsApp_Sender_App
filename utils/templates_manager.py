@@ -104,20 +104,20 @@ class TemplatesManager:
             log_exception("Templates migration transaction failed", exc)
         self.store.set_meta("templates_migrated", "1")
 
-    def get_all(self):
+    def get_all(self) -> list[dict]:
         """Return list of all templates."""
         if not self.store:
             return list(self.templates)
         return self.store.query_all("SELECT name, body, created, updated FROM wa_templates ORDER BY id DESC")
 
-    def get_names(self):
+    def get_names(self) -> list[str]:
         """Return list of template names."""
         if not self.store:
             return [t.get("name", "") for t in self.templates]
         rows = self.store.query_all("SELECT name FROM wa_templates ORDER BY id DESC")
         return [r.get("name", "") for r in rows]
 
-    def get_by_name(self, name):
+    def get_by_name(self, name: str) -> dict | None:
         """Get a template by its name."""
         if not self.store:
             for t in self.templates:
@@ -126,7 +126,7 @@ class TemplatesManager:
             return None
         return self.store.query_one("SELECT name, body, created, updated FROM wa_templates WHERE name = ?", (name,))
 
-    def add(self, name, body):
+    def add(self, name: str, body: str):
         """Add a new template or update existing one with the same name."""
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         if not self.store:
@@ -153,7 +153,7 @@ class TemplatesManager:
                 commit=True,
             )
 
-    def delete(self, name):
+    def delete(self, name: str) -> None:
         """Delete a template by name."""
         if not self.store:
             self.templates = [t for t in self.templates if t.get("name") != name]
@@ -161,7 +161,7 @@ class TemplatesManager:
             return
         self.store.execute("DELETE FROM wa_templates WHERE name = ?", (name,), commit=True)
 
-    def rename(self, old_name, new_name):
+    def rename(self, old_name: str, new_name: str):
         """Rename a template."""
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         if not self.store:

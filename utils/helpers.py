@@ -47,7 +47,7 @@ def _normalize_phone(phone, default_country_code="20"):
     return phone
 
 
-def normalize_phone(phone, default_country_code="20"):
+def normalize_phone(phone: str, default_country_code="20") -> str:
     """Public wrapper for phone normalization."""
     return _normalize_phone(phone, default_country_code)
 
@@ -265,7 +265,6 @@ def check_proxy(proxy_type, host, port, username=None, password=None, timeout=10
     Returns (success, info_dict).
     """
     import urllib.request
-    import urllib.error
     import json
 
     proxy_type = proxy_type.lower()

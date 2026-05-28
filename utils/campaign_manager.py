@@ -12,6 +12,7 @@ from utils.logger import logger, log_exception
 
 class CampaignManager:
     def __init__(self, campaigns_path=None, db_path=None, use_sqlite=True):
+        """Initialize campaign manager with SQLite storage and optional JSON migration."""
         if campaigns_path is None:
             campaigns_path = os.path.join(os.getcwd(), "campaigns.json")
         self.campaigns_path = campaigns_path
@@ -70,6 +71,7 @@ class CampaignManager:
             log_exception(f"Unexpected error saving campaigns to {self.campaigns_path}", exc)
 
     def _migrate_from_json_once(self):
+        """One-time migration of campaign history from JSON to SQLite."""
         if self.store.get_meta("campaigns_migrated") == "1":
             return
         if not os.path.exists(self.campaigns_path):
@@ -153,6 +155,7 @@ class CampaignManager:
 
     def add_campaign(self, name, total, sent, failed, invalid,
                      duration_seconds, results_log, csv_path=None):
+        """Record a completed campaign with its per-contact results."""
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         success_rate = round(sent / total * 100, 1) if total else 0
 
@@ -226,6 +229,7 @@ class CampaignManager:
         }
 
     def get_all(self):
+        """Return all campaigns ordered by newest first."""
         if not self.store:
             return list(reversed(self.campaigns))
         return self.store.query_all(
@@ -263,6 +267,7 @@ class CampaignManager:
         )
 
     def delete_campaign(self, campaign_id):
+        """Delete a campaign and its results by ID."""
         if not self.store:
             self.campaigns = [c for c in self.campaigns if c.get("id") != campaign_id]
             self._save_to_json()

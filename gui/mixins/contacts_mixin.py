@@ -2,24 +2,18 @@
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, ttk
 import re
-import threading
-import queue
-import time
 import random
 import os
 import csv
-import datetime
-import json
 
-from gui.theme import COLORS, FONTS, ERROR_CATALOG
-from utils.logger import logger
-from utils.helpers import read_contacts, read_contacts_auto
+from utils.helpers import read_contacts_auto
 
 
 class ContactsMixin:
     """Mixin: Contact loading, filtering, template application, and spintax."""
 
     def _browse_contacts(self):
+        """Open a file dialog to select a contacts file."""
         path = filedialog.askopenfilename(filetypes=[("Contacts", "*.csv;*.xlsx;*.xls;*.txt")])
         if path:
             self.contacts_entry.delete(0, "end")
@@ -48,6 +42,7 @@ class ContactsMixin:
             self.log(f"⚠️ خطأ أثناء تحديث قائمة الأرقام: {e}")
 
     def _prepare_content(self):
+        """Prepare message text and attachments from the UI inputs."""
         msg_template = self.message_textbox.get("1.0", "end").strip()
         # Get attachments from the new manager
         raw_attachments = self.attachment_manager.get_attachments()
@@ -88,6 +83,7 @@ class ContactsMixin:
 
     def _get_contacts_from_input(self):
         # Retrieve contacts directly from our progress_tree Treeview!
+        """Load contacts from the selected file or numbers table."""
         children = self.progress_tree.get_children()
         if not children:
             contacts_input = self.contacts_entry.get().strip()
@@ -134,6 +130,7 @@ class ContactsMixin:
         return contacts
 
     def _log_preflight(self, contacts, msg_template, attachments):
+        """Log pre-flight info before starting automation."""
         msg_len = len(msg_template) if msg_template else 0
         if attachments:
             types = ", ".join([a.get("type", "file") for a in attachments])
@@ -143,6 +140,7 @@ class ContactsMixin:
 
 
     def _apply_template(self, text, contact):
+        """Apply variable substitution to a message template for a contact."""
         if not text:
             return ""
         out = str(text)
@@ -163,6 +161,7 @@ class ContactsMixin:
 
     def _apply_spintax(self, text):
         # Only replace braces that contain a '|', so {name} stays intact.
+        """Resolve spintax expressions {option1|option2} with random picks."""
         pattern = re.compile(r"\{([^{}]*\|[^{}]*)\}")
         prev = None
         while prev != text:
@@ -176,6 +175,7 @@ class ContactsMixin:
         return text
 
     def _test_spintax(self):
+        """Preview spintax resolution in a dialog window."""
         text = self.message_textbox.get("1.0", "end").strip()
         if not text:
             messagebox.showwarning("تنبيه", "يرجى كتابة نص الرسالة أولاً لتجربة التدوير/المتغيرات.")
@@ -214,6 +214,7 @@ class ContactsMixin:
         messagebox.showinfo("معاينة الرسالة الحية", info_text)
 
     def _format_attachments_for_contact(self, attachments, contact):
+        """Apply per-contact variable substitution to attachment paths."""
         if not attachments:
             return []
         formatted = []
@@ -226,6 +227,7 @@ class ContactsMixin:
         return formatted
 
     def _split_messages(self, text):
+        """Split a multi-message text by the === separator."""
         if not text:
             return []
         parts = re.split(r"\n\s*---\s*\n", text)

@@ -1,17 +1,12 @@
 """WhatsApp Sender Pro — Modal dialog windows (import, number generator, bulk add)."""
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, ttk
-import re
-import threading
-import queue
 import time
-import random
 import os
 import csv
 import datetime
-import json
 
-from gui.theme import COLORS, FONTS, ERROR_CATALOG
+from gui.theme import COLORS
 from utils.logger import logger
 
 
@@ -19,6 +14,7 @@ class DialogsMixin:
     """Mixin: Modal dialog windows (import, number generator, bulk add)."""
 
     def _open_import_dialog(self):
+        """Open the advanced CSV/Excel import dialog with column mapping."""
         win = ctk.CTkToplevel(self)
         win.title(self.tr("dialog_import_title"))
         win.geometry("900x620")
@@ -403,6 +399,7 @@ class DialogsMixin:
         _load_preview()
 
     def _open_number_generator(self):
+        """Open the sequential phone number generator dialog."""
         win = ctk.CTkToplevel(self)
         win.title("مولد أرقام")
         win.geometry("520x420")
@@ -500,6 +497,7 @@ class DialogsMixin:
                       command=_save_and_use).pack(side="left", padx=6)
 
     def _add_manual_number_dialog(self):
+        """Open a dialog to manually add a single phone number."""
         dialog = ctk.CTkToplevel(self)
         dialog.title("إضافة رقم يدوي")
         dialog.geometry("380x280")
@@ -564,6 +562,7 @@ class DialogsMixin:
         ).pack(side="right")
 
     def _add_bulk_manual_numbers_dialog(self):
+        """Open a dialog to paste and import multiple numbers at once."""
         dialog = ctk.CTkToplevel(self)
         dialog.title("Manual Import | استيراد يدوي")
         dialog.geometry("540x580")

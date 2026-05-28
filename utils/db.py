@@ -7,6 +7,7 @@ _DB_LOCK = threading.Lock()
 
 class SQLiteStore:
     def __init__(self, db_path=None):
+        """Initialize SQLite connection with WAL mode and create tables if needed."""
         if db_path is None:
             db_path = os.path.join(os.getcwd(), "data", "whatsapp_sender.db")
         self.db_path = db_path
@@ -88,13 +89,15 @@ class SQLiteStore:
             self.conn.executescript(schema)
             self.conn.commit()
 
-    def get_meta(self, key):
+    def get_meta(self, key: str) -> str | None:
+        """Retrieve a value from the wa_meta key-value store."""
         with _DB_LOCK:
             cur = self.conn.execute("SELECT value FROM wa_meta WHERE key = ?", (key,))
             row = cur.fetchone()
             return row["value"] if row else None
 
-    def set_meta(self, key, value):
+    def set_meta(self, key: str, value: str) -> None:
+        """Insert or update a value in the wa_meta key-value store."""
         with _DB_LOCK:
             self.conn.execute(
                 "INSERT INTO wa_meta(key, value) VALUES(?, ?) "
@@ -103,33 +106,37 @@ class SQLiteStore:
             )
             self.conn.commit()
 
-    def execute(self, sql, params=(), commit=False):
+    def execute(self, sql: str, params=(), commit=False):
+        """Execute a single SQL statement; optionally commit immediately."""
         with _DB_LOCK:
             cur = self.conn.execute(sql, params)
             if commit:
                 self.conn.commit()
             return cur
 
-    def executemany(self, sql, params_list, commit=False):
+    def executemany(self, sql: str, params_list, commit: bool=False):
+        """Execute a parameterized SQL statement against all parameter sequences."""
         with _DB_LOCK:
             cur = self.conn.executemany(sql, params_list)
             if commit:
                 self.conn.commit()
             return cur
 
-    def query_all(self, sql, params=()):
+    def query_all(self, sql: str, params=()):
+        """Execute a SELECT and return all rows as a list of dicts."""
         with _DB_LOCK:
             cur = self.conn.execute(sql, params)
             rows = cur.fetchall()
             return [dict(r) for r in rows]
 
-    def query_one(self, sql, params=()):
+    def query_one(self, sql: str, params=()):
+        """Execute a SELECT and return the first row as a dict, or None."""
         with _DB_LOCK:
             cur = self.conn.execute(sql, params)
             row = cur.fetchone()
             return dict(row) if row else None
 
-    def close(self):
+    def close(self) -> None:
         """Explicitly close the database connection."""
         with _DB_LOCK:
             try:

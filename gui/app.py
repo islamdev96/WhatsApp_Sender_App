@@ -4,18 +4,15 @@ Built with CustomTkinter for a professional UI.
 """
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, ttk
-import re
 import threading
 import queue
 import time
-import random
 import os
 import csv
 import datetime
 import json
 
-from gui.components import RichTextFrame, AttachmentManager
-from gui.theme import COLORS, FONTS, PALETTE_DARK, PALETTE_LIGHT, ERROR_CATALOG
+from gui.theme import COLORS, PALETTE_DARK, PALETTE_LIGHT, ERROR_CATALOG
 from gui.mixins import (
     TabBuildersMixin,
     AutomationMixin,
@@ -26,7 +23,6 @@ from gui.mixins import (
 )
 
 from automation.bot import WhatsAppBot
-from utils.helpers import read_contacts, read_contacts_auto
 from utils.config_manager import ConfigManager
 from utils.templates_manager import TemplatesManager
 from utils.contacts_manager import ContactsManager
@@ -199,6 +195,7 @@ class ModernWhatsAppApp(
     # ═══════════════════════════════════════════════════════════════════════
 
     def _build_layout(self):
+        """Build the main application layout: sidebar menu + content area."""
         import tkinter as tk
         import json
 
@@ -241,6 +238,7 @@ class ModernWhatsAppApp(
     # ─── native Windows Menu Bar ──────────────────────────────────────────────
 
     def _build_menu_bar(self):
+        """Build the left sidebar navigation with tab buttons."""
         import tkinter as tk
         menu_bar = tk.Menu(self)
         
@@ -293,6 +291,7 @@ class ModernWhatsAppApp(
 
     def _build_top_toolbar(self):
         # Toolbar Main Container Frame
+        """Build the top toolbar with profile selector and action buttons."""
         self.toolbar_frame = ctk.CTkFrame(self, height=72, corner_radius=0, fg_color=COLORS["primary_dark"])
         self.toolbar_frame.grid(row=0, column=0, sticky="ew")
         self.toolbar_frame.grid_propagate(False)
@@ -389,6 +388,7 @@ class ModernWhatsAppApp(
         self.btn_lang_toggle.pack(side="left", padx=15, pady=8)
 
     def _toggle_language(self):
+        """Switch the application language between Arabic and English."""
         new_lang = "en" if self.current_lang.get() == "ar" else "ar"
         self.current_lang.set(new_lang)
         self.config.set("language", new_lang)
@@ -398,6 +398,7 @@ class ModernWhatsAppApp(
 
     def _build_bottom_bar(self):
         # Bottom Bar Container Frame
+        """Build the bottom status bar with session info and stats."""
         self.bottom_bar = ctk.CTkFrame(self, height=45, corner_radius=0, fg_color=COLORS["primary_dark"])
         self.bottom_bar.grid(row=2, column=0, sticky="ew")
         self.bottom_bar.grid_propagate(False)
@@ -446,6 +447,7 @@ class ModernWhatsAppApp(
         self.btn_stop.pack(side="right", padx=5)
 
     def _switch_tab(self, tab_id):
+        """Switch visible tab and highlight the active menu button."""
         self.current_tab = tab_id
         for fid, frame in self.tab_frames.items():
             frame.grid_forget()
@@ -461,6 +463,7 @@ class ModernWhatsAppApp(
     # ─── Main Tab (3-Column Workspace) ───────────────────────────────────────
 
     def _process_ui_queue(self):
+        """Process pending UI updates from background threads."""
         while True:
             try:
                 fn = self.ui_queue.get_nowait()
@@ -476,9 +479,11 @@ class ModernWhatsAppApp(
         self.after(50, self._process_ui_queue)
 
     def _run_on_ui(self, fn):
+        """Schedule a function to run on the main UI thread."""
         self.ui_queue.put(fn)
 
     def _set_session_status(self, text, color=None):
+        """Update the session status indicator text and color."""
         def _do():
             if not hasattr(self, "session_status_label"):
                 return
@@ -564,6 +569,7 @@ class ModernWhatsAppApp(
         self.log(format_event(level, message, detail))
 
     def _open_log_file(self):
+        """Open the application log file in the default text editor."""
         try:
             os.makedirs(self.log_dir, exist_ok=True)
             if os.path.exists(self.log_file_path):
@@ -574,6 +580,7 @@ class ModernWhatsAppApp(
             messagebox.showerror("خطأ", str(e))
 
     def _clear_log(self):
+        """Clear the event log display."""
         self.log_textbox.configure(state="normal")
         self.log_textbox.delete("1.0", "end")
         self.log_textbox.configure(state="disabled")
@@ -581,6 +588,7 @@ class ModernWhatsAppApp(
 
     def _agent_debug_log(self, hypothesis_id, location, message, data=None):
         # #region agent log
+        """Log a detailed diagnostic entry for debugging automation issues."""
         try:
             log_path = os.path.join(os.getcwd(), "debug-364cc6.log")
             with open(log_path, "a", encoding="utf-8") as f:
@@ -626,6 +634,7 @@ class ModernWhatsAppApp(
             self.log("✅ تم تسجيل الدخول — يمكنك الضغط على «بدء الإرسال» متى شئت.")
 
     def _show_dialog(self, kind, title, message):
+        """Show an info, warning, or error dialog on the UI thread."""
         def _do():
             if kind == "info":
                 messagebox.showinfo(title, message)
@@ -636,6 +645,7 @@ class ModernWhatsAppApp(
         self._run_on_ui(_do)
 
     def report_error(self, code, message=None, detail=None, dialog=True, level="error"):
+        """Report an error by code with optional dialog and log entry."""
         base_message = message or ERROR_CATALOG.get(code, "حدث خطأ غير معروف.")
         log_message = f"[{code}] {base_message}"
         if detail:
@@ -646,6 +656,7 @@ class ModernWhatsAppApp(
             self._show_dialog(level, "تنبيه" if level == "warning" else "خطأ", dialog_message)
 
     def _update_stats(self):
+        """Refresh the sent/failed/invalid counters in the bottom bar."""
         total = self.sent + self.failed + self.invalid
         if hasattr(self, "stat_cards") and self.stat_cards:
             try:
@@ -662,12 +673,14 @@ class ModernWhatsAppApp(
                 logger.debug("Could not update counter label: %s", exc)
 
     def _update_total_counts(self, total=0, contacts_count=0, groups_count=0):
+        """Update total/contacts/groups counters in the bottom bar."""
         if hasattr(self, "total_counts_label"):
             self.total_counts_label.configure(
                 text=f"الإجمالي: {total} | جهات: {contacts_count} | مجموعات: {groups_count}"
             )
 
     def _show_error_codes(self):
+        """Display the error code reference dialog."""
         lines = [f"{code} — {desc}" for code, desc in ERROR_CATALOG.items()]
         self._show_dialog("info", "أكواد الأخطاء", "\n".join(lines))
 
@@ -676,6 +689,7 @@ class ModernWhatsAppApp(
     # ═══════════════════════════════════════════════════════════════════════
 
     def _open_csv(self, path):
+        """Open a CSV file in the system default application."""
         if path and os.path.exists(path):
             os.startfile(path)
         else:
@@ -686,6 +700,7 @@ class ModernWhatsAppApp(
     # ═══════════════════════════════════════════════════════════════════════
 
     def _save_settings(self):
+        """Save all settings from the settings tab to config."""
         try:
             self.config.set("delay_min", int(self.delay_min_entry.get()))
             self.config.set("delay_max", int(self.delay_max_entry.get()))
@@ -733,6 +748,7 @@ class ModernWhatsAppApp(
             messagebox.showerror("خطأ", "يرجى إدخال أرقام صحيحة في جميع الحقول.")
 
     def _toggle_appearance(self):
+        """Toggle between dark and light mode."""
         mode = self.appearance_switch.get()
         ctk.set_appearance_mode(mode)
         self.config.set_and_save("appearance_mode", mode)
@@ -742,6 +758,7 @@ class ModernWhatsAppApp(
 
     def _load_saved_state(self):
         # Load last used files
+        """Restore UI state (contacts path, message, attachments) from config."""
         last_csv = self.config.get("last_contacts_file", "")
         if last_csv and os.path.exists(last_csv):
             self.contacts_entry.insert(0, last_csv)
@@ -790,6 +807,7 @@ class ModernWhatsAppApp(
         self._load_profile_proxy_settings(profile_name)
 
     def _save_current_state(self):
+        """Persist current UI state to config for next session."""
         self.config.set("last_contacts_file", self.contacts_entry.get())
         self.config.set("last_message", self.message_textbox.get("1.0", "end").strip())
         attachments = self.attachment_manager.get_attachments() if hasattr(self, "attachment_manager") else []
@@ -808,6 +826,7 @@ class ModernWhatsAppApp(
         self.config.save()
 
     def _on_close(self):
+        """Handle application shutdown: save state, cleanup, destroy window."""
         self._save_current_state()
         if self.bot:
             self.bot.close()
@@ -843,6 +862,7 @@ class ModernWhatsAppApp(
 
     def _login_action(self):
         # Check if the bot exists and the driver is actively open (has windows)
+        """Initialize the browser and start the login process."""
         is_active = False
         if self.bot and self.bot.driver:
             try:
@@ -919,6 +939,7 @@ class ModernWhatsAppApp(
         threading.Thread(target=run_login, daemon=True).start()
 
     def _run_pending_start(self):
+        """Execute a queued send/check action after login completes."""
         pending = self.pending_start_payload
         self.pending_start_payload = None
         self._agent_debug_log(
@@ -933,6 +954,7 @@ class ModernWhatsAppApp(
             self._begin_send(*pending)
 
     def _get_profiles(self):
+        """List available browser profile directories."""
         try:
             profiles = [d for d in os.listdir(self.profiles_dir) if os.path.isdir(os.path.join(self.profiles_dir, d))]
             if os.path.exists(self.legacy_profile_dir) and "Legacy" not in profiles:
@@ -943,6 +965,7 @@ class ModernWhatsAppApp(
             return ["Default"]
 
     def _on_profile_change(self, choice):
+        """Handle profile selection change — update paths and proxy settings."""
         if self.bot and self.bot.driver:
             messagebox.showwarning("تنبيه", "لا يمكن تغيير الحساب أثناء تشغيل المتصفح. يرجى إغلاق المتصفح أولاً.")
             if self.user_data_dir == self.legacy_profile_dir:
@@ -983,6 +1006,7 @@ class ModernWhatsAppApp(
             self._load_profile_proxy_settings(choice)
 
     def _create_new_profile(self):
+        """Create a new browser profile directory."""
         dialog = ctk.CTkInputDialog(text="أدخل اسم الحساب الجديد:", title="حساب جديد")
         name = dialog.get_input()
         if name:
@@ -1000,6 +1024,7 @@ class ModernWhatsAppApp(
                 messagebox.showerror("خطأ", "هذا الاسم موجود بالفعل.")
 
     def _load_profile_proxy_settings(self, profile_name):
+        """Load proxy configuration for the selected profile."""
         profile_proxies = self.config.get("profile_proxies", {})
         prof_config = profile_proxies.get(profile_name, {
             "enabled": False,
@@ -1048,6 +1073,7 @@ class ModernWhatsAppApp(
         self.proxy_status_label.configure(text="الحالة: لم يتم الفحص", text_color=COLORS["text_muted"])
 
     def _test_proxy_connection(self):
+        """Test the configured proxy connection in a background thread."""
         proxy_type = self.proxy_type_var.get().lower()
         host = self.proxy_host_entry.get().strip()
         port = self.proxy_port_entry.get().strip()
@@ -1088,6 +1114,7 @@ class ModernWhatsAppApp(
         threading.Thread(target=run_test, daemon=True).start()
 
     def _generate_new_profile_fingerprint(self):
+        """Generate a random browser fingerprint for the profile."""
         from utils.helpers import generate_random_fingerprint
         fp = generate_random_fingerprint()
         
@@ -1102,23 +1129,20 @@ class ModernWhatsAppApp(
     # ═══════════════════════════════════════════════════════════════════════
 
 
-
-
-
-
-
-
     # ═══════════════════════════════════════════════════════════════════════
     #  TABLES & UTILS HELPERS
     # ═══════════════════════════════════════════════════════════════════════
 
     def _show_help_dialog(self):
+        """Display the help/documentation dialog."""
         self._show_dialog("info", "دليل الاستخدام والمساعدة", "دليل الاستخدام:\n1. قم بفتح تطبيق WhatsApp وسجل الدخول باستخدام رمز الاستجابة السريعة (QR Code).\n2. استورد الأرقام باستخدام زر الاستيراد أو قم بإدخالها يدوياً.\n3. اكتب الرسالة في المحرر وأضف أي ملفات مرفقة إن وجدت.\n4. اضغط على زر 'ارسل الآن' لبدء الحملة الإعلانية.")
 
     def _show_about_dialog(self):
+        """Display the about dialog with version info."""
         self._show_dialog("info", "حول البرنامج", "WhatsApp Sender Pro\nالإصدار v17.0\nمطور ومحسن لتوفير أقصى درجات الحماية والسرعة.\nالبرنامج يدعم حماية بصمة المتصفح ونظام منع الحظر التلقائي الذكي.")
 
     def _logout_action(self):
+        """Log out of WhatsApp by closing the browser session."""
         if self.bot:
             try:
                 self.bot.close()
@@ -1133,6 +1157,7 @@ class ModernWhatsAppApp(
             self._show_dialog("warning", "تسجيل الخروج", "المتصفح مغلق بالفعل.")
 
     def _toggle_appearance_menu(self):
+        """Toggle appearance from the menu bar."""
         current_mode = ctk.get_appearance_mode().lower()
         new_mode = "light" if current_mode == "dark" else "dark"
         ctk.set_appearance_mode(new_mode)

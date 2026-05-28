@@ -50,4 +50,5 @@ def log_error(message, exc=None, level=logging.ERROR):
 
 
 def log_exception(message, exc):
+    """Log an exception with full traceback at ERROR level."""
     logger.exception("%s: %s", message, exc)

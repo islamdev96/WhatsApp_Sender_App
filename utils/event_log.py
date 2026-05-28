@@ -9,6 +9,7 @@ EventCallback = Callable[[str, str, Optional[str]], None]
 
 
 def format_event(level: str, message: str, detail: Optional[str] = None) -> str:
+    """Format a diagnostic event into a timestamped log line."""
     ts = datetime.now().strftime("%H:%M:%S")
     level = (level or "INFO").upper()
     line = f"[{ts}] [{level}] {message}"

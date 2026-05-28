@@ -1,17 +1,12 @@
 """WhatsApp Sender Pro — Automation control methods (send, stop, pause, error mapping)."""
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, ttk
-import re
 import threading
-import queue
-import time
 import random
 import os
-import csv
 import datetime
-import json
 
-from gui.theme import COLORS, FONTS, ERROR_CATALOG
+from gui.theme import COLORS
 from utils.logger import logger
 
 
@@ -19,6 +14,7 @@ class AutomationMixin:
     """Mixin: Automation control methods (send, stop, pause, error mapping)."""
 
     def _begin_send(self, contacts, msg_template, attachments):
+        """Prepare and launch the sending automation thread."""
         self._agent_debug_log(
             "H4",
             "modern_ui.py:_begin_send",
@@ -216,6 +212,7 @@ class AutomationMixin:
         self._begin_send(contacts, msg_template, attachments)
 
     def _stop_action(self):
+        """Stop the running automation by setting the stop event."""
         if messagebox.askyesno("تأكيد", "هل تريد إيقاف العملية؟"):
             self.stop_event.set()
             if self.pause_event.is_set():
@@ -226,6 +223,7 @@ class AutomationMixin:
             self.log("🛑 طلب إيقاف...")
 
     def _check_numbers_action(self, contacts_override=None):
+        """Start the number validity checking process."""
         if self.is_running or self.is_checking:
             return
         contacts = contacts_override or self._get_contacts_from_input()
@@ -280,6 +278,7 @@ class AutomationMixin:
         return True
 
     def _recover_bot_before_retry(self, attachments):
+        """Attempt to recover the bot state before retrying a failed send."""
         if not self.bot:
             return
         try:
@@ -291,6 +290,7 @@ class AutomationMixin:
             logger.debug("Could not recover bot before retry: %s", exc)
 
     def _map_bot_error(self, res):
+        """Map a bot error code to a user-friendly message."""
         if not res:
             return "ERR-99", "خطأ غير معروف.", None
         if str(res).startswith("ERR_TEXT_SEND"):
@@ -335,6 +335,7 @@ class AutomationMixin:
     # ═══════════════════════════════════════════════════════════════════════
 
     def _run_automation(self, contacts, msg_template, attachments):
+        """Main automation loop: iterate contacts and send messages."""
         if not self.bot:
             return
 
@@ -627,6 +628,7 @@ class AutomationMixin:
             self._run_on_ui(lambda: self.status_label.configure(text="جاهز..."))
 
     def _run_number_check(self, contacts):
+        """Check phone number validity via WhatsApp."""
         if not self.bot:
             return
         self.sent = 0
@@ -719,6 +721,7 @@ class AutomationMixin:
             self._run_on_ui(lambda: self.status_label.configure(text="جاهز..."))
 
     def _toggle_pause(self):
+        """Toggle pause/resume of the running automation."""
         if not self.is_running:
             return
         if self.is_paused:
@@ -735,6 +738,7 @@ class AutomationMixin:
             self._set_progress_status("Paused")
 
     def _set_progress_status(self, text):
+        """Update the progress window status text."""
         def _do():
             if self.progress_status_label:
                 self.progress_status_label.configure(text=text)
@@ -746,6 +750,7 @@ class AutomationMixin:
     # ═══════════════════════════════════════════════════════════════════════
 
     def _close_progress_window(self):
+        """Close and clean up the progress window."""
         if self.is_running or self.is_checking:
             if messagebox.askyesno("تأكيد", "عملية الإرسال/الفحص لا تزال جارية. هل تريد إيقاف العملية وإغلاق هذه الشاشة؟"):
                 self.stop_event.set()
@@ -771,6 +776,7 @@ class AutomationMixin:
         self.pause_btn = None
 
     def _export_last_report(self):
+        """Open the last generated report file."""
         if self.last_report_path and os.path.exists(self.last_report_path):
             self._open_csv(self.last_report_path)
         else:

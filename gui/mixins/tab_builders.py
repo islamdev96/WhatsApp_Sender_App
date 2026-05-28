@@ -1,17 +1,10 @@
 """WhatsApp Sender Pro — Tab builder methods (main, groups, templates, settings, log)."""
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, ttk
-import re
-import threading
-import queue
-import time
-import random
 import os
 import csv
-import datetime
-import json
 
-from gui.theme import COLORS, FONTS, ERROR_CATALOG
+from gui.theme import COLORS
 from utils.logger import logger
 from gui.components import RichTextFrame, AttachmentManager
 
@@ -20,6 +13,7 @@ class TabBuildersMixin:
     """Mixin: Tab builder methods (main, groups, templates, settings, log)."""
 
     def _build_tab_main(self):
+        """Build the main sending tab: contacts table, message editor, attachments."""
         frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.tab_frames["main"] = frame
 
@@ -261,10 +255,10 @@ class TabBuildersMixin:
         self.attachment_manager.grid(row=1, column=0, sticky="nsew", pady=2)
 
 
-
     # ─── Groups Tab ───────────────────────────────────────────────────────
 
     def _build_tab_groups(self):
+        """Build the contact groups management tab."""
         frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.tab_frames["groups"] = frame
 
@@ -352,6 +346,7 @@ class TabBuildersMixin:
     # ─── Templates Tab ────────────────────────────────────────────────────
 
     def _build_tab_templates(self):
+        """Build the message templates management tab."""
         frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.tab_frames["templates"] = frame
 
@@ -414,6 +409,7 @@ class TabBuildersMixin:
     # ─── Settings Tab ─────────────────────────────────────────────────────
 
     def _build_tab_settings(self):
+        """Build the settings tab with proxy, safety, and display options."""
         frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.tab_frames["settings"] = frame
 
@@ -672,6 +668,7 @@ class TabBuildersMixin:
     # ─── Log Tab ──────────────────────────────────────────────────────────
 
     def _build_tab_log(self):
+        """Build the event log/diagnostic tab."""
         frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.tab_frames["log"] = frame
 
@@ -728,6 +725,7 @@ class TabBuildersMixin:
     # ═══════════════════════════════════════════════════════════════════════
 
     def _create_file_row(self, parent, label_text, entry_attr, browse_cmd):
+        """Create a labeled file path input row with browse button."""
         row = ctk.CTkFrame(parent, fg_color="transparent")
         row.pack(fill="x", padx=15, pady=4)
         
@@ -747,6 +745,7 @@ class TabBuildersMixin:
                       command=browse_cmd).pack(side="right")
 
     def _refresh_templates_list(self):
+        """Reload the templates list from storage."""
         for w in self.templates_listbox.winfo_children():
             w.destroy()
             
@@ -790,6 +789,7 @@ class TabBuildersMixin:
                           command=lambda n=t["name"]: self._delete_template_by_name(n)).pack(side="left", padx=2)
 
     def _select_template(self, name):
+        """Select a template by name and load its body into the editor."""
         t = self.templates.get_by_name(name)
         if t:
             self.template_name_entry.delete(0, "end")
@@ -798,6 +798,7 @@ class TabBuildersMixin:
             self.template_body_textbox.insert("1.0", t["body"])
 
     def _save_template(self):
+        """Save the current message as a named template."""
         name = self.template_name_entry.get().strip()
         body = self.template_body_textbox.get("1.0", "end").strip()
         if not name:
@@ -811,6 +812,7 @@ class TabBuildersMixin:
         messagebox.showinfo("تم", f"تم حفظ القالب: {name}")
 
     def _delete_template(self):
+        """Delete the currently selected template."""
         name = self.template_name_entry.get().strip()
         if not name:
             return
@@ -821,6 +823,7 @@ class TabBuildersMixin:
             self._refresh_templates_list()
 
     def _load_template(self):
+        """Load the selected template body into the message editor."""
         name = self.template_name_entry.get().strip()
         t = self.templates.get_by_name(name)
         if t:
@@ -836,6 +839,7 @@ class TabBuildersMixin:
     # ═══════════════════════════════════════════════════════════════════════
 
     def _refresh_groups_list(self):
+        """Reload the contact groups list from storage."""
         for w in self.groups_listbox.winfo_children():
             w.destroy()
         
@@ -859,6 +863,7 @@ class TabBuildersMixin:
             btn.pack(fill="x", pady=3)
 
     def _select_group(self, name):
+        """Select a group and display its contact count."""
         self.group_name_entry.delete(0, "end")
         self.group_name_entry.insert(0, name)
         g = self.contacts_mgr.get_by_name(name)
@@ -875,6 +880,7 @@ class TabBuildersMixin:
             self.group_info_label.configure(text=f"📊 {total} جهة اتصال{extra} | آخر تحديث: {g.get('updated', '-')}")
 
     def _browse_group_file(self):
+        """Browse for a contacts file to import into a group."""
         path = filedialog.askopenfilename(filetypes=[
             ("جهات الاتصال", "*.csv;*.xlsx;*.xls;*.txt"),
             ("CSV", "*.csv"),
@@ -886,6 +892,7 @@ class TabBuildersMixin:
             self.group_import_entry.insert(0, path)
 
     def _create_group_and_import(self):
+        """Create a new group and import contacts from a file."""
         name = self.group_name_entry.get().strip()
         if not name:
             messagebox.showwarning("تنبيه", "يرجى إدخال اسم المجموعة.")
@@ -902,6 +909,7 @@ class TabBuildersMixin:
         messagebox.showinfo("تم", f"تم إنشاء المجموعة '{name}' مع {count} جهة اتصال.")
 
     def _add_contacts_to_group(self):
+        """Add contacts from a file to the selected group."""
         name = self.group_name_entry.get().strip()
         if not name or not self.contacts_mgr.get_by_name(name):
             messagebox.showwarning("تنبيه", "يرجى اختيار مجموعة موجودة أولاً.")
@@ -920,6 +928,7 @@ class TabBuildersMixin:
         messagebox.showinfo("تم", f"تم إضافة {added} جهة اتصال جديدة إلى '{name}'.")
 
     def _delete_group(self):
+        """Delete the currently selected contact group."""
         name = self.group_name_entry.get().strip()
         if not name:
             return
@@ -932,6 +941,7 @@ class TabBuildersMixin:
             self._refresh_groups_list()
 
     def _send_to_group(self):
+        """Start sending to all contacts in the selected group."""
         name = self.group_name_entry.get().strip()
         g = self.contacts_mgr.get_by_name(name) if name else None
         if not g or not g["contacts"]:
@@ -948,26 +958,9 @@ class TabBuildersMixin:
     # ════════════════════════════════════════════════════════════
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
     # ═══════════════════════════════════════════════════════════════════════
     #  SCHEDULING
     # ═══════════════════════════════════════════════════════════════════════
-
-
-
-
 
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -975,8 +968,8 @@ class TabBuildersMixin:
     # ═══════════════════════════════════════════════════════════════════════
 
 
-
     def _refresh_numbers_table(self, contacts):
+        """Reload the numbers preview table from contacts list."""
         for item in self.progress_tree.get_children():
             self.progress_tree.delete(item)
         for c in contacts:
@@ -987,10 +980,12 @@ class TabBuildersMixin:
         self._update_contacts_count_from_tree()
 
     def _update_contacts_count_from_tree(self):
+        """Update the contacts count label from the table rows."""
         total = len(self.progress_tree.get_children())
         self.total_counts_label.configure(text=f"مجموعات: 0 | جهات الاتصال: {total} | Total: {total}")
 
     def _show_import_popup_menu(self):
+        """Show the import options popup menu (file, manual, bulk, generate)."""
         import tkinter as tk
         menu = tk.Menu(self, tearoff=0)
         menu.add_command(label="📁 استيراد من ملف Excel/CSV...", command=self._browse_contacts)
@@ -1004,6 +999,7 @@ class TabBuildersMixin:
             logger.debug("Could not show import popup menu: %s", exc)
 
     def _remove_selected_table_number(self):
+        """Remove the selected row from the numbers table."""
         selected = self.progress_tree.selection()
         if not selected:
             self._show_dialog("warning", "تنبيه", "يرجى تحديد صف واحد أو أكثر لحذفه.")
@@ -1013,18 +1009,21 @@ class TabBuildersMixin:
         self._update_contacts_count_from_tree()
 
     def _show_numbers_context_menu(self, event):
+        """Show the right-click context menu on the numbers table."""
         try:
             self.numbers_context_menu.post(event.x_root, event.y_root)
         except Exception as exc:
             logger.debug("Could not show numbers context menu: %s", exc)
 
     def _clear_numbers_table(self):
+        """Clear all rows from the numbers preview table."""
         for item in self.progress_tree.get_children():
             self.progress_tree.delete(item)
         self._update_contacts_count_from_tree()
         self.log("🗑️ تم مسح قائمة الأرقام بالكامل.")
 
     def _show_attachments_popup_menu(self):
+        """Show the attachments add popup menu."""
         import tkinter as tk
         menu = tk.Menu(self, tearoff=0)
         menu.add_command(label="🖼️ إضافة صورة/فيديو...", command=lambda: self.attachment_manager.add_attachment("image"))

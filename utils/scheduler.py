@@ -51,7 +51,7 @@ class Scheduler:
         mins = int(delay_seconds // 60)
         return True, f"تم الجدولة في {time_str} (بعد {mins} دقيقة)"
 
-    def cancel(self):
+    def cancel(self) -> None:
         """Cancel the scheduled task."""
         self._cancel_event.set()
         self.is_scheduled = False
@@ -67,7 +67,7 @@ class Scheduler:
         mins, secs = divmod(int(remaining), 60)
         return mins, secs
 
-    def get_remaining_text(self):
+    def get_remaining_text(self) -> str | None:
         """Get remaining time as formatted text."""
         r = self.get_remaining()
         if not r:

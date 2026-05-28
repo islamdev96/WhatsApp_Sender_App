@@ -3,7 +3,6 @@ Workflow Manager — Manage multi-step sending workflows.
 Stores workflows and steps in SQLite.
 """
 import json
-import os
 import datetime
 from utils.db import SQLiteStore
 from utils.logger import logger
@@ -11,9 +10,11 @@ from utils.logger import logger
 
 class WorkflowManager:
     def __init__(self, db_path=None):
+        """Initialize workflow manager with SQLite storage."""
         self.store = SQLiteStore(db_path=db_path)
 
     def get_all(self):
+        """Return all workflows with step counts."""
         rows = self.store.query_all("SELECT id, name, created, updated FROM wa_workflows ORDER BY id DESC")
         out = []
         for r in rows:
@@ -25,6 +26,7 @@ class WorkflowManager:
         return out
 
     def get_by_name(self, name):
+        """Find a workflow by name; returns dict with steps or None."""
         if not name:
             return None
         wf = self.store.query_one("SELECT id, name, created, updated FROM wa_workflows WHERE name = ?", (name,))
@@ -35,6 +37,7 @@ class WorkflowManager:
         return wf
 
     def get(self, workflow_id):
+        """Find a workflow by ID; returns dict with steps or None."""
         wf = self.store.query_one("SELECT id, name, created, updated FROM wa_workflows WHERE id = ?", (workflow_id,))
         if not wf:
             return None
@@ -42,6 +45,7 @@ class WorkflowManager:
         return wf
 
     def _get_steps(self, workflow_id):
+        """Load all steps for a workflow, parsing attachment JSON."""
         rows = self.store.query_all(
             "SELECT id, step_order, body, attachments_json, delay_min, delay_max "
             "FROM wa_workflow_steps WHERE workflow_id = ? ORDER BY step_order",
@@ -67,6 +71,7 @@ class WorkflowManager:
         return steps
 
     def save(self, name, steps, workflow_id=None):
+        """Create or update a workflow with its steps atomically."""
         if not name:
             return False, "اسم سير العمل مطلوب."
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -118,6 +123,7 @@ class WorkflowManager:
         return True, wf_id
 
     def delete(self, workflow_id):
+        """Delete a workflow and all its steps."""
         self.store.execute("DELETE FROM wa_workflow_steps WHERE workflow_id = ?", (workflow_id,), commit=True)
         self.store.execute("DELETE FROM wa_workflows WHERE id = ?", (workflow_id,), commit=True)
         return True

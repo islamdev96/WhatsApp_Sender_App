@@ -1,17 +1,9 @@
 """WhatsApp Sender Pro — Progress window and status updates."""
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, ttk
-import re
-import threading
-import queue
 import time
-import random
-import os
-import csv
-import datetime
-import json
 
-from gui.theme import COLORS, FONTS, ERROR_CATALOG
+from gui.theme import COLORS
 from utils.logger import logger
 
 
@@ -19,6 +11,7 @@ class ProgressMixin:
     """Mixin: Progress window and status updates."""
 
     def _open_progress_window_blind(self, total, mode="send"):
+        """Open the sending/checking progress window with live table."""
         def _do():
             if self.progress_win and self.progress_win.winfo_exists():
                 try:
@@ -182,6 +175,7 @@ class ProgressMixin:
     def _add_progress_row_blind(self, row_values, tag="waiting"):
         # row_values = [phone, type, time, status, message]
         # Prepend icon to phone (ID)
+        """Add a result row to the progress table."""
         icon = ""
         if tag == "success": icon = "OK "
         elif tag == "failed": icon = "FAIL "
@@ -203,6 +197,7 @@ class ProgressMixin:
         self._run_on_ui(_do)
 
     def _update_progress_header_blind(self, processed, total, current_phone=None, current_name=None, eta=None, status_text=None):
+        """Update the progress header with current stats and ETA."""
         def _do():
             try:
                 remaining = max(total - processed, 0)

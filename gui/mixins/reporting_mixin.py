@@ -1,17 +1,10 @@
 """WhatsApp Sender Pro — Report generation and CSV export."""
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, ttk
-import re
-import threading
-import queue
-import time
-import random
 import os
 import csv
 import datetime
-import json
 
-from gui.theme import COLORS, FONTS, ERROR_CATALOG
 from utils.logger import logger
 
 
@@ -19,6 +12,7 @@ class ReportingMixin:
     """Mixin: Report generation and CSV export."""
 
     def _generate_final_report(self, duration):
+        """Generate and display the final campaign summary report."""
         total = self.sent + self.failed + self.invalid
         if total == 0:
             return None
@@ -55,6 +49,7 @@ class ReportingMixin:
         return csv_path
 
     def _save_report_csv(self):
+        """Save the campaign results to a CSV file."""
         if not self.results_log:
             return None
         try:
@@ -83,6 +78,7 @@ class ReportingMixin:
     # ═══════════════════════════════════════════════════════════════════════
 
     def _save_number_check_report(self):
+        """Save number validity check results to a CSV file."""
         if not self.results_log:
             return None, None, None
         try:
@@ -128,6 +124,7 @@ class ReportingMixin:
     # ═══════════════════════════════════════════════════════════════════════
 
     def _format_progress_eta(self, seconds):
+        """Format remaining seconds into a human-readable ETA string."""
         if seconds is None:
             return "--"
         try:

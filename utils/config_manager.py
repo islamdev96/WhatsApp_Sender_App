@@ -46,7 +46,7 @@ class ConfigManager:
         self.config = dict(DEFAULT_CONFIG)
         self.load()
 
-    def load(self):
+    def load(self) -> None:
         """Load config from file, merging with defaults for any missing keys."""
         try:
             if os.path.exists(self.config_path):
@@ -122,7 +122,7 @@ class ConfigManager:
             self.config[key] = default
             return int(default), True
 
-    def save(self):
+    def save(self) -> None:
         """Persist current config to disk."""
         try:
             with open(self.config_path, 'w', encoding='utf-8') as f:
@@ -132,10 +132,10 @@ class ConfigManager:
         except Exception as exc:
             log_exception(f"Unexpected error saving config to {self.config_path}", exc)
 
-    def get(self, key, default=None):
+    def get(self, key: str, default=None):
         return self.config.get(key, default)
 
-    def set(self, key, value):
+    def set(self, key: str, value):
         # Stricter type enforcement and parsing for configuration values
         int_keys = {
             "batch_size", "max_retries", "max_consecutive_failures", 
@@ -173,6 +173,6 @@ class ConfigManager:
         if key in safety_keys:
             self._enforce_safe_limits(persist=False)
 
-    def set_and_save(self, key, value):
+    def set_and_save(self, key: str, value):
         self.set(key, value)
         self.save()

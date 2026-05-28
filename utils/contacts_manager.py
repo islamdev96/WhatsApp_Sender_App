@@ -124,7 +124,7 @@ class ContactsManager:
             log_exception("Contact groups migration transaction failed", exc)
         self.store.set_meta("contacts_migrated", "1")
 
-    def get_all(self):
+    def get_all(self) -> list[dict]:
         """Return list of all groups."""
         if not self.store:
             return list(self.groups)
@@ -143,14 +143,14 @@ class ContactsManager:
             })
         return out
 
-    def get_names(self):
+    def get_names(self) -> list[str]:
         """Return list of group names."""
         if not self.store:
             return [g.get("name", "") for g in self.groups]
         rows = self.store.query_all("SELECT name FROM wa_groups ORDER BY id DESC")
         return [r.get("name", "") for r in rows]
 
-    def get_by_name(self, name):
+    def get_by_name(self, name: str) -> dict | None:
         """Get a group by its name."""
         if not self.store:
             for g in self.groups:
@@ -166,7 +166,7 @@ class ContactsManager:
         )
         return {"name": g["name"], "contacts": contacts, "created": g.get("created"), "updated": g.get("updated")}
 
-    def create_group(self, name, contacts=None):
+    def create_group(self, name: str, contacts=None) -> bool:
         """Create a new group. contacts = list of {phone, name} dicts."""
         if self.get_by_name(name):
             return False  # Already exists
@@ -192,7 +192,7 @@ class ContactsManager:
                 )
         return True
 
-    def update_contacts(self, name, contacts):
+    def update_contacts(self, name: str, contacts) -> bool:
         """Replace the contacts list for a group."""
         if not self.store:
             g = self.get_by_name(name)
@@ -232,7 +232,7 @@ class ContactsManager:
             return False
         return True
 
-    def add_contacts(self, name, new_contacts):
+    def add_contacts(self, name: str, new_contacts):
         """Add contacts to a group (avoiding duplicates by phone)."""
         if not self.store:
             g = self.get_by_name(name)
@@ -271,7 +271,7 @@ class ContactsManager:
             )
         return added
 
-    def remove_contact(self, group_name, phone):
+    def remove_contact(self, group_name: str, phone: str):
         """Remove a contact by phone from a group."""
         if not self.store:
             g = self.get_by_name(group_name)
@@ -300,7 +300,7 @@ class ContactsManager:
             return True
         return False
 
-    def delete_group(self, name):
+    def delete_group(self, name: str) -> None:
         """Delete a group by name."""
         if not self.store:
             self.groups = [g for g in self.groups if g.get("name") != name]
@@ -308,7 +308,7 @@ class ContactsManager:
             return
         self.store.execute("DELETE FROM wa_groups WHERE name = ?", (name,), commit=True)
 
-    def rename_group(self, old_name, new_name):
+    def rename_group(self, old_name: str, new_name: str) -> bool:
         """Rename a group."""
         if self.get_by_name(new_name):
             return False  # Target name exists
@@ -327,7 +327,7 @@ class ContactsManager:
         )
         return cur.rowcount > 0
 
-    def get_contact_count(self, name):
+    def get_contact_count(self, name: str) -> int:
         """Get the number of contacts in a group."""
         if not self.store:
             g = self.get_by_name(name)

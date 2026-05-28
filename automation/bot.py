@@ -6,7 +6,6 @@ import time
 import os
 import json
 
-from selenium.common.exceptions import WebDriverException
 
 from utils.logger import logger
 from utils.event_log import print_event
@@ -160,6 +159,7 @@ class WhatsAppBot(
             log_exception(f"Error in _emit: {level} - {message}", exc)
 
     def _load_selectors_from_file(self):
+        """Load DOM selectors from the JSON config file."""
         selectors_path = os.path.join(os.path.dirname(__file__), "selectors.json")
         if not os.path.exists(selectors_path):
             return
@@ -206,6 +206,7 @@ class WhatsAppBot(
             log_exception(f"Error loading selectors from {selectors_path}", exc)
 
     def _find_any(self, locators):
+        """Try multiple CSS/XPath locators and return the first visible match."""
         if not self.driver:
             return None
         for by, value in locators:
@@ -219,6 +220,7 @@ class WhatsAppBot(
         return None
 
     def _wait_for_any(self, locators, timeout=30, poll=0.5, stop_event=None):
+        """Wait until at least one of the given locators is present in the DOM."""
         end_time = time.time() + timeout
         while time.time() < end_time:
             if stop_event and stop_event.is_set():

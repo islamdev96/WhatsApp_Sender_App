@@ -4,14 +4,16 @@ import urllib.parse
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
+from selenium.common.exceptions import TimeoutException, WebDriverException
 from utils.logger import logger
 
 class GMapsScraper:
     def __init__(self, driver):
+        """Initialize Google Maps scraper with a Selenium WebDriver instance."""
         self.driver = driver
 
     def scrape(self, query, stop_event, max_results=100, update_callback=None):
+        """Scrape business phone numbers from Google Maps search results."""
         results = []
         try:
             encoded_query = urllib.parse.quote_plus(query)
