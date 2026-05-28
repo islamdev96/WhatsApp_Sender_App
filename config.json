@@ -1,16 +1,10 @@
 {
   "appearance_mode": "light",
-  "language": "ar",
+  "language": "en",
   "last_contacts_file": "",
-  "last_image_file": "G:/صور/صور لاهم العروض/صور مناسبات/5.png",
-  "last_attachments": [
-    {
-      "path": "G:/صور/صور لاهم العروض/صور مناسبات/5.png",
-      "type": "image",
-      "caption": ""
-    }
-  ],
-  "last_message": "لقد قمت بإكمال جميع التحسينات وتأمين الكود بشكل كامل وتلقائي، وتجاوز أي عقبات تقنية بنجاح.\n\nملخص التعديلات التي تم إنجازها:\nتحسين أداء وإدارة الحملات (campaign_manager.py):\n\nتسريع عمليات نقل وإدخال الحملات في قاعدة البيانات SQLite بمقدار 10 إلى 100 ضعف من خلال تجميع الإدخالات داخل عملية موحدة (Transaction/Batch).\nتفعيل الكتابة الآمنة والذرية (Atomic JSON writes) لحفظ الحملات احتياطياً لتجنب أي تلف في الملف في حال الإغلاق المفاجئ للتطبيق.\nالتحقق التلقائي والآمن للبيانات والخيارات (config_manager.py):\n\nإجبار النظام على التحقق الذاتي من أنواع المدخلات (Numeric / Boolean) وتصحيحها تلقائياً لتفادي أي انهيار غير متوقع.\nفرض قيود الحماية والأمان ضد الحظر (Anti-ban clamping) فور تعديل أي خيارات حساسة للحفاظ على سلامة الحسابات.",
+  "last_image_file": "",
+  "last_attachments": [],
+  "last_message": "",
   "send_text_with_image": false,
   "background_mode": false,
   "delay_min": 30.0,

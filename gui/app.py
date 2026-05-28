@@ -246,48 +246,48 @@ class ModernWhatsAppApp(
         import tkinter as tk
         menu_bar = tk.Menu(self)
         
-        # 1. File Menu (ملف)
+        # 1. File Menu
         file_menu = tk.Menu(menu_bar, tearoff=0)
-        file_menu.add_command(label="📁 فتح ملف الأرقام...", command=self._browse_contacts)
-        file_menu.add_command(label="📥 استيراد متقدم...", command=self._open_import_dialog)
+        file_menu.add_command(label=self.tr("menu_file_open"), command=self._browse_contacts)
+        file_menu.add_command(label=self.tr("menu_file_import"), command=self._open_import_dialog)
         file_menu.add_separator()
-        file_menu.add_command(label="💾 حفظ القالب الحالي", command=self._save_template)
+        file_menu.add_command(label=self.tr("menu_file_save_template"), command=self._save_template)
         file_menu.add_separator()
-        file_menu.add_command(label="🚪 خروج", command=self._on_close)
-        menu_bar.add_cascade(label="ملف", menu=file_menu)
+        file_menu.add_command(label=self.tr("menu_file_exit"), command=self._on_close)
+        menu_bar.add_cascade(label=self.tr("menu_file"), menu=file_menu)
 
-        # 2. Edit Menu (تعديل)
+        # 2. Edit Menu
         edit_menu = tk.Menu(menu_bar, tearoff=0)
-        edit_menu.add_command(label="🧮 مولد أرقام جديد...", command=self._open_number_generator)
+        edit_menu.add_command(label=self.tr("menu_edit_num_gen"), command=self._open_number_generator)
         edit_menu.add_separator()
-        edit_menu.add_command(label="🗑️ مسح الرسالة", command=lambda: self.message_editor.set_text(""))
-        edit_menu.add_command(label="🗑️ مسح المرفقات", command=lambda: self.attachment_manager.clear())
-        menu_bar.add_cascade(label="تعديل", menu=edit_menu)
+        edit_menu.add_command(label=self.tr("menu_edit_clear_msg"), command=lambda: self.message_editor.set_text(""))
+        edit_menu.add_command(label=self.tr("menu_edit_clear_attach"), command=lambda: self.attachment_manager.clear())
+        menu_bar.add_cascade(label=self.tr("menu_edit"), menu=edit_menu)
 
-        # 3. View Menu (رأي)
+        # 3. View Menu
         view_menu = tk.Menu(menu_bar, tearoff=0)
-        view_menu.add_command(label="🌗 تبديل الوضع الداكن/الفاتح", command=self._toggle_appearance_menu)
-        menu_bar.add_cascade(label="رأي", menu=view_menu)
+        view_menu.add_command(label=self.tr("menu_view_toggle_dark"), command=self._toggle_appearance_menu)
+        menu_bar.add_cascade(label=self.tr("menu_view"), menu=view_menu)
 
-        # 4. Settings Menu (الإعدادات)
+        # 4. Settings Menu
         settings_menu = tk.Menu(menu_bar, tearoff=0)
-        settings_menu.add_command(label="⚙️ إعدادات الإرسال والتأخير...", command=lambda: self._switch_tab("settings"))
-        settings_menu.add_command(label="🛡️ إعدادات البروكسي وحماية بصمة المتصفح...", command=lambda: self._switch_tab("settings"))
-        menu_bar.add_cascade(label="الإعدادات", menu=settings_menu)
+        settings_menu.add_command(label=self.tr("menu_settings_send_delay"), command=lambda: self._switch_tab("settings"))
+        settings_menu.add_command(label=self.tr("menu_settings_proxy"), command=lambda: self._switch_tab("settings"))
+        menu_bar.add_cascade(label=self.tr("menu_settings"), menu=settings_menu)
 
-        # 5. Tools Menu (أدوات)
+        # 5. Tools Menu
         tools_menu = tk.Menu(menu_bar, tearoff=0)
-        tools_menu.add_command(label="👥 مجموعات جهات الاتصال", command=lambda: self._switch_tab("groups"))
-        tools_menu.add_command(label="🔍 فحص الأرقام", command=lambda: self._check_numbers_action())
-        menu_bar.add_cascade(label="أدوات", menu=tools_menu)
+        tools_menu.add_command(label=self.tr("menu_tools_contacts"), command=lambda: self._switch_tab("groups"))
+        tools_menu.add_command(label=self.tr("menu_tools_check_nums"), command=lambda: self._check_numbers_action())
+        menu_bar.add_cascade(label=self.tr("menu_tools"), menu=tools_menu)
 
-        # 6. Help Menu (مساعدة)
+        # 6. Help Menu
         help_menu = tk.Menu(menu_bar, tearoff=0)
-        help_menu.add_command(label="📖 دليل الاستخدام والمساعدة...", command=self._show_help_dialog)
-        help_menu.add_command(label="📋 سجل الأحداث والتشخيص", command=lambda: self._switch_tab("log"))
+        help_menu.add_command(label=self.tr("menu_help_guide"), command=self._show_help_dialog)
+        help_menu.add_command(label=self.tr("menu_help_log"), command=lambda: self._switch_tab("log"))
         help_menu.add_separator()
-        help_menu.add_command(label="ℹ️ حول البرنامج", command=self._show_about_dialog)
-        menu_bar.add_cascade(label="مساعدة", menu=help_menu)
+        help_menu.add_command(label=self.tr("menu_help_about"), command=self._show_about_dialog)
+        menu_bar.add_cascade(label=self.tr("menu_help"), menu=help_menu)
 
         self.configure(menu=menu_bar)
 
@@ -320,7 +320,7 @@ class ModernWhatsAppApp(
             (self.tr("groups_grabber"), "groups"),
             (self.tr("templates"), "templates"),
             (self.tr("settings"), "settings"),
-            ("الأحداث", "log"),
+            (self.tr("tab_events"), "log"),
         ]
 
         self.nav_buttons = {}
@@ -385,7 +385,7 @@ class ModernWhatsAppApp(
         )
         self.btn_add_profile.pack(side="left", padx=2, pady=8)
         
-        lbl_profile = ctk.CTkLabel(tb_content, text="Account:", font=("Segoe UI", 11), text_color=COLORS["text_muted"])
+        lbl_profile = ctk.CTkLabel(tb_content, text=self.tr("lbl_account"), font=("Segoe UI", 11), text_color=COLORS["text_muted"])
         lbl_profile.pack(side="left", padx=2)
         
         # 6. Language Toggle Button
@@ -401,11 +401,66 @@ class ModernWhatsAppApp(
         self.btn_lang_toggle.pack(side="left", padx=15, pady=8)
 
     def _toggle_language(self):
-        """Switch the application language between Arabic and English."""
+        """Switch the application language between Arabic and English instantly."""
         new_lang = "en" if self.current_lang.get() == "ar" else "ar"
         self.current_lang.set(new_lang)
         self.config.set("language", new_lang)
-        messagebox.showinfo("Language Changed", "Language has been changed. Please restart the application to apply the changes.")
+        self.config.save()
+        
+        # Preserve current state
+        active_tab = self.current_tab if hasattr(self, "current_tab") else "main"
+        
+        status_text = self.session_status_label.cget("text") if hasattr(self, "session_status_label") else ""
+        status_color = None
+        if hasattr(self, "status_indicator"):
+            try:
+                status_color = self.status_indicator.cget("text_color")
+            except Exception:
+                pass
+                
+        contacts = []
+        if hasattr(self, "progress_tree") and self.progress_tree:
+            for item in self.progress_tree.get_children():
+                vals = self.progress_tree.item(item, "values")
+                if len(vals) >= 3:
+                    contacts.append({
+                        "name": vals[0],
+                        "phone": vals[1],
+                        "var1": vals[2]
+                    })
+                    
+        # Completely rebuild the UI with the new language
+        self._rebuild_ui()
+        
+        # Restore tab, status, and contacts
+        self._switch_tab(active_tab)
+        if status_text:
+            self._set_session_status(status_text, status_color)
+        if contacts:
+            self._refresh_numbers_table(contacts)
+
+    def _rebuild_ui(self):
+        """Completely rebuild the UI to apply language changes instantly."""
+        self._save_current_state()
+        
+        if hasattr(self, "toolbar_frame") and self.toolbar_frame:
+            try:
+                self.toolbar_frame.destroy()
+            except Exception:
+                pass
+        if hasattr(self, "main_frame") and self.main_frame:
+            try:
+                self.main_frame.destroy()
+            except Exception:
+                pass
+        if hasattr(self, "bottom_bar") and self.bottom_bar:
+            try:
+                self.bottom_bar.destroy()
+            except Exception:
+                pass
+                
+        self._build_layout()
+        self._load_saved_state()
 
     # ─── Bottom Status Bar ───────────────────────────────────────────────────
 
@@ -425,7 +480,7 @@ class ModernWhatsAppApp(
 
         self.session_status_label = ctk.CTkLabel(
             status_frame,
-            text="Disconnected | Not Ready | Account: N/A",
+            text=self.tr("status_bar_disconnected"),
             font=("Segoe UI", 12),
             text_color=COLORS["text_muted"]
         )
@@ -449,7 +504,7 @@ class ModernWhatsAppApp(
 
         # Schedule Button
         self.btn_schedule = ctk.CTkButton(
-            actions_frame, text="📅 " + "جدولة الحملة",
+            actions_frame, text=self.tr("btn_schedule_campaign"),
             font=("Segoe UI", 12, "bold"),
             width=115, height=32, corner_radius=6,
             fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],

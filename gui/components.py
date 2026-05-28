@@ -6,8 +6,9 @@ import os
 from utils.logger import logger
 
 class AttachmentItem(ctk.CTkFrame):
-    def __init__(self, master, path, type_="image", caption="", remove_callback=None, colors=None, **kwargs):
+    def __init__(self, master, path, type_="image", caption="", remove_callback=None, colors=None, tr=None, **kwargs):
         self.colors = colors or {}
+        self.tr = tr or (lambda key: key)
         if "fg_color" not in kwargs:
             kwargs["fg_color"] = self._c("bg_dark", "transparent")
         super().__init__(master, **kwargs)
@@ -39,7 +40,7 @@ class AttachmentItem(ctk.CTkFrame):
 
         self.caption_entry = ctk.CTkEntry(
             content_frame,
-            placeholder_text="أضف كابشن (اختياري)...",
+            placeholder_text=self.tr("att_placeholder_caption"),
             height=24,
             font=("Segoe UI", 11),
             fg_color=self._c("card_bg", None),
@@ -93,8 +94,9 @@ class AttachmentItem(ctk.CTkFrame):
         }
 
 class AttachmentManager(ctk.CTkFrame):
-    def __init__(self, master, colors=None, **kwargs):
+    def __init__(self, master, colors=None, tr=None, **kwargs):
         self.colors = colors or {}
+        self.tr = tr or (lambda key: key)
         super().__init__(master, **kwargs)
 
         self.attachments = [] # List of AttachmentItem widgets
@@ -103,46 +105,57 @@ class AttachmentManager(ctk.CTkFrame):
         header = ctk.CTkFrame(self, fg_color="transparent", height=30)
         header.pack(fill="x", padx=5, pady=5)
 
-        self.header_label = ctk.CTkLabel(header, text="المرفقات", font=("Segoe UI", 13, "bold"),
+        is_ar = False
+        p = master
+        while p:
+            if hasattr(p, "current_lang"):
+                is_ar = p.current_lang.get() == "ar"
+                break
+            p = getattr(p, "master", None)
+
+        side_lbl = "right" if is_ar else "left"
+        side_opposite = "left" if is_ar else "right"
+
+        self.header_label = ctk.CTkLabel(header, text=self.tr("att_header"), font=("Segoe UI", 13, "bold"),
                                          text_color=self._c("text_main", None))
-        self.header_label.pack(side="right", padx=5)
+        self.header_label.pack(side=side_lbl, padx=5)
 
         # Add Buttons (Right aligned)
         self.btn_add_doc = ctk.CTkButton(
-            header, text="+ ملف", width=60, height=24,
+            header, text=self.tr("att_btn_doc"), width=60, height=24,
             fg_color=self._c("primary", None),
             hover_color=self._c("primary_hover", None),
             text_color=self._c("text_main", None),
             command=lambda: self.add_attachment("document"),
         )
-        self.btn_add_doc.pack(side="left", padx=2)
+        self.btn_add_doc.pack(side=side_opposite, padx=2)
 
         self.btn_add_vid = ctk.CTkButton(
-            header, text="+ فيديو", width=60, height=24,
+            header, text=self.tr("att_btn_video"), width=60, height=24,
             fg_color=self._c("primary", None),
             hover_color=self._c("primary_hover", None),
             text_color=self._c("text_main", None),
             command=lambda: self.add_attachment("video"),
         )
-        self.btn_add_vid.pack(side="left", padx=2)
+        self.btn_add_vid.pack(side=side_opposite, padx=2)
 
         self.btn_add_img = ctk.CTkButton(
-            header, text="+ صورة", width=60, height=24,
+            header, text=self.tr("att_btn_image"), width=60, height=24,
             fg_color=self._c("primary", None),
             hover_color=self._c("primary_hover", None),
             text_color=self._c("text_main", None),
             command=lambda: self.add_attachment("image"),
         )
-        self.btn_add_img.pack(side="left", padx=2)
+        self.btn_add_img.pack(side=side_opposite, padx=2)
 
         self.btn_clear = ctk.CTkButton(
-            header, text="مسح", width=50, height=24,
+            header, text=self.tr("att_btn_clear"), width=50, height=24,
             fg_color=self._c("danger", None),
             hover_color=self._c("danger_hover", None),
             text_color=self._c("text_main", None),
             command=self.clear,
         )
-        self.btn_clear.pack(side="left", padx=2)
+        self.btn_clear.pack(side=side_opposite, padx=2)
 
         # List Area
         self.scroll_frame = ctk.CTkScrollableFrame(self, height=150, fg_color="transparent")
@@ -167,7 +180,7 @@ class AttachmentManager(ctk.CTkFrame):
 
     def _add_item(self, path, type_, caption=""):
         """Create an AttachmentItem widget and append it to the list."""
-        item = AttachmentItem(self.scroll_frame, path, type_, caption=caption, remove_callback=self._remove_item, colors=self.colors)
+        item = AttachmentItem(self.scroll_frame, path, type_, caption=caption, remove_callback=self._remove_item, colors=self.colors, tr=self.tr)
         item.pack(fill="x", pady=2)
         self.attachments.append(item)
 
