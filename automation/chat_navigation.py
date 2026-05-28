@@ -1,6 +1,8 @@
 """WhatsApp Sender Pro — Chat opening, search, number validation."""
 import time
 
+from automation.constants import WHATSAPP_URL, CHAT_LOAD_TIMEOUT
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
@@ -97,7 +99,7 @@ class ChatNavigationMixin:
             logger.debug("Could not capture current html element before navigation: %s", exc)
 
         # Force a full reload by appending a unique timestamp to avoid URL-navigation cache/routing locks in WhatsApp Web
-        url = f"https://web.whatsapp.com/send?phone={phone}&t={int(time.time())}"
+        url = f"{WHATSAPP_URL}/send?phone={phone}&t={int(time.time())}"
         self._emit("STEP", "فتح المحادثة عبر الرابط", phone)
         self.driver.get(url)
         
@@ -156,7 +158,7 @@ class ChatNavigationMixin:
             return "STOPPED"
         if not self.driver:
             return "ERR_NOT_READY"
-        url = f"https://web.whatsapp.com/send?phone={phone}"
+        url = f"{WHATSAPP_URL}/send?phone={phone}"
         try:
             self.driver.get(url)
             ready_state = self._wait_for_chat_or_invalid(timeout=45, stop_event=stop_event)
@@ -174,7 +176,7 @@ class ChatNavigationMixin:
     def check_number_validity(self, phone):
         """Checks if a phone number has a WhatsApp account by navigating to wa.me link and checking for errors."""
         try:
-            url = f"https://web.whatsapp.com/send?phone={phone}"
+            url = f"{WHATSAPP_URL}/send?phone={phone}"
             self.driver.get(url)
             
             # Wait for either the chat to open or the invalid number popup
@@ -306,6 +308,7 @@ class ChatNavigationMixin:
             timeout=5, stop_event=stop_event, require_attach=True
         )
 
-    def _wait_for_chat_or_invalid(self, timeout=60, poll=0.5, stop_event=None):
+    def _wait_for_chat_or_invalid(self, timeout=CHAT_LOAD_TIMEOUT, poll=0.5, stop_event=None):
         return self.navigator.wait_for_chat_or_invalid(timeout, poll, stop_event)
+
 

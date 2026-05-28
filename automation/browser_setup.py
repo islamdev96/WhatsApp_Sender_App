@@ -1,5 +1,7 @@
 """WhatsApp Sender Pro — Browser driver setup, login, and window management."""
 import time
+
+from automation.constants import WHATSAPP_URL, LOGIN_TIMEOUT
 import os
 
 from selenium.common.exceptions import (
@@ -29,7 +31,7 @@ class BrowserSetupMixin:
         options.add_argument("--disable-gpu")
         
         # Open in Chrome App Mode for a clean, minimal popup window (no address bar or tabs)
-        options.add_argument("--app=https://web.whatsapp.com")
+        options.add_argument(f"--app={WHATSAPP_URL}")
         options.add_argument("--disable-notifications")
         options.add_argument("--no-first-run")
         options.add_argument("--no-default-browser-check")
@@ -112,15 +114,15 @@ class BrowserSetupMixin:
                 return
             try:
                 if "web.whatsapp.com" not in self.driver.current_url:
-                    self.driver.get("https://web.whatsapp.com")
+                    self.driver.get(WHATSAPP_URL)
             except Exception as exc:
                 logger.debug("Could not inspect current browser URL: %s", exc)
                 try:
-                    self.driver.get("https://web.whatsapp.com")
+                    self.driver.get(WHATSAPP_URL)
                 except Exception as nav_exc:
                     logger.debug("Could not navigate to WhatsApp Web: %s", nav_exc)
 
-    def wait_for_login(self, timeout=900):
+    def wait_for_login(self, timeout=LOGIN_TIMEOUT):
         """Waits until the chat list is visible, indicating successful login or browser is closed."""
         start_time = time.time()
         while time.time() - start_time < timeout:

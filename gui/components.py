@@ -59,9 +59,11 @@ class AttachmentItem(ctk.CTkFrame):
         self.remove_btn.grid(row=0, column=2, padx=5, pady=5)
 
     def _c(self, key, fallback=None):
+        """Look up a color key from the theme palette with optional fallback."""
         return self.colors.get(key, fallback)
 
     def apply_theme(self, colors):
+        """Apply a new color theme to all child widgets."""
         self.colors = colors or {}
         self.configure(fg_color=self._c("bg_dark", "transparent"))
         self.icon_label.configure(text_color=self._c("accent", None))
@@ -78,10 +80,12 @@ class AttachmentItem(ctk.CTkFrame):
         )
 
     def _on_remove(self):
+        """Handle the remove button click — invoke the removal callback."""
         if self.remove_callback:
             self.remove_callback(self)
 
     def get_data(self):
+        """Return attachment data dict with path, type, and caption."""
         return {
             "path": self.path,
             "type": self.type_,
@@ -147,6 +151,7 @@ class AttachmentManager(ctk.CTkFrame):
         self.apply_theme(self.colors)
 
     def add_attachment(self, type_):
+        """Open a file dialog for the given type and add selected files."""
         filetypes = []
         if type_ == "image":
             filetypes = [("Images", "*.jpg *.jpeg *.png *.gif *.bmp *.webp")]
@@ -161,27 +166,33 @@ class AttachmentManager(ctk.CTkFrame):
                 self._add_item(path, type_)
 
     def _add_item(self, path, type_, caption=""):
+        """Create an AttachmentItem widget and append it to the list."""
         item = AttachmentItem(self.scroll_frame, path, type_, caption=caption, remove_callback=self._remove_item, colors=self.colors)
         item.pack(fill="x", pady=2)
         self.attachments.append(item)
 
     def _remove_item(self, item):
+        """Remove an attachment item widget from the list and destroy it."""
         if item in self.attachments:
             self.attachments.remove(item)
             item.destroy()
 
     def get_attachments(self):
+        """Return list of all attachment data dicts."""
         return [item.get_data() for item in self.attachments]
 
     def clear(self):
+        """Remove and destroy all attachment items."""
         for item in list(self.attachments):
             item.destroy()
         self.attachments = []
 
     def _c(self, key, fallback=None):
+        """Look up a color key from the theme palette with optional fallback."""
         return self.colors.get(key, fallback)
 
     def apply_theme(self, colors):
+        """Apply a new color theme to all child widgets."""
         self.colors = colors or {}
         self.header_label.configure(text_color=self._c("text_main", None))
         for btn in (self.btn_add_doc, self.btn_add_vid, self.btn_add_img):
@@ -326,47 +337,57 @@ class RichTextFrame(ctk.CTkFrame):
         self.apply_theme(self.colors)
 
     def _undo(self):
+        """Undo the last text edit operation."""
         try:
             self.text_box._textbox.edit_undo()
         except tk.TclError as exc:
             logger.debug("Undo ignored: %s", exc)
 
     def _redo(self):
+        """Redo the last undone text edit operation."""
         try:
             self.text_box._textbox.edit_redo()
         except tk.TclError as exc:
             logger.debug("Redo ignored: %s", exc)
 
     def _cut(self):
+        """Cut selected text to clipboard."""
         self.text_box._textbox.event_generate("<<Cut>>")
 
     def _copy(self):
+        """Copy selected text to clipboard."""
         self.text_box._textbox.event_generate("<<Copy>>")
 
     def _paste(self):
+        """Paste text from clipboard at cursor position."""
         self.text_box._textbox.event_generate("<<Paste>>")
 
     def _delete(self):
+        """Delete the currently selected text."""
         try:
             self.text_box._textbox.delete("sel.first", "sel.last")
         except tk.TclError as exc:
             logger.debug("Delete ignored because no text is selected: %s", exc)
 
     def _select_all(self):
+        """Select all text in the textbox."""
         self.text_box._textbox.tag_add("sel", "1.0", "end")
 
     def _show_context_menu(self, event):
+        """Display the right-click context menu at the mouse position."""
         try:
             self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
             self.context_menu.grab_release()
 
     def _insert_var(self, value):
+        """Insert a template variable placeholder at the cursor position."""
         self.text_box.insert("insert", f" {value} ")
         self.var_option.set("متغير")
         self._update_char_count()
 
     def _insert_wrap(self, char):
+        """Wrap selected text with formatting characters (e.g., * for bold)."""
         try:
             # Try to wrap selected text
             sel_start = self.text_box.index("sel.first")
@@ -385,9 +406,11 @@ class RichTextFrame(ctk.CTkFrame):
         self._update_char_count()
 
     def get_text(self):
+        """Return the current text content stripped of whitespace."""
         return self.text_box.get("1.0", "end").strip()
     
     def set_text(self, text):
+        """Replace all text content and update the character counter."""
         self.text_box.delete("1.0", "end")
         self.text_box.insert("1.0", text)
         self._update_char_count()
@@ -450,6 +473,7 @@ class RichTextFrame(ctk.CTkFrame):
             return "break"
 
     def _align_right(self):
+        """Enable right-to-left text alignment (RTL)."""
         self.align_right_enabled = True
         try:
             self.text_box._textbox.tag_configure("align_right", justify="right")
@@ -458,6 +482,7 @@ class RichTextFrame(ctk.CTkFrame):
             logger.debug("Could not apply right alignment tag: %s", exc)
 
     def _align_left(self):
+        """Disable right-to-left alignment and restore left-to-right (LTR)."""
         self.align_right_enabled = False
         try:
             self.text_box._textbox.tag_remove("align_right", "1.0", "end")
@@ -495,6 +520,7 @@ class RichTextFrame(ctk.CTkFrame):
             tb.tag_add("strike", f"1.0 + {match.start(1)} chars", f"1.0 + {match.end(1)} chars")
 
     def _update_char_count(self, event=None):
+        """Update the character counter label and refresh visual styling."""
         text = self.text_box.get("1.0", "end").strip()
         count = len(text)
         self.char_counter.configure(text=f"{count} حرف")
@@ -507,9 +533,11 @@ class RichTextFrame(ctk.CTkFrame):
                 logger.debug("Could not maintain right alignment tag: %s", exc)
 
     def _c(self, key, fallback=None):
+        """Look up a color key from the theme palette with optional fallback."""
         return self.colors.get(key, fallback)
 
     def apply_theme(self, colors):
+        """Apply a new color theme to all child widgets."""
         self.colors = colors or {}
         self.label.configure(text_color=self._c("text_main", None))
         self.var_option.configure(

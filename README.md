@@ -42,7 +42,12 @@ WhatsApp_Sender_App/
 │   ├── templates_manager.py    # Message templates (SQLite)
 │   ├── workflow_manager.py     # Multi-step workflows (SQLite)
 │   ├── db.py                   # SQLiteStore wrapper
-│   ├── helpers.py              # Phone normalization, file I/O
+│   ├── helpers/                # Helper utilities (sub-package)
+│   │   ├── phone.py            # Phone normalization
+│   │   ├── contacts_io.py      # CSV/Excel/TXT file reading
+│   │   ├── proxy.py            # Proxy extension generation
+│   │   ├── fingerprint.py      # Browser fingerprint generator
+│   │   └── cleanup.py          # Old report cleanup
 │   ├── safety.py               # Campaign safety checks
 │   ├── scheduler.py            # Scheduled sending
 │   ├── logger.py               # Application logging

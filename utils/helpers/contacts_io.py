@@ -1,55 +1,9 @@
+"""Contact file reading (CSV, Excel, TXT) and template generation."""
 import csv
 import os
 import re
 from utils.logger import logger, log_exception
-
-
-def _normalize_phone(phone, default_country_code="20"):
-    """Normalize a phone number string.
-
-    Handles:
-    - Leading '+' sign (strips it for WhatsApp API)
-    - Numbers already starting with country code
-    - Egypt-specific local formats (01X → 201X) when default is '20'
-    - Generic local numbers with configurable default country code
-    """
-    if not phone:
-        return None
-    phone = str(phone).strip()
-    # Remove .0 from float conversion
-    if phone.endswith('.0'):
-        phone = phone[:-2]
-    # Remove common formatting chars
-    phone = re.sub(r'[\s\-\(\)\.]+', '', phone)
-    # Handle + prefix
-    if phone.startswith('+'):
-        phone = phone[1:]
-    
-    # Smart generic normalizing: if a local number starts with 0 (e.g. 05xxx or 01xxx)
-    # and default_country_code is set, strip the leading 0 and prepend the country code.
-    if default_country_code:
-        default_cc = str(default_country_code).strip().replace("+", "")
-        if phone.startswith('0') and not phone.startswith('00') and len(phone) > 4:
-            phone = default_cc + phone[1:]
-
-    # If already starts with country code, return as-is
-    if default_country_code and phone.startswith(str(default_country_code)):
-        return phone
-    # Egypt-specific: local mobile numbers
-    if default_country_code == "20":
-        if phone.startswith('01') and len(phone) == 11:
-            return '2' + phone
-        if phone.startswith('1') and len(phone) == 10:
-            return '20' + phone
-    # Generic: prepend default country code for short local numbers
-    if default_country_code and len(phone) <= 10 and not phone.startswith('0'):
-        return str(default_country_code) + phone
-    return phone
-
-
-def normalize_phone(phone: str, default_country_code="20") -> str:
-    """Public wrapper for phone normalization."""
-    return _normalize_phone(phone, default_country_code)
+from utils.helpers.phone import normalize_phone, _normalize_phone
 
 
 def read_contacts(file_path, default_country_code="20"):
@@ -92,6 +46,7 @@ def read_contacts(file_path, default_country_code="20"):
         log_exception(f"Error reading contacts from {file_path}", exc)
 
     return contacts
+
 
 
 def read_contacts_excel(file_path, default_country_code="20"):
@@ -170,6 +125,7 @@ def read_contacts_excel(file_path, default_country_code="20"):
     return contacts
 
 
+
 def read_contacts_txt(file_path, default_country_code="20"):
     """Reads contacts from a plain text file, extracting phone numbers.
     
@@ -230,6 +186,7 @@ def read_contacts_txt(file_path, default_country_code="20"):
     return contacts
 
 
+
 def read_contacts_auto(file_path, default_country_code="20"):
     """Auto-detect file type and read contacts accordingly."""
     if not file_path or not os.path.exists(file_path):
@@ -241,6 +198,7 @@ def read_contacts_auto(file_path, default_country_code="20"):
         return read_contacts_txt(file_path, default_country_code)
     else:
         return read_contacts(file_path, default_country_code)
+
 
 
 def create_contacts_template(file_path):
@@ -259,198 +217,4 @@ def create_contacts_template(file_path):
         return False
 
 
-def check_proxy(proxy_type, host, port, username=None, password=None, timeout=10):
-    """Tests a proxy connection using urllib.
-    
-    Returns (success, info_dict).
-    """
-    import urllib.request
-    import json
 
-    proxy_type = proxy_type.lower()
-    proxy_url = f"{proxy_type}://"
-    if username and password:
-        proxy_url += f"{username}:{password}@"
-    proxy_url += f"{host}:{port}"
-    
-    proxy_handler = urllib.request.ProxyHandler({
-        'http': proxy_url,
-        'https': proxy_url
-    })
-    
-    opener = urllib.request.build_opener(proxy_handler)
-    try:
-        # Use http://ip-api.com/json (clean HTTP) to verify public IP and location details
-        response = opener.open("http://ip-api.com/json", timeout=timeout)
-        data = json.loads(response.read().decode('utf-8'))
-        if data.get('status') == 'success':
-            return True, {
-                'ip': data.get('query'),
-                'country': data.get('country'),
-                'city': data.get('city'),
-                'isp': data.get('isp')
-            }
-        else:
-            return True, {
-                'ip': data.get('query') or 'Unknown',
-                'country': 'Unknown',
-                'city': 'Unknown',
-                'isp': 'Unknown'
-            }
-    except Exception as e:
-        return False, {'error': str(e)}
-
-
-def create_proxy_extension(profile_dir, proxy_type, host, port, username, password):
-    """Generates a custom Chrome extension dynamically to handle proxy credentials authentication."""
-    import json
-    ext_dir = os.path.join(profile_dir, "proxy_extension")
-    os.makedirs(ext_dir, exist_ok=True)
-    
-    manifest_path = os.path.join(ext_dir, "manifest.json")
-    background_path = os.path.join(ext_dir, "background.js")
-    
-    manifest_json = {
-        "version": "1.0.0",
-        "manifest_version": 2,
-        "name": "Chrome Proxy Helper Extension",
-        "permissions": [
-            "proxy",
-            "tabs",
-            "unlimitedStorage",
-            "storage",
-            "<all_urls>",
-            "webRequest",
-            "webRequestBlocking"
-        ],
-        "background": {
-            "scripts": ["background.js"]
-        },
-        "minimum_chrome_version": "22.0.0"
-    }
-    
-    background_js = f"""
-    var config = {{
-        mode: "fixed_servers",
-        rules: {{
-            singleProxy: {{
-                scheme: "{proxy_type.lower()}",
-                host: "{host}",
-                port: parseInt({port})
-            }},
-            bypassList: []
-        }}
-    }};
-
-    chrome.proxy.settings.set({{value: config, scope: "regular"}}, function() {{}});
-
-    chrome.webRequest.onAuthRequired.addListener(
-        function(details) {{
-            return {{
-                authCredentials: {{
-                    username: "{username}",
-                    password: "{password}"
-                }}
-            }};
-        }},
-        {{urls: ["<all_urls>"]}},
-        ["blocking"]
-    );
-    """
-    
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(manifest_json, f, indent=4)
-        
-    with open(background_path, "w", encoding="utf-8") as f:
-        f.write(background_js)
-        
-    return ext_dir
-
-
-def generate_random_fingerprint():
-    """Generates a random desktop browser user-agent and resolution footprint."""
-    import random
-    user_agents = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15"
-    ]
-    resolutions = [
-        "1920,1080",
-        "1366,768",
-        "1440,900",
-        "1536,864",
-        "1600,900"
-    ]
-    return {
-        "user_agent": random.choice(user_agents),
-        "resolution": random.choice(resolutions)
-    }
-
-
-def cleanup_proxy_extension(profile_dir):
-    """Remove the dynamically generated proxy extension from a Chrome profile.
-
-    Should be called after the browser session ends to avoid leaving
-    stale credential files on disk.
-    """
-    import shutil
-    ext_dir = os.path.join(profile_dir, "proxy_extension")
-    if os.path.isdir(ext_dir):
-        try:
-            shutil.rmtree(ext_dir, ignore_errors=True)
-            logger.info("Cleaned up proxy extension in %s", profile_dir)
-        except Exception as exc:
-            log_exception(f"Could not remove proxy extension dir {ext_dir}", exc)
-
-
-def cleanup_old_reports(reports_base_dir=None, max_age_days=30):
-    """Delete report files (CSV/TXT) older than *max_age_days*.
-
-    Scans `reports/` and `reports/number_checks/` for stale files
-    and removes them to prevent unbounded disk usage.
-
-    Returns the number of files removed.
-    """
-    import time
-
-    if reports_base_dir is None:
-        reports_base_dir = os.path.join(os.getcwd(), "reports")
-    if not os.path.isdir(reports_base_dir):
-        return 0
-
-    cutoff = time.time() - (max_age_days * 86400)
-    removed = 0
-    scan_dirs = [reports_base_dir]
-
-    # Also scan known subdirectories
-    for sub in ("number_checks", "logs"):
-        sub_path = os.path.join(reports_base_dir, sub)
-        if os.path.isdir(sub_path):
-            scan_dirs.append(sub_path)
-
-    for dir_path in scan_dirs:
-        try:
-            for entry in os.scandir(dir_path):
-                if not entry.is_file():
-                    continue
-                ext = os.path.splitext(entry.name)[1].lower()
-                if ext not in (".csv", ".txt", ".log"):
-                    continue
-                try:
-                    if entry.stat().st_mtime < cutoff:
-                        os.unlink(entry.path)
-                        removed += 1
-                except OSError as exc:
-                    logger.debug("Could not remove old report %s: %s", entry.path, exc)
-        except OSError as exc:
-            logger.debug("Could not scan reports directory %s: %s", dir_path, exc)
-
-    if removed:
-        logger.info("Cleaned up %d old report file(s) from %s", removed, reports_base_dir)
-    return removed
