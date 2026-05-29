@@ -4,7 +4,7 @@ from gui.theme import COLORS
 
 
 def build_settings_tab(self, frame: ctk.CTkFrame) -> None:
-    """Build the settings tab with proxy, safety, and display options."""
+    """Build the settings components inside the Proxy & Safety tab of the popup dialog."""
     self.tab_frames["settings"] = frame
 
     is_ar = self.current_lang.get() == "ar"
@@ -12,60 +12,26 @@ def build_settings_tab(self, frame: ctk.CTkFrame) -> None:
     side_lbl = "right" if is_ar else "left"
     side_opposite = "left" if is_ar else "right"
     
-    header = ctk.CTkLabel(frame, text=self.tr("settings_header"),
-                          font=ctk.CTkFont(size=20, weight="bold"))
-    header.pack(anchor=anchor_val, padx=25, pady=(20, 15))
-
     scroll = ctk.CTkScrollableFrame(frame, corner_radius=12)
-    scroll.pack(fill="both", expand=True, padx=20, pady=(0, 15))
+    scroll.pack(fill="both", expand=True, padx=10, pady=10)
 
-    # Delay Settings
-    delay_card = ctk.CTkFrame(scroll, corner_radius=10)
-    delay_card.pack(fill="x", padx=10, pady=8)
-    ctk.CTkLabel(delay_card, text=self.tr("settings_delay_title"),
-                 font=ctk.CTkFont(size=14, weight="bold")).pack(anchor=anchor_val, padx=15, pady=(10, 5))
+    # Hidden frame to keep required widgets in memory but not render them visually
+    hidden_frame = ctk.CTkFrame(frame)
+    # Note: hidden_frame is NOT packed, keeping everything inside it invisible
 
-    delay_row = ctk.CTkFrame(delay_card, fg_color="transparent")
-    delay_row.pack(fill="x", padx=15, pady=(0, 12))
-
-    ctk.CTkLabel(delay_row, text=self.tr("settings_from"), font=ctk.CTkFont(size=12)).pack(side=side_lbl, padx=(5, 0))
-    self.delay_min_entry = ctk.CTkEntry(delay_row, width=70, height=34, corner_radius=8,
-                                        justify="center")
-    self.delay_min_entry.pack(side=side_lbl, padx=5)
+    self.delay_min_entry = ctk.CTkEntry(hidden_frame)
     self.delay_min_entry.insert(0, str(self.config.get("delay_min", 8)))
 
-    ctk.CTkLabel(delay_row, text=self.tr("settings_to"), font=ctk.CTkFont(size=12)).pack(side=side_lbl, padx=(5, 0))
-    self.delay_max_entry = ctk.CTkEntry(delay_row, width=70, height=34, corner_radius=8,
-                                        justify="center")
-    self.delay_max_entry.pack(side=side_lbl, padx=5)
+    self.delay_max_entry = ctk.CTkEntry(hidden_frame)
     self.delay_max_entry.insert(0, str(self.config.get("delay_max", 25)))
 
-    # Batch Settings
-    batch_card = ctk.CTkFrame(scroll, corner_radius=10)
-    batch_card.pack(fill="x", padx=10, pady=8)
-    ctk.CTkLabel(batch_card, text=self.tr("settings_batch_title"),
-                 font=ctk.CTkFont(size=14, weight="bold")).pack(anchor=anchor_val, padx=15, pady=(10, 5))
-
-    batch_row1 = ctk.CTkFrame(batch_card, fg_color="transparent")
-    batch_row1.pack(fill="x", padx=15, pady=(0, 5))
-    ctk.CTkLabel(batch_row1, text=self.tr("settings_after_every"), font=ctk.CTkFont(size=12)).pack(side=side_lbl, padx=(5, 0))
-    self.batch_size_entry = ctk.CTkEntry(batch_row1, width=70, height=34, corner_radius=8,
-                                         justify="center")
-    self.batch_size_entry.pack(side=side_lbl, padx=5)
+    self.batch_size_entry = ctk.CTkEntry(hidden_frame)
     self.batch_size_entry.insert(0, str(self.config.get("batch_size", 30)))
 
-    batch_row2 = ctk.CTkFrame(batch_card, fg_color="transparent")
-    batch_row2.pack(fill="x", padx=15, pady=(0, 12))
-    ctk.CTkLabel(batch_row2, text=self.tr("settings_pause_from"), font=ctk.CTkFont(size=12)).pack(side=side_lbl, padx=(5, 0))
-    self.batch_min_entry = ctk.CTkEntry(batch_row2, width=70, height=34, corner_radius=8,
-                                        justify="center")
-    self.batch_min_entry.pack(side=side_lbl, padx=5)
+    self.batch_min_entry = ctk.CTkEntry(hidden_frame)
     self.batch_min_entry.insert(0, str(self.config.get("batch_pause_min", 180)))
 
-    ctk.CTkLabel(batch_row2, text=self.tr("settings_to"), font=ctk.CTkFont(size=12)).pack(side=side_lbl, padx=(5, 0))
-    self.batch_max_entry = ctk.CTkEntry(batch_row2, width=70, height=34, corner_radius=8,
-                                        justify="center")
-    self.batch_max_entry.pack(side=side_lbl, padx=5)
+    self.batch_max_entry = ctk.CTkEntry(hidden_frame)
     self.batch_max_entry.insert(0, str(self.config.get("batch_pause_max", 240)))
 
     # Reliability Settings
@@ -119,7 +85,7 @@ def build_settings_tab(self, frame: ctk.CTkFrame) -> None:
     self.rotation_interval_entry.pack(side=side_lbl, padx=5)
     self.rotation_interval_entry.insert(0, str(self.config.get("rotation_interval", 50)))
 
-    # General Settings (New)
+    # General Settings
     general_card = ctk.CTkFrame(scroll, corner_radius=10)
     general_card.pack(fill="x", padx=10, pady=8)
     ctk.CTkLabel(general_card, text=self.tr("settings_general_title"),
@@ -132,7 +98,6 @@ def build_settings_tab(self, frame: ctk.CTkFrame) -> None:
     self.country_code_entry.pack(side=side_lbl, padx=5)
     self.country_code_entry.insert(0, str(self.config.get("default_country_code", "20")))
 
-    # Proxy & VPN Settings Card
     # Proxy & VPN Settings Card
     proxy_card = ctk.CTkFrame(scroll, corner_radius=10)
     proxy_card.pack(fill="x", padx=10, pady=8)
@@ -258,12 +223,3 @@ def build_settings_tab(self, frame: ctk.CTkFrame) -> None:
         command=self._generate_new_profile_fingerprint
     )
     self.fp_gen_btn.pack(side=side_opposite, padx=5)
-
-    # Save Button
-    ctk.CTkButton(scroll, text=self.tr("settings_save"), height=42,
-                  font=ctk.CTkFont(size=14, weight="bold"),
-                  fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
-                  command=self._save_settings).pack(fill="x", padx=10, pady=15)
-
-    # Scheduled Campaigns Queue Card
-    self._build_schedule_queue_card(scroll)

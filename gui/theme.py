@@ -5,56 +5,56 @@ Color palettes, typography, and error catalog.
 # ─── Color Palette (Premium) ────────────────────────────────────────────────
 PALETTE_DARK = {
     # Main branding
-    "primary":       "#00E676",  # Neon Green
-    "primary_hover": "#00C853",
-    "primary_dark":  "#0A0F16",  # Sidebar / base (Deeper Slate)
+    "primary":       "#00A884",  # WhatsApp Premium Teal Green
+    "primary_hover": "#008F6F",
+    "primary_dark":  "#000000",  # Pitch-black base
 
     # Status colors
-    "danger":        "#FF3D00",
-    "danger_hover":  "#DD2C00",
-    "warning":       "#FFB020",
-    "success":       "#00E676",
-    "success_hover": "#00C853",
+    "danger":        "#F43F5E",
+    "danger_hover":  "#E11D48",
+    "warning":       "#F59E0B",
+    "success":       "#00A884",
+    "success_hover": "#008F6F",
     "info":          "#38BDF8",
 
-    # UI Elements
-    "card_bg":       "#151E2E",
-    "bg_dark":       "#0F172A",
-    "text_main":     "#F8FAFC",
-    "text_muted":    "#94A3B8",
-    "accent":        "#22D3EE",
-    "accent_hover":  "#06B6D4",
-    "border":        "#263145",
-    "secondary":     "#1F2937",
-    "secondary_hover":"#2A3A52",
-    "secondary_text":"#E5E7EB",
+    # UI Elements (High contrast, flat)
+    "card_bg":       "#000000",  # Pitch black for cards
+    "bg_dark":       "#000000",  # Pitch black for frames
+    "text_main":     "#FFFFFF",  # High-contrast white text
+    "text_muted":    "#A0A0A0",  # Muted grey text
+    "accent":        "#00E676",
+    "accent_hover":  "#00C853",
+    "border":        "#333333",  # Dark grey borders
+    "secondary":     "#121212",  # Dark buttons
+    "secondary_hover":"#1A1A1A",
+    "secondary_text":"#FFFFFF",
 }
 
 PALETTE_LIGHT = {
     # Main branding
-    "primary":       "#00B15D",
-    "primary_hover": "#009E52",
-    "primary_dark":  "#FFFFFF",  # Sidebar / base in light mode
+    "primary":       "#008069",  # WhatsApp Premium Light Teal Green
+    "primary_hover": "#006653",
+    "primary_dark":  "#F0F2F5",  # Light grey-blue
 
     # Status colors
-    "danger":        "#DC2626",
-    "danger_hover":  "#B91C1C",
-    "warning":       "#F59E0B",
-    "success":       "#16A34A",
-    "success_hover": "#15803D",
+    "danger":        "#E11D48",
+    "danger_hover":  "#BE123C",
+    "warning":       "#D97706",
+    "success":       "#008069",
+    "success_hover": "#006653",
     "info":          "#0284C7",
 
     # UI Elements
-    "card_bg":       "#F1F5F9",
+    "card_bg":       "#F0F2F5",
     "bg_dark":       "#FFFFFF",
-    "text_main":     "#0F172A",
-    "text_muted":    "#64748B",
-    "accent":        "#0EA5E9",
-    "accent_hover":  "#0284C7",
-    "border":        "#E2E8F0",
-    "secondary":     "#E2E8F0",
-    "secondary_hover":"#CBD5E1",
-    "secondary_text":"#0F172A",
+    "text_main":     "#111B21",  # Deep charcoal text
+    "text_muted":    "#667781",  # Sleek muted grey
+    "accent":        "#027EB5",
+    "accent_hover":  "#015F8A",
+    "border":        "#E9EDF0",
+    "secondary":     "#E9EDF0",
+    "secondary_hover":"#D1D7DB",
+    "secondary_text":"#111B21",
 }
 
 # Active palette (filled at runtime based on appearance mode)

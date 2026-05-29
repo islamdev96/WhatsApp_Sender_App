@@ -771,6 +771,32 @@ class AutomationMixin:
                 if self.stop_event.wait(chosen_delay):
                     break
 
+                # ── Friendly Sending (Anti-Ban mechanism) ──
+                friendly_enabled = self.config.get("friendly_enabled", False)
+                if friendly_enabled and processed > 0 and processed % 7 == 0:
+                    friendly_nums_str = self.config.get("friendly_numbers", "")
+                    friendly_msgs_str = self.config.get("friendly_messages", "")
+                    
+                    friendly_nums = [n.strip() for n in friendly_nums_str.split(",") if n.strip()]
+                    friendly_msgs = [m.strip() for m in friendly_msgs_str.split(",") if m.strip()]
+                    
+                    if friendly_nums and friendly_msgs:
+                        f_phone = random.choice(friendly_nums)
+                        f_msg = random.choice(friendly_msgs)
+                        self.log(f"👥 [Friendly Anti-Ban] Sending friendly message to {f_phone}...")
+                        
+                        f_res = self.bot.send_message(
+                            phone=f_phone,
+                            name="Friendly Account",
+                            message_template=f_msg,
+                            extra_messages=[],
+                            attachments=[],
+                            stop_event=self.stop_event,
+                        )
+                        self.log(f"👥 [Friendly Anti-Ban] Status: {f_res}")
+                        # Extra random delay after friendly message
+                        time.sleep(random.uniform(5, 10))
+
             end_time = datetime.datetime.now()
             duration = end_time - start_time
             

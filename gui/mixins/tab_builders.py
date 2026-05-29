@@ -33,9 +33,8 @@ class TabBuildersMixin:
         build_templates_tab(self, frame)
 
     def _build_tab_settings(self):
-        """Build the settings tab with proxy, safety, and display options."""
-        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        build_settings_tab(self, frame)
+        """Initialize settings inputs in-memory at startup to avoid runtime campaign crashes."""
+        self._ensure_background_settings_exist()
 
     def _build_tab_log(self):
         """Build the event log/diagnostic tab."""

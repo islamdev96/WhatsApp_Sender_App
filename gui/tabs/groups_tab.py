@@ -93,7 +93,7 @@ def build_groups_tab(self, frame: ctk.CTkFrame) -> None:
     self.btn_add_single_contact = ctk.CTkButton(
         contact_tools, text=self.tr("groups_btn_add_contact"), font=("Segoe UI", 11, "bold"),
         fg_color=COLORS["success"], hover_color=COLORS["primary_hover"],
-        text_color="#000000", width=95, height=28, corner_radius=6,
+        text_color="#FFFFFF", width=95, height=28, corner_radius=6,
         command=self._on_add_single_contact_click
     )
     self.btn_add_single_contact.pack(side=side_opposite, padx=2)

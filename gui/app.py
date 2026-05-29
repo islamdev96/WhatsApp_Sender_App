@@ -55,7 +55,7 @@ class ModernWhatsAppApp(
         self._apply_palette(mode)
 
         # ── Window Setup ──
-        self.title("WhatsApp Sender Pro")
+        self.title("Auto WhatsApp Business Sender Turbo Pro v17.0 Full")
         w = self.config.get("window_width", 1000)
         h = self.config.get("window_height", 700)
         self.geometry(f"{w}x{h}")
@@ -137,23 +137,20 @@ class ModernWhatsAppApp(
         COLORS.clear()
         COLORS.update(palette)
 
-        # Configure ttk.Style for all Treeviews to match our modern palette
+        # Configure ttk.Style for all Treeviews to match our modern high-contrast palette
         style = ttk.Style()
         try:
             style.theme_use("clam")
         except Exception as exc:
             logger.debug("Could not apply ttk clam theme: %s", exc)
 
-        bg_color = COLORS["bg_dark"]
-        fg_color = COLORS["text_main"]
-        card_bg = COLORS["card_bg"]
         primary_color = COLORS["primary"]
 
         style.configure(
             "Treeview",
-            background=bg_color,
-            foreground=fg_color,
-            fieldbackground=bg_color,
+            background="#FFFFFF",
+            foreground="#000000",
+            fieldbackground="#FFFFFF",
             rowheight=28,
             font=("Segoe UI", 10),
             borderwidth=0
@@ -161,15 +158,15 @@ class ModernWhatsAppApp(
         style.configure(
             "Treeview.Heading",
             font=("Segoe UI", 10, "bold"),
-            background=card_bg,
-            foreground=fg_color,
+            background="#F0F2F5",
+            foreground="#000000",
             borderwidth=1,
             relief="flat"
         )
         style.map(
             "Treeview",
             background=[("selected", primary_color)],
-            foreground=[("selected", "#000000" if str(mode).lower() == "dark" else "#FFFFFF")]
+            foreground=[("selected", "#FFFFFF")]
         )
 
 
@@ -184,7 +181,7 @@ class ModernWhatsAppApp(
         if hasattr(self, "nav_buttons") and hasattr(self, "current_tab"):
             for nid, btn in self.nav_buttons.items():
                 if nid == self.current_tab:
-                    btn.configure(fg_color=COLORS["primary"], text_color="#000000", font=("Segoe UI", 11, "bold"))
+                    btn.configure(fg_color=COLORS["primary"], text_color="#FFFFFF", font=("Segoe UI", 11, "bold"))
                 else:
                     btn.configure(fg_color="transparent", text_color=COLORS["text_muted"], font=("Segoe UI", 11))
         if hasattr(self, "attachment_manager"):
@@ -192,9 +189,25 @@ class ModernWhatsAppApp(
         if hasattr(self, "message_editor"):
             self.message_editor.apply_theme(COLORS)
         if hasattr(self, "btn_start"):
-            self.btn_start.configure(fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"], text_color="#000000")
+            self.btn_start.configure(fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"], text_color="#FFFFFF")
         if hasattr(self, "btn_stop"):
             self.btn_stop.configure(fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"], text_color="#FFFFFF")
+
+        # Dynamic updates for new top toolbar widgets
+        if hasattr(self, "btn_tb_login"):
+            self.btn_tb_login.configure(fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"], text_color=COLORS["secondary_text"])
+        if hasattr(self, "btn_tb_send_settings"):
+            self.btn_tb_send_settings.configure(text_color=COLORS["text_muted"])
+        if hasattr(self, "btn_tb_logout"):
+            self.btn_tb_logout.configure(fg_color="#D32F2F", hover_color="#B71C1C", text_color="#FFFFFF")
+        if hasattr(self, "btn_theme_toggle"):
+            is_dark = ctk.get_appearance_mode().lower() == "dark"
+            is_ar = self.current_lang.get() == "ar"
+            theme_txt = ("☀️ Light" if is_dark else "🌙 Dark") if not is_ar else ("☀️ مضيء" if is_dark else "🌙 مظلم")
+            self.btn_theme_toggle.configure(text=theme_txt, fg_color=COLORS["card_bg"], text_color=COLORS["text_main"])
+        if hasattr(self, "btn_lang_toggle"):
+            lang_txt = "🇬🇧 EN" if self.current_lang.get() == "ar" else "🇸🇦 AR"
+            self.btn_lang_toggle.configure(text=lang_txt, fg_color=COLORS["card_bg"], text_color=COLORS["text_main"])
 
     # ═══════════════════════════════════════════════════════════════════════
     #  LAYOUT
@@ -271,8 +284,8 @@ class ModernWhatsAppApp(
 
         # 4. Settings Menu
         settings_menu = tk.Menu(menu_bar, tearoff=0)
-        settings_menu.add_command(label=self.tr("menu_settings_send_delay"), command=lambda: self._switch_tab("settings"))
-        settings_menu.add_command(label=self.tr("menu_settings_proxy"), command=lambda: self._switch_tab("settings"))
+        settings_menu.add_command(label=self.tr("menu_settings_send_delay"), command=self._open_sending_settings_dialog)
+        settings_menu.add_command(label=self.tr("menu_settings_proxy"), command=self._open_sending_settings_dialog)
         menu_bar.add_cascade(label=self.tr("menu_settings"), menu=settings_menu)
 
         # 5. Tools Menu
@@ -319,7 +332,6 @@ class ModernWhatsAppApp(
             (self.tr("new_campaign"), "main"),
             (self.tr("groups_grabber"), "groups"),
             (self.tr("templates"), "templates"),
-            (self.tr("settings"), "settings"),
             (self.tr("tab_events"), "log"),
         ]
 
@@ -349,7 +361,19 @@ class ModernWhatsAppApp(
         )
         self.btn_tb_help.pack(side="right", padx=3)
 
-        # 4. Red Logout button (placed far left)
+        # 4. Settings Popup Button next to the tabs
+        self.btn_tb_send_settings = ctk.CTkButton(
+            tb_content, text="⚙️ " + self.tr("dialog_settings"),
+            font=("Segoe UI", 11, "bold"),
+            width=100, height=52, corner_radius=8,
+            fg_color="transparent",
+            text_color=COLORS["text_muted"],
+            hover_color=COLORS["bg_dark"],
+            command=self._open_sending_settings_dialog
+        )
+        self.btn_tb_send_settings.pack(side="right", padx=3)
+
+        # 5. Red Logout button (placed far left)
         self.btn_tb_logout = ctk.CTkButton(
             tb_content, text=self.tr("logout"),
             font=("Segoe UI", 12, "bold"),
@@ -360,7 +384,7 @@ class ModernWhatsAppApp(
         )
         self.btn_tb_logout.pack(side="left", padx=10, pady=6)
 
-        # 5. Profile selector combobox (placed next to logout)
+        # 6. Profile selector combobox (placed next to logout)
         self.profile_combo = ctk.CTkComboBox(
             tb_content, values=self._get_profiles(),
             variable=self.profile_var,
@@ -388,7 +412,7 @@ class ModernWhatsAppApp(
         lbl_profile = ctk.CTkLabel(tb_content, text=self.tr("lbl_account"), font=("Segoe UI", 11), text_color=COLORS["text_muted"])
         lbl_profile.pack(side="left", padx=2)
         
-        # 6. Language Toggle Button
+        # 7. Language Toggle Button
         lang_text = "🇬🇧 EN" if self.current_lang.get() == "ar" else "🇸🇦 AR"
         self.btn_lang_toggle = ctk.CTkButton(
             tb_content, text=lang_text,
@@ -398,7 +422,382 @@ class ModernWhatsAppApp(
             text_color=COLORS["text_main"],
             command=self._toggle_language
         )
-        self.btn_lang_toggle.pack(side="left", padx=15, pady=8)
+        self.btn_lang_toggle.pack(side="left", padx=10, pady=8)
+
+        # 8. Theme Toggle Button
+        theme_icon = "☀️ Light" if self.config.get("appearance_mode", "dark") == "dark" else "🌙 Dark"
+        if self.current_lang.get() == "ar":
+            theme_icon = "☀️ مضيء" if self.config.get("appearance_mode", "dark") == "dark" else "🌙 مظلم"
+            
+        self.btn_theme_toggle = ctk.CTkButton(
+            tb_content, text=theme_icon,
+            font=("Segoe UI", 12, "bold"),
+            width=80, height=36, corner_radius=8,
+            fg_color=COLORS["card_bg"], hover_color=COLORS["border"],
+            text_color=COLORS["text_main"],
+            command=self._toggle_appearance_menu
+        )
+        self.btn_theme_toggle.pack(side="left", padx=5, pady=8)
+
+    def _open_sending_settings_dialog(self):
+        """Open the unified sending settings dialog containing all application settings in one single place."""
+        import tkinter as tk
+        from tkinter import Listbox, messagebox
+        from gui.tabs.settings_tab import build_settings_tab
+        
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(self.tr("dialog_settings_title"))
+        dialog.geometry("750x640")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+
+        # Center on parent and update to ensure full layout map before grab
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 750) // 2
+        y = self.winfo_y() + (self.winfo_height() - 640) // 2
+        dialog.geometry(f"+{x}+{y}")
+        dialog.update()
+        dialog.grab_set()
+
+        # Tabview
+        tabview = ctk.CTkTabview(dialog, segmented_button_selected_color=COLORS["primary"],
+                                 segmented_button_selected_hover_color=COLORS["primary_hover"],
+                                 segmented_button_unselected_color=COLORS["secondary"],
+                                 text_color=COLORS["text_main"])
+        tabview.pack(fill="both", expand=True, padx=15, pady=10)
+
+        # Tab names translated using locales.json
+        tab_conn = tabview.add(self.tr("tab_connection"))
+        tab_send = tabview.add(self.tr("tab_sending_settings"))
+        tab_friend = tabview.add(self.tr("tab_friendly_sending"))
+        tab_proxy = tabview.add(self.tr("tab_proxy_safety"))
+        tab_queue = tabview.add(self.tr("tab_scheduled_queue"))
+
+        # Build Proxy & Safety and Scheduled Queue
+        build_settings_tab(self, tab_proxy)
+        self._build_schedule_queue_card(tab_queue)
+        self._refresh_schedule_queue()
+
+        # =======================================================================
+        # TAB 1: Connection
+        # =======================================================================
+        # Use pack with propagate and expand to avoid unmapped .place layout issues
+        conn_frame = ctk.CTkFrame(tab_conn, border_width=1, border_color=COLORS["border"], fg_color="transparent", width=360, height=130)
+        conn_frame.pack_propagate(False)
+        conn_frame.pack(expand=True, padx=20, pady=20)
+        
+        lbl_conn_speed = ctk.CTkLabel(conn_frame, text=self.tr("settings_conn_speed"), font=("Segoe UI", 12, "bold"))
+        lbl_conn_speed.pack(anchor="w", padx=25, pady=(15, 5))
+
+        preset_var = ctk.StringVar(value=self.tr("speed_normal"))
+        try:
+            curr_min = int(self.delay_min_entry.get())
+            if curr_min >= 20: preset_var.set(self.tr("speed_very_slow"))
+            elif curr_min >= 12: preset_var.set(self.tr("speed_slow"))
+            elif curr_min >= 8: preset_var.set(self.tr("speed_normal"))
+            elif curr_min >= 4: preset_var.set(self.tr("speed_fast"))
+            else: preset_var.set(self.tr("speed_very_fast"))
+        except Exception:
+            preset_var.set(self.tr("speed_normal"))
+
+        presets_list = [
+            self.tr("speed_very_slow"),
+            self.tr("speed_slow"),
+            self.tr("speed_normal"),
+            self.tr("speed_fast"),
+            self.tr("speed_very_fast")
+        ]
+        combo_preset = ctk.CTkComboBox(
+            conn_frame, values=presets_list, variable=preset_var,
+            height=34, width=310,
+            fg_color=COLORS["card_bg"], border_color=COLORS["border"],
+            button_color=COLORS["primary"], button_hover_color=COLORS["primary_hover"],
+            text_color=COLORS["text_main"], dropdown_fg_color=COLORS["card_bg"],
+            dropdown_text_color=COLORS["text_main"]
+        )
+        combo_preset.pack(padx=25, pady=5)
+
+        # =======================================================================
+        # TAB 2: Sending Settings
+        # =======================================================================
+        tab_send.grid_columnconfigure(0, weight=1)
+
+        # Delay between messages frame
+        delay_frame = ctk.CTkFrame(tab_send, border_width=1, border_color=COLORS["border"], fg_color="transparent")
+        delay_frame.pack(fill="x", padx=20, pady=15)
+        
+        lbl_delay = ctk.CTkLabel(delay_frame, text=self.tr("settings_delay_title"), font=("Segoe UI", 12, "bold"), text_color=COLORS["primary"])
+        lbl_delay.pack(anchor="w", padx=15, pady=(10, 5))
+
+        row_delay = ctk.CTkFrame(delay_frame, fg_color="transparent")
+        row_delay.pack(fill="x", padx=15, pady=5)
+
+        ctk.CTkLabel(row_delay, text=self.tr("settings_wait_between"), font=("Segoe UI", 11)).pack(side="left", padx=5)
+        entry_min = ctk.CTkEntry(row_delay, width=80, height=28, justify="center")
+        entry_min.pack(side="left", padx=5)
+        try:
+            entry_min.insert(0, self.delay_min_entry.get())
+        except Exception:
+            entry_min.insert(0, "8")
+        ctk.CTkLabel(row_delay, text=self.tr("settings_seconds"), font=("Segoe UI", 11)).pack(side="left", padx=5)
+
+        ctk.CTkLabel(row_delay, text=self.tr("settings_and"), font=("Segoe UI", 11)).pack(side="left", padx=5)
+        entry_max = ctk.CTkEntry(row_delay, width=80, height=28, justify="center")
+        entry_max.pack(side="left", padx=5)
+        try:
+            entry_max.insert(0, self.delay_max_entry.get())
+        except Exception:
+            entry_max.insert(0, "15")
+        ctk.CTkLabel(row_delay, text=self.tr("settings_seconds"), font=("Segoe UI", 11)).pack(side="left", padx=5)
+
+        # Sleep settings
+        sleep_enabled = ctk.BooleanVar(value=self.config.get("sleep_enabled", True))
+        
+        chk_sleep = ctk.CTkCheckBox(
+            delay_frame, text=self.tr("settings_activate_sleep"),
+            variable=sleep_enabled, font=("Segoe UI", 11, "bold")
+        )
+        chk_sleep.pack(anchor="w", padx=20, pady=10)
+
+        sleep_sub_frame = ctk.CTkFrame(delay_frame, border_width=1, border_color=COLORS["border"], fg_color="transparent")
+        sleep_sub_frame.pack(fill="x", padx=20, pady=(0, 15))
+
+        row_sleep1 = ctk.CTkFrame(sleep_sub_frame, fg_color="transparent")
+        row_sleep1.pack(fill="x", padx=15, pady=5)
+        ctk.CTkLabel(row_sleep1, text=self.tr("settings_after"), font=("Segoe UI", 11), width=60, anchor="w").pack(side="left", padx=5)
+        entry_sleep_size = ctk.CTkEntry(row_sleep1, width=80, height=28, justify="center")
+        entry_sleep_size.pack(side="left", padx=5)
+        try:
+            entry_sleep_size.insert(0, self.batch_size_entry.get())
+        except Exception:
+            entry_sleep_size.insert(0, "30")
+        ctk.CTkLabel(row_sleep1, text=self.tr("settings_messages"), font=("Segoe UI", 11)).pack(side="left", padx=5)
+
+        row_sleep2 = ctk.CTkFrame(sleep_sub_frame, fg_color="transparent")
+        row_sleep2.pack(fill="x", padx=15, pady=5)
+        ctk.CTkLabel(row_sleep2, text=self.tr("settings_for"), font=("Segoe UI", 11), width=60, anchor="w").pack(side="left", padx=5)
+        entry_sleep_max = ctk.CTkEntry(row_sleep2, width=80, height=28, justify="center")
+        entry_sleep_max.pack(side="left", padx=5)
+        try:
+            entry_sleep_max.insert(0, self.batch_max_entry.get())
+        except Exception:
+            entry_sleep_max.insert(0, "240")
+        ctk.CTkLabel(row_sleep2, text=self.tr("settings_seconds"), font=("Segoe UI", 11)).pack(side="left", padx=5)
+
+        def toggle_sleep_entries():
+            state = "normal" if sleep_enabled.get() else "disabled"
+            entry_sleep_size.configure(state=state)
+            entry_sleep_max.configure(state=state)
+
+        chk_sleep.configure(command=toggle_sleep_entries)
+        toggle_sleep_entries()
+
+        # =======================================================================
+        # TAB 3: Friendly sending
+        # =======================================================================
+        list_container = ctk.CTkFrame(tab_friend, fg_color="transparent")
+        list_container.pack(fill="x", padx=10, pady=5)
+        list_container.grid_columnconfigure(0, weight=1)
+        list_container.grid_columnconfigure(1, weight=1)
+
+        # Column 1: Common Whatsapp Accounts List
+        col1_frame = ctk.CTkFrame(list_container, fg_color="transparent")
+        col1_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
+        
+        ctk.CTkLabel(col1_frame, text=self.tr("settings_friendly_accounts"), font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=5)
+        
+        listbox_accounts = Listbox(col1_frame, height=6, bg="#FFFFFF", fg="#000000",
+                                   selectbackground=COLORS["primary"], selectforeground="#FFFFFF",
+                                   borderwidth=1, relief="solid", highlightthickness=0)
+        listbox_accounts.pack(fill="x", padx=5, pady=2)
+
+        btn_row_acc = ctk.CTkFrame(col1_frame, fg_color="transparent")
+        btn_row_acc.pack(fill="x", padx=5, pady=2)
+
+        def add_acc():
+            win_input = ctk.CTkInputDialog(text=self.tr("lbl_number") + ":", title=self.tr("settings_friendly_accounts"))
+            val = win_input.get_input()
+            if val and val.strip():
+                listbox_accounts.insert("end", val.strip())
+
+        def del_acc():
+            sel = listbox_accounts.curselection()
+            if sel:
+                listbox_accounts.delete(sel[0])
+
+        ctk.CTkButton(btn_row_acc, text=self.tr("btn_add_rule"), width=70, height=26, fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"], text_color=COLORS["text_main"], command=add_acc).pack(side="left", padx=2)
+        ctk.CTkButton(btn_row_acc, text=self.tr("groups_btn_delete"), width=70, height=26, fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"], text_color=COLORS["text_main"], command=del_acc).pack(side="left", padx=2)
+
+        # Column 2: Messages Dictionary List
+        col2_frame = ctk.CTkFrame(list_container, fg_color="transparent")
+        col2_frame.grid(row=0, column=1, padx=5, pady=5, sticky="nsew")
+
+        ctk.CTkLabel(col2_frame, text=self.tr("settings_friendly_messages"), font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=5)
+
+        listbox_dict = Listbox(col2_frame, height=6, bg="#FFFFFF", fg="#000000",
+                               selectbackground=COLORS["primary"], selectforeground="#FFFFFF",
+                               borderwidth=1, relief="solid", highlightthickness=0)
+        listbox_dict.pack(fill="x", padx=5, pady=2)
+
+        btn_row_dict = ctk.CTkFrame(col2_frame, fg_color="transparent")
+        btn_row_dict.pack(fill="x", padx=5, pady=2)
+
+        def add_dict_msg():
+            win_input = ctk.CTkInputDialog(text=self.tr("lbl_message") + ":", title=self.tr("settings_friendly_messages"))
+            val = win_input.get_input()
+            if val and val.strip():
+                listbox_dict.insert("end", val.strip())
+
+        def del_dict_msg():
+            sel = listbox_dict.curselection()
+            if sel:
+                listbox_dict.delete(sel[0])
+
+        ctk.CTkButton(btn_row_dict, text=self.tr("btn_add_rule"), width=70, height=26, fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"], text_color=COLORS["text_main"], command=add_dict_msg).pack(side="left", padx=2)
+        ctk.CTkButton(btn_row_dict, text=self.tr("groups_btn_delete"), width=70, height=26, fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"], text_color=COLORS["text_main"], command=del_dict_msg).pack(side="left", padx=2)
+
+        # Load existing data into listboxes
+        saved_accounts = self.config.get("friendly_numbers_list", ["201012345678", "201112345678"])
+        saved_messages = self.config.get("friendly_messages_list", ["سلام كيف حالك؟", "الحمد لله تمام", "أهلاً بك"])
+        for acc in saved_accounts:
+            listbox_accounts.insert("end", acc)
+        for msg in saved_messages:
+            listbox_dict.insert("end", msg)
+
+        # Checkbox & Frame
+        friendly_enabled = ctk.BooleanVar(value=self.config.get("friendly_enabled", False))
+        
+        chk_friendly = ctk.CTkCheckBox(
+            tab_friend, text=self.tr("settings_activate_friendly"),
+            variable=friendly_enabled, font=("Segoe UI", 11, "bold")
+        )
+        chk_friendly.pack(anchor="w", padx=15, pady=10)
+
+        friendly_sub_frame = ctk.CTkFrame(tab_friend, border_width=1, border_color=COLORS["border"], fg_color="transparent")
+        friendly_sub_frame.pack(fill="x", padx=15, pady=(0, 10))
+
+        row_f1 = ctk.CTkFrame(friendly_sub_frame, fg_color="transparent")
+        row_f1.pack(fill="x", padx=15, pady=3)
+        ctk.CTkLabel(row_f1, text=self.tr("settings_after"), font=("Segoe UI", 11), width=60, anchor="w").pack(side="left", padx=5)
+        entry_f_after = ctk.CTkEntry(row_f1, width=80, height=26, justify="center")
+        entry_f_after.pack(side="left", padx=5)
+        entry_f_after.insert(0, str(self.config.get("friendly_after", 5)))
+        ctk.CTkLabel(row_f1, text=self.tr("settings_messages"), font=("Segoe UI", 11)).pack(side="left", padx=5)
+
+        row_f2 = ctk.CTkFrame(friendly_sub_frame, fg_color="transparent")
+        row_f2.pack(fill="x", padx=15, pady=3)
+        ctk.CTkLabel(row_f2, text=self.tr("settings_count"), font=("Segoe UI", 11), width=60, anchor="w").pack(side="left", padx=5)
+        entry_f_count = ctk.CTkEntry(row_f2, width=80, height=26, justify="center")
+        entry_f_count.pack(side="left", padx=5)
+        entry_f_count.insert(0, str(self.config.get("friendly_count", 15)))
+
+        row_f3 = ctk.CTkFrame(friendly_sub_frame, fg_color="transparent")
+        row_f3.pack(fill="x", padx=15, pady=3)
+        ctk.CTkLabel(row_f3, text=self.tr("settings_wait"), font=("Segoe UI", 11), width=60, anchor="w").pack(side="left", padx=5)
+        entry_f_wait = ctk.CTkEntry(row_f3, width=80, height=26, justify="center")
+        entry_f_wait.pack(side="left", padx=5)
+        entry_f_wait.insert(0, str(self.config.get("friendly_wait", 1)))
+        ctk.CTkLabel(row_f3, text=self.tr("settings_seconds"), font=("Segoe UI", 11)).pack(side="left", padx=5)
+
+        # Muted caption
+        lbl_caption = ctk.CTkLabel(
+            friendly_sub_frame, text=self.tr("settings_friendly_note"),
+            font=("Segoe UI", 9, "italic"), text_color=COLORS["text_muted"]
+        )
+        lbl_caption.pack(anchor="w", padx=15, pady=(5, 10))
+
+        def toggle_friendly_entries():
+            state = "normal" if friendly_enabled.get() else "disabled"
+            entry_f_after.configure(state=state)
+            entry_f_count.configure(state=state)
+            entry_f_wait.configure(state=state)
+
+        chk_friendly.configure(command=toggle_friendly_entries)
+        toggle_friendly_entries()
+
+        # =======================================================================
+        # SAVE & CANCEL ACTIONS
+        # =======================================================================
+        def save_all():
+            # Update Preset speeds
+            val = preset_var.get()
+            if val == self.tr("speed_very_slow"):
+                val_min, val_max = 20, 30
+            elif val == self.tr("speed_slow"):
+                val_min, val_max = 12, 22
+            elif val == self.tr("speed_normal"):
+                val_min, val_max = 8, 15
+            elif val == self.tr("speed_fast"):
+                val_min, val_max = 4, 8
+            else: # Very Fast
+                val_min, val_max = 2, 4
+            
+            # Save Delays
+            try:
+                min_v = int(entry_min.get())
+                max_v = int(entry_max.get())
+                self.delay_min_entry.delete(0, "end")
+                self.delay_min_entry.insert(0, str(min_v))
+                self.delay_max_entry.delete(0, "end")
+                self.delay_max_entry.insert(0, str(max_v))
+                self.config.set("delay_min", min_v)
+                self.config.set("delay_max", max_v)
+            except ValueError:
+                pass
+
+            # Save Sleep Limits
+            try:
+                b_size = int(entry_sleep_size.get())
+                b_max = int(entry_sleep_max.get())
+                self.batch_size_entry.delete(0, "end")
+                self.batch_size_entry.insert(0, str(b_size))
+                self.batch_max_entry.delete(0, "end")
+                self.batch_max_entry.insert(0, str(b_max))
+                self.config.set("batch_size", b_size)
+                self.config.set("batch_pause_max", b_max)
+            except ValueError:
+                pass
+
+            # Extract data from Listboxes
+            accs = list(listbox_accounts.get(0, "end"))
+            msgs = list(listbox_dict.get(0, "end"))
+
+            # Save Friendly details
+            try:
+                f_after = int(entry_f_after.get())
+                f_count = int(entry_f_count.get())
+                f_wait = int(entry_f_wait.get())
+                self.config.set("friendly_after", f_after)
+                self.config.set("friendly_count", f_count)
+                self.config.set("friendly_wait", f_wait)
+            except ValueError:
+                pass
+
+            self.config.set("sleep_enabled", sleep_enabled.get())
+            self.config.set("friendly_enabled", friendly_enabled.get())
+            self.config.set("friendly_numbers_list", accs)
+            self.config.set("friendly_messages_list", msgs)
+            self.config.set("friendly_numbers", ",".join(accs))
+            self.config.set("friendly_messages", ",".join(msgs))
+            
+            # Now call the original settings save method to validate and commit config
+            self._save_settings()
+            
+            self.config.save()
+            self.log("⚙️ Sending Settings saved successfully!")
+            dialog.destroy()
+            self._ensure_background_settings_exist()
+
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent", height=45)
+        btn_row.pack(fill="x", side="bottom", padx=15, pady=15)
+
+        btn_close = ctk.CTkButton(
+            btn_row, text=self.tr("dialog_btn_close"), font=("Segoe UI", 12, "bold"),
+            width=100, height=34, fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
+            text_color=COLORS["text_main"],
+            command=save_all
+        )
+        btn_close.pack(side="right", padx=5)
 
     def _toggle_language(self):
         """Switch the application language between Arabic and English instantly."""
@@ -486,45 +885,6 @@ class ModernWhatsAppApp(
         )
         self.session_status_label.pack(side="left", padx=5)
 
-        # Live scheduled campaign indicator
-        # Right Action Buttons
-        actions_frame = ctk.CTkFrame(self.bottom_bar, fg_color="transparent")
-        actions_frame.pack(side="right", fill="y", padx=15, pady=2)
-
-        # Send Now Button
-        self.btn_start = ctk.CTkButton(
-            actions_frame, text="✈️ " + self.tr("btn_send_now"),
-            font=("Segoe UI", 13, "bold"),
-            width=125, height=32, corner_radius=6,
-            fg_color=COLORS["primary"], hover_color=COLORS["primary_hover"],
-            text_color="#000000",
-            command=self._start_action
-        )
-        self.btn_start.pack(side="right", padx=5)
-
-        # Schedule Button
-        self.btn_schedule = ctk.CTkButton(
-            actions_frame, text=self.tr("btn_schedule_campaign"),
-            font=("Segoe UI", 12, "bold"),
-            width=115, height=32, corner_radius=6,
-            fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
-            text_color=COLORS["secondary_text"],
-            command=self._schedule_action
-        )
-        self.btn_schedule.pack(side="right", padx=5)
-
-        # 4. Pause / Stop Button
-        self.btn_stop = ctk.CTkButton(
-            actions_frame, text="🛑 " + self.tr("btn_pause_send"),
-            font=("Segoe UI", 12, "bold"),
-            width=100, height=32, corner_radius=6,
-            fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"],
-            text_color="#FFFFFF",
-            state="disabled",
-            command=self._stop_action
-        )
-        self.btn_stop.pack(side="right", padx=5)
-
     def _switch_tab(self, tab_id):
         """Switch visible tab and highlight the active menu button."""
         self.current_tab = tab_id
@@ -535,7 +895,7 @@ class ModernWhatsAppApp(
         # Highlight active nav item
         for nid, btn in self.nav_buttons.items():
             if nid == tab_id:
-                btn.configure(fg_color=COLORS["primary"], text_color="#000000", font=("Segoe UI", 11, "bold"))
+                btn.configure(fg_color=COLORS["primary"], text_color="#FFFFFF", font=("Segoe UI", 11, "bold"))
             else:
                 btn.configure(fg_color="transparent", text_color=COLORS["text_muted"], font=("Segoe UI", 11))
 
@@ -777,6 +1137,32 @@ class ModernWhatsAppApp(
     # ═══════════════════════════════════════════════════════════════════════
     #  SETTINGS
     # ═══════════════════════════════════════════════════════════════════════
+
+    def _ensure_background_settings_exist(self):
+        """Ensure all background settings entries exist in memory on a hidden frame to prevent campaigns from crashing."""
+        if not hasattr(self, "hidden_settings_frame"):
+            self.hidden_settings_frame = ctk.CTkFrame(self)
+        
+        # Instantiate any missing entry/variable with saved config values
+        if not hasattr(self, "delay_min_entry") or not self.delay_min_entry.winfo_exists():
+            self.delay_min_entry = ctk.CTkEntry(self.hidden_settings_frame)
+            self.delay_min_entry.insert(0, str(self.config.get("delay_min", 8)))
+            
+        if not hasattr(self, "delay_max_entry") or not self.delay_max_entry.winfo_exists():
+            self.delay_max_entry = ctk.CTkEntry(self.hidden_settings_frame)
+            self.delay_max_entry.insert(0, str(self.config.get("delay_max", 25)))
+            
+        if not hasattr(self, "batch_size_entry") or not self.batch_size_entry.winfo_exists():
+            self.batch_size_entry = ctk.CTkEntry(self.hidden_settings_frame)
+            self.batch_size_entry.insert(0, str(self.config.get("batch_size", 30)))
+            
+        if not hasattr(self, "batch_min_entry") or not self.batch_min_entry.winfo_exists():
+            self.batch_min_entry = ctk.CTkEntry(self.hidden_settings_frame)
+            self.batch_min_entry.insert(0, str(self.config.get("batch_pause_min", 180)))
+            
+        if not hasattr(self, "batch_max_entry") or not self.batch_max_entry.winfo_exists():
+            self.batch_max_entry = ctk.CTkEntry(self.hidden_settings_frame)
+            self.batch_max_entry.insert(0, str(self.config.get("batch_pause_max", 240)))
 
     def _save_settings(self):
         """Save all settings from the settings tab to config."""
