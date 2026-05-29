@@ -949,16 +949,27 @@ class ModernWhatsAppApp(
             self.pending_start_payload = None
             self.pending_check_contacts = None
 
+    def _check_and_cleanup_dead_bot(self):
+        """Check if self.bot has a dead/closed browser and set self.bot to None if so."""
+        if self.bot:
+            is_alive = False
+            if self.bot.driver:
+                try:
+                    is_alive = len(self.bot.driver.window_handles) > 0
+                except Exception:
+                    is_alive = False
+            if not is_alive:
+                try:
+                    self.bot.close()
+                except Exception:
+                    pass
+                self.bot = None
+
     def _login_action(self):
         # Check if the bot exists and the driver is actively open (has windows)
         """Initialize the browser and start the login process."""
-        is_active = False
-        if self.bot and self.bot.driver:
-            try:
-                is_active = len(self.bot.driver.window_handles) > 0
-            except Exception as exc:
-                logger.debug("Could not inspect browser window handles: %s", exc)
-                is_active = False
+        self._check_and_cleanup_dead_bot()
+        is_active = self.bot is not None
 
         if is_active:
             self.bot.background_mode = False
@@ -1078,7 +1089,8 @@ class ModernWhatsAppApp(
 
     def _on_profile_change(self, choice):
         """Handle profile selection change — update paths and proxy settings."""
-        if self.bot and self.bot.driver:
+        self._check_and_cleanup_dead_bot()
+        if self.bot is not None:
             messagebox.showwarning("تنبيه", "لا يمكن تغيير الحساب أثناء تشغيل المتصفح. يرجى إغلاق المتصفح أولاً.")
             if self.user_data_dir == self.legacy_profile_dir:
                 self.profile_var.set("Legacy")

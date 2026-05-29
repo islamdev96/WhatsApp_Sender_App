@@ -22,7 +22,7 @@
   "use_valid_after_check": true,
   "use_workflow": false,
   "last_workflow": "—",
-  "profile_name": "yuuty",
+  "profile_name": "Default",
   "profiles_dir": "data\\profiles",
   "window_width": 1920,
   "window_height": 976,
@@ -52,8 +52,8 @@
       "username": "",
       "password": "",
       "fingerprint_enabled": true,
-      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
-      "resolution": "1600,900"
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+      "resolution": "1366,768"
     }
   }
 }

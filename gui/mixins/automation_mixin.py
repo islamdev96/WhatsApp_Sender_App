@@ -356,6 +356,7 @@ class AutomationMixin:
 
     def _proceed_start_action(self, sending_mode="safe", dispatch_mode="single", selected_profiles=None):
         """Actually start the campaign after settings are selected."""
+        self._check_and_cleanup_dead_bot()
         self.sending_mode = sending_mode
         self.dispatch_mode = dispatch_mode
         self.selected_profiles = selected_profiles or [self.config.get("profile_name", "Default")]
@@ -377,31 +378,16 @@ class AutomationMixin:
         if dispatch_mode == "parallel":
             self.log(f"👥 تم بدء الحملة بالتوازي باستخدام {len(self.selected_profiles)} حسابات: {', '.join(self.selected_profiles)}")
             self._begin_parallel_send(contacts, msg_template, attachments)
-        else:
-            # Single Account Mode
-            # Set the active profile to the single selected profile
-            profile = self.selected_profiles[0]
-            if profile != self.config.get("profile_name", "Default"):
-                self._run_on_ui(lambda p=profile: self._on_profile_change(p))
-            
-            # Check Bot & Login
-            if not self.bot or not self.bot.driver:
-                auto_open = self.config.get("auto_open_login", True)
-                if auto_open or messagebox.askyesno("تنبيه", "المتصفح غير مفتوح. هل تريد فتحه الآن؟"):
-                    self.pending_start_payload = (contacts, msg_template, attachments)
-                    self._set_session_status("الحالة: جاري فتح المتصفح...", COLORS["info"])
-                    self._login_action()
-                return
+            return
 
-            if not self.bot.is_logged_in():
-                self.bot.bring_to_front()
-                self.report_error("ERR-21", dialog=True, level="warning")
-                return
-
-            self._set_session_status("الحالة: متصل", COLORS["success"])
-            self._begin_send(contacts, msg_template, attachments)    
-        # 3. Check Bot & Login
-        if not self.bot or not self.bot.driver:
+        # Single Account Mode
+        # Set the active profile to the single selected profile
+        profile = self.selected_profiles[0]
+        if profile != self.config.get("profile_name", "Default"):
+            self._run_on_ui(lambda p=profile: self._on_profile_change(p))
+        
+        # Check Bot & Login
+        if self.bot is None:
             auto_open = self.config.get("auto_open_login", True)
             if auto_open or messagebox.askyesno("تنبيه", "المتصفح غير مفتوح. هل تريد فتحه الآن؟"):
                 self.pending_start_payload = (contacts, msg_template, attachments)
@@ -430,13 +416,14 @@ class AutomationMixin:
 
     def _check_numbers_action(self, contacts_override=None):
         """Start the number validity checking process."""
+        self._check_and_cleanup_dead_bot()
         if self.is_running or self.is_checking:
             return
         contacts = contacts_override or self._get_contacts_from_input()
         if not contacts:
             return
 
-        if not self.bot or not self.bot.driver:
+        if self.bot is None:
             auto_open = self.config.get("auto_open_login", True)
             if auto_open or messagebox.askyesno("تنبيه", "المتصفح غير مفتوح. هل تريد فتحه الآن؟"):
                 self.pending_check_contacts = contacts
@@ -1006,7 +993,15 @@ class AutomationMixin:
             return False
 
         # Open browser automatically if closed
-        if not self.bot or not self.bot.driver:
+        is_active = False
+        if self.bot and self.bot.driver:
+            try:
+                is_active = len(self.bot.driver.window_handles) > 0
+            except Exception:
+                is_active = False
+
+        if not is_active:
+            self._run_on_ui(self._check_and_cleanup_dead_bot)
             self._run_on_ui(lambda: self.log("🌐 فتح المتصفح تلقائياً لتسجيل الدخول للحملة المجدولة..."))
             self.pending_start_payload = (contacts, message, attachments)
             self._run_on_ui(self._login_action)
