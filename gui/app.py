@@ -41,6 +41,7 @@ class ModernWhatsAppApp(
 ):
     def __init__(self):
         super().__init__()
+        self.withdraw()
 
         # ── Config & Templates & Groups ──
         self.config = ConfigManager()
@@ -124,6 +125,72 @@ class ModernWhatsAppApp(
 
         # ── Start UI Queue Processor ──
         self.after(50, self._process_ui_queue)
+
+        # ── Show Splash Screen ──
+        self._show_splash_screen()
+
+    def _show_splash_screen(self):
+        """Displays a premium borderless splash screen for 2.5 seconds before launching the main window."""
+        # Create a frameless splash window
+        splash = ctk.CTkToplevel(self)
+        splash.overrideredirect(True)
+        splash.configure(fg_color=COLORS.get("bg_dark", "#0F172A"))
+        
+        # Size and position of splash screen
+        width, height = 500, 360
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width - width) // 2
+        y = (screen_height - height) // 2
+        splash.geometry(f"{width}x{height}+{x}+{y}")
+        
+        # Load and render premium vector logo
+        from PIL import Image
+        logo_path = os.path.join("data", "app_logo.png")
+        if os.path.exists(logo_path):
+            try:
+                pil_img = Image.open(logo_path)
+                logo_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(160, 160))
+                lbl_logo = ctk.CTkLabel(splash, image=logo_img, text="")
+                lbl_logo.pack(pady=(35, 10))
+            except Exception as e:
+                logger.debug("Could not load splash logo: %s", e)
+                ctk.CTkLabel(splash, text="🟢", font=("Segoe UI", 48)).pack(pady=(45, 15))
+        else:
+            ctk.CTkLabel(splash, text="🟢", font=("Segoe UI", 48)).pack(pady=(45, 15))
+            
+        # App Title & Description
+        ctk.CTkLabel(
+            splash, text="Auto WhatsApp Business Sender Turbo Pro", 
+            font=("Segoe UI", 16, "bold"), text_color=COLORS.get("primary", "#00E676")
+        ).pack(pady=(5, 2))
+        
+        ctk.CTkLabel(
+            splash, text="V17.0 Full Standalone Edition", 
+            font=("Segoe UI", 11), text_color=COLORS.get("text_muted", "#64748B")
+        ).pack(pady=0)
+        
+        # Indeterminate pulse progress bar
+        progress = ctk.CTkProgressBar(splash, width=320, height=5, progress_color=COLORS.get("primary", "#00E676"))
+        progress.pack(pady=25)
+        progress.configure(mode="indeterminate")
+        progress.start()
+        
+        # Loading caption
+        is_ar = self.current_lang.get() == "ar"
+        caption_txt = "جاري تحميل المكونات وتجهيز المتصفح..." if is_ar else "Loading components and browser setup..."
+        lbl_cap = ctk.CTkLabel(splash, text=caption_txt, font=("Segoe UI", 10, "italic"), text_color=COLORS.get("text_muted", "#64748B"))
+        lbl_cap.pack()
+        
+        # Graceful callback to deiconify main app window
+        def close_splash():
+            try:
+                splash.destroy()
+            except Exception:
+                pass
+            self.deiconify()
+            
+        self.after(2500, close_splash)
 
     def tr(self, key):
         """Translate a key based on current language."""

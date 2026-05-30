@@ -44,17 +44,52 @@ def build_campaigns_tab(self, frame: ctk.CTkFrame) -> None:
                      text_color=color).pack(anchor="w", padx=15, pady=(2, 10))
         return card
 
+    def _make_gauge_card(parent, title, rate_val, color):
+        card = ctk.CTkFrame(parent, corner_radius=12, height=80, width=200)
+        card.pack(side="left", expand=True, fill="x", padx=5)
+        
+        # Grid layout for title and gauge
+        card.grid_columnconfigure(0, weight=1)
+        card.grid_columnconfigure(1, weight=0)
+        card.grid_rowconfigure(0, weight=1)
+        
+        text_frame = ctk.CTkFrame(card, fg_color="transparent")
+        text_frame.grid(row=0, column=0, sticky="w", padx=15, pady=10)
+        
+        ctk.CTkLabel(text_frame, text=title, font=ctk.CTkFont(size=11),
+                     text_color=COLORS["text_muted"]).pack(anchor="w")
+                     
+        rate_str = f"{rate_val:.0f}%"
+        ctk.CTkLabel(text_frame, text=rate_str, font=ctk.CTkFont(size=22, weight="bold"),
+                     text_color=color).pack(anchor="w", pady=(2, 0))
+                     
+        # Canvas for gauge
+        import tkinter as tk
+        canvas = tk.Canvas(card, width=54, height=54, bg=COLORS.get("card_bg", "#1E293B"),
+                           highlightthickness=0, bd=0)
+        canvas.grid(row=0, column=1, padx=15, pady=13)
+        
+        # Draw background track
+        canvas.create_oval(4, 4, 50, 50, outline=COLORS.get("border", "#334155"), width=5)
+        # Draw active success arc
+        extent_angle = -int((rate_val / 100) * 360)
+        if extent_angle != 0:
+            canvas.create_arc(4, 4, 50, 50, start=90, extent=extent_angle,
+                              outline=color, width=5, style="arc")
+        return card
+
     # Load campaign stats
     campaigns = self.campaign_manager.get_all()
     total_campaigns = len(campaigns)
     total_sent = sum(c.get("sent", 0) for c in campaigns)
     total_failed = sum(c.get("failed", 0) for c in campaigns)
-    success_rate = f"{(total_sent / max(total_sent + total_failed, 1)) * 100:.0f}%"
+    rate_percentage = (total_sent / max(total_sent + total_failed, 1)) * 100
+    success_rate = f"{rate_percentage:.0f}%"
 
     self._camp_card_total = _make_stat_card(stats_frame, self.tr("campaigns_stat_total"), total_campaigns, COLORS["primary"])
     self._camp_card_sent = _make_stat_card(stats_frame, self.tr("campaigns_stat_sent"), total_sent, "#2E7D32")
     self._camp_card_failed = _make_stat_card(stats_frame, self.tr("campaigns_stat_failed"), total_failed, COLORS["danger"])
-    self._camp_card_rate = _make_stat_card(stats_frame, self.tr("campaigns_stat_rate"), success_rate, COLORS["info"])
+    self._camp_card_rate = _make_gauge_card(stats_frame, self.tr("campaigns_stat_rate"), rate_percentage, COLORS["info"])
 
     # ── Campaigns Table ──
     table_frame = ctk.CTkFrame(frame, corner_radius=12)
