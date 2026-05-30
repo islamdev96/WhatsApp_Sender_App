@@ -9,6 +9,7 @@ import time
 
 from gui.theme import COLORS
 from utils.logger import logger
+from gui.dialogs import ScheduleCampaignDialog
 
 
 class AutomationMixin:
@@ -74,10 +75,6 @@ class AutomationMixin:
 
     def _schedule_action(self):
         """Opens a visual DateTime Picker dialog to schedule the campaign."""
-        import tkinter as tk
-        from tkinter import messagebox
-        import datetime
-
         # 1. Prepare campaign content
         msg_template, attachments = self._prepare_content()
         if msg_template is None and attachments is None:
@@ -87,143 +84,7 @@ class AutomationMixin:
         if not contacts:
             return
 
-        dialog = ctk.CTkToplevel(self)
-        dialog.title("📅 جدولة الحملة | Schedule Campaign")
-        dialog.geometry("520x460")
-        dialog.resizable(False, False)
-        dialog.transient(self)
-        dialog.grab_set()
-
-        # Centre on parent
-        x = self.winfo_x() + (self.winfo_width() - 520) // 2
-        y = self.winfo_y() + (self.winfo_height() - 460) // 2
-        dialog.geometry(f"+{x}+{y}")
-
-        frm = ctk.CTkFrame(dialog, fg_color="transparent")
-        frm.pack(fill="both", expand=True, padx=25, pady=20)
-
-        # Title
-        title = ctk.CTkLabel(frm, text="📅 جدولة الحملة الجديدة | Schedule New Campaign",
-                             font=("Segoe UI", 16, "bold"), text_color=COLORS.get("primary", "#00E676"))
-        title.pack(anchor="w", pady=(0, 15))
-
-        # Campaign Name Entry
-        ctk.CTkLabel(frm, text="اسم الحملة / Campaign Name:", font=("Segoe UI", 12)).pack(anchor="e", pady=(5, 2))
-        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-        name_entry = ctk.CTkEntry(frm, height=36, placeholder_text=f"حملة مجدولة - {now_str}")
-        name_entry.pack(fill="x", pady=(0, 10))
-
-        # DateTime Selection Row
-        picker_frame = ctk.CTkFrame(frm, fg_color="transparent")
-        picker_frame.pack(fill="x", pady=10)
-
-        # Year, Month, Day selectors
-        now = datetime.datetime.now()
-        
-        # Day
-        day_var = tk.StringVar(value=str(now.day))
-        ctk.CTkLabel(picker_frame, text="اليوم / Day:", font=("Segoe UI", 11)).grid(row=0, column=4, padx=5, sticky="e")
-        day_combo = ctk.CTkComboBox(picker_frame, width=70, values=[str(d) for d in range(1, 32)], variable=day_var)
-        day_combo.grid(row=1, column=4, padx=5)
-
-        # Month
-        month_var = tk.StringVar(value=str(now.month))
-        ctk.CTkLabel(picker_frame, text="الشهر / Month:", font=("Segoe UI", 11)).grid(row=0, column=3, padx=5, sticky="e")
-        month_combo = ctk.CTkComboBox(picker_frame, width=75, values=[str(m) for m in range(1, 13)], variable=month_var)
-        month_combo.grid(row=1, column=3, padx=5)
-
-        # Year
-        year_var = tk.StringVar(value=str(now.year))
-        ctk.CTkLabel(picker_frame, text="السنة / Year:", font=("Segoe UI", 11)).grid(row=0, column=2, padx=5, sticky="e")
-        year_combo = ctk.CTkComboBox(picker_frame, width=80, values=[str(now.year), str(now.year + 1)], variable=year_var)
-        year_combo.grid(row=1, column=2, padx=5)
-
-        # Hour
-        hour_var = tk.StringVar(value=str(now.hour))
-        ctk.CTkLabel(picker_frame, text="الساعة / Hour:", font=("Segoe UI", 11)).grid(row=0, column=1, padx=5, sticky="e")
-        hour_combo = ctk.CTkComboBox(picker_frame, width=70, values=[str(h) for h in range(24)], variable=hour_var)
-        hour_combo.grid(row=1, column=1, padx=5)
-
-        # Minute
-        minute_var = tk.StringVar(value=str(now.minute))
-        ctk.CTkLabel(picker_frame, text="الدقيقة / Min:", font=("Segoe UI", 11)).grid(row=0, column=0, padx=5, sticky="e")
-        minute_combo = ctk.CTkComboBox(picker_frame, width=70, values=[str(m) for m in range(60)], variable=minute_var)
-        minute_combo.grid(row=1, column=0, padx=5)
-
-        # Sending Mode selector
-        ctk.CTkLabel(frm, text="وضع الإرسال / Sending Mode:", font=("Segoe UI", 12)).pack(anchor="e", pady=(15, 2))
-        mode_var = tk.StringVar(value="safe")
-        
-        mode_frame = ctk.CTkFrame(frm, fg_color=COLORS.get("card_bg", "#1E293B"), corner_radius=8, height=45)
-        mode_frame.pack(fill="x", pady=(0, 15))
-        
-        r_safe = ctk.CTkRadioButton(mode_frame, text="الوضع الآمن (Safe Mode)", variable=mode_var, value="safe")
-        r_safe.pack(side="right", padx=15, pady=8)
-        
-        r_blind = ctk.CTkRadioButton(mode_frame, text="الوضع العشوائي (Blind Mode)", variable=mode_var, value="blind")
-        r_blind.pack(side="left", padx=15, pady=8)
-
-        # Action Buttons
-        btn_frame = ctk.CTkFrame(frm, fg_color="transparent")
-        btn_frame.pack(fill="x", pady=(20, 0))
-
-        btn_cancel = ctk.CTkButton(btn_frame, text="إلغاء | Cancel",
-                                   font=("Segoe UI", 13, "bold"), width=130, height=38,
-                                   fg_color=COLORS.get("danger", "#EF4444"),
-                                   hover_color=COLORS.get("danger_hover", "#DC2626"),
-                                   text_color="#FFFFFF",
-                                   command=dialog.destroy)
-        btn_cancel.pack(side="left", padx=(0, 10))
-
-        def on_schedule():
-            try:
-                target_year = int(year_combo.get())
-                target_month = int(month_combo.get())
-                target_day = int(day_combo.get())
-                target_hour = int(hour_combo.get())
-                target_minute = int(minute_combo.get())
-                
-                target_dt = datetime.datetime(target_year, target_month, target_day, target_hour, target_minute)
-            except ValueError:
-                messagebox.showerror("خطأ", "التاريخ والوقت المحدد غير صالح.")
-                return
-
-            if target_dt <= datetime.datetime.now():
-                messagebox.showerror("خطأ", "يرجى تحديد تاريخ ووقت في المستقبل.")
-                return
-
-            name = name_entry.get().strip()
-            if not name:
-                name = f"حملة مجدولة - {target_dt.strftime('%Y-%m-%d %H:%M')}"
-
-            # If contacts is loaded from a group inside contacts_entry, get that group name
-            c_input = self.contacts_entry.get().strip()
-            group_name = None
-            if c_input.startswith("[GROUP:") and c_input.endswith("]"):
-                group_name = c_input[7:-1]
-
-            # Save scheduled campaign in DB
-            self.scheduler.schedule_campaign(
-                name=name,
-                scheduled_time=target_dt,
-                message=msg_template,
-                attachments=attachments,
-                group_name=group_name,
-                contacts=contacts if not group_name else None,
-                sending_mode=mode_var.get()
-            )
-
-            dialog.destroy()
-            messagebox.showinfo("تمت الجدولة", f"تمت جدولة الحملة '{name}' بنجاح في {target_dt.strftime('%Y-%m-%d %H:%M')}.")
-            self.log(f"📅 تم جدولة حملة جديدة: {name} في {target_dt.strftime('%Y-%m-%d %H:%M')}")
-
-        btn_ok = ctk.CTkButton(btn_frame, text="تأكيد الجدولة | Schedule",
-                               font=("Segoe UI", 13, "bold"), width=150, height=38,
-                               fg_color=COLORS.get("primary", "#00E676"),
-                               hover_color=COLORS.get("primary_hover", "#00C853"),
-                               text_color="#000000",
-                               command=on_schedule)
-        btn_ok.pack(side="right")
+        ScheduleCampaignDialog(self, contacts, msg_template, attachments)
 
     def _show_sending_mode_dialog(self):
         """Premium campaign dispatch setup dialog. Select accounts, sending mode, and single/parallel dispatch."""
