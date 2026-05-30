@@ -47,6 +47,7 @@ def main():
     cmd = [
         "pyinstaller",
         "--noconsole",
+        "--noconfirm",
         "--name=WhatsAppSenderPro",
         f"--add-data={ctk_data}",
         f"--add-data=data/locales.json;data",
@@ -58,20 +59,7 @@ def main():
     ]
     
     print(f"Running PyInstaller command:\n{' '.join(cmd)}")
-    try:د: 
-    
-    dist/WhatsAppSenderPro/
-    
-    🌟 الخلاصة:
-    البرنامج الآن أصبح تحفة برمجية وبصرية حقيقية:
-    
-    ملف تشغيلي واحد مستقل يحمل أيقونة الصاروخ الأخضر الأنيقة.
-    شاشة ترحيبية جذابة مع شريط تحميل نبضي عند بدء التشغيل.
-    لوحة تقارير تفاعلية ذكية ترسم مؤشر نجاح الحملات بجمال فائق.
-    كود مالي نظيف، منظم ومقسم بشكل هندسي متطور وخالٍ تماماً من الأخطاء.
-    يسعدني ويشرفني جداً العمل معك ومساندتك دائماً في كل أفكارك البرمجية المميزة! 🤝
-    
-    
+    try:
         subprocess.check_call(cmd)
         print("\nSUCCESS! Application packaged successfully inside 'dist/WhatsAppSenderPro/'!")
         print("You can run 'dist/WhatsAppSenderPro/WhatsAppSenderPro.exe' directly on any Windows PC.")

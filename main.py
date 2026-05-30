@@ -15,6 +15,8 @@ def main():
         flush=True,
     )
     logger.info("WhatsApp Sender Pro starting")
+
+    # Launch main application
     try:
         app = ModernWhatsAppApp()
         app.mainloop()
