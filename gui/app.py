@@ -215,9 +215,9 @@ class ModernWhatsAppApp(
 
         style.configure(
             "Treeview",
-            background="#FFFFFF",
-            foreground="#000000",
-            fieldbackground="#FFFFFF",
+            background=COLORS["card_bg"],
+            foreground=COLORS["text_main"],
+            fieldbackground=COLORS["card_bg"],
             rowheight=28,
             font=("Segoe UI", 10),
             borderwidth=0
@@ -225,15 +225,20 @@ class ModernWhatsAppApp(
         style.configure(
             "Treeview.Heading",
             font=("Segoe UI", 10, "bold"),
-            background="#F0F2F5",
-            foreground="#000000",
+            background=COLORS["bg_dark"],
+            foreground=COLORS["text_main"],
             borderwidth=1,
             relief="flat"
         )
         style.map(
+            "Treeview.Heading",
+            background=[("active", COLORS["border"]), ("!active", COLORS["bg_dark"])],
+            foreground=[("active", COLORS["text_main"]), ("!active", COLORS["text_main"])]
+        )
+        style.map(
             "Treeview",
             background=[("selected", primary_color)],
-            foreground=[("selected", "#FFFFFF")]
+            foreground=[("selected", "#000000" if primary_color in ("#00E676", "#00FF9D") else "#FFFFFF")]
         )
 
 
@@ -248,11 +253,20 @@ class ModernWhatsAppApp(
         if hasattr(self, "session_status_label"):
             self.session_status_label.configure(text_color=COLORS["text_muted"])
         if hasattr(self, "nav_buttons") and hasattr(self, "current_tab"):
+            is_dark = ctk.get_appearance_mode().lower() == "dark"
             for nid, btn in self.nav_buttons.items():
                 if nid == self.current_tab:
-                    btn.configure(fg_color=COLORS.get("sidebar_active", "#00A884"), text_color="#FFFFFF")
+                    active_text = COLORS.get("primary", "#00FF9D") if is_dark else "#FFFFFF"
+                    btn.configure(
+                        fg_color=COLORS.get("sidebar_active", "#1C2A4A"),
+                        text_color=active_text
+                    )
                 else:
-                    btn.configure(fg_color="transparent", text_color=COLORS.get("sidebar_text", "#FFFFFF"))
+                    inactive_text = COLORS.get("text_muted", "#94A3B8") if is_dark else COLORS.get("sidebar_text", "#E9EDEF")
+                    btn.configure(
+                        fg_color="transparent",
+                        text_color=inactive_text
+                    )
         if hasattr(self, "attachment_manager"):
             self.attachment_manager.apply_theme(COLORS)
         if hasattr(self, "message_editor"):
@@ -368,8 +382,8 @@ class ModernWhatsAppApp(
 
         # 4. Settings Menu
         settings_menu = tk.Menu(menu_bar, tearoff=0)
-        settings_menu.add_command(label=self.tr("menu_settings_send_delay"), command=self._open_sending_settings_dialog)
-        settings_menu.add_command(label=self.tr("menu_settings_proxy"), command=self._open_sending_settings_dialog)
+        settings_menu.add_command(label=self.tr("menu_settings_send_delay"), command=lambda: self._open_sending_settings_dialog(self.tr("tab_sending_settings")))
+        settings_menu.add_command(label=self.tr("menu_settings_proxy"), command=lambda: self._open_sending_settings_dialog(self.tr("tab_proxy_safety")))
         menu_bar.add_cascade(label=self.tr("menu_settings"), menu=settings_menu)
 
         # 5. Tools Menu
@@ -581,7 +595,7 @@ class ModernWhatsAppApp(
                 self.delay_max_entry.delete(0, "end")
                 self.delay_max_entry.insert(0, "15")
 
-    def _open_sending_settings_dialog(self):
+    def _open_sending_settings_dialog(self, initial_tab=None):
         """Open the unified sending settings dialog containing all application settings in one single place."""
         import tkinter as tk
         from tkinter import Listbox, messagebox
@@ -619,6 +633,12 @@ class ModernWhatsAppApp(
         build_settings_tab(self, tab_proxy)
         self._build_schedule_queue_card(tab_queue)
         self._refresh_schedule_queue()
+
+        if initial_tab:
+            try:
+                tabview.set(initial_tab)
+            except Exception as e:
+                logger.debug("Could not set initial settings tab: %s", e)
 
         # =======================================================================
         # TAB 1: Connection
@@ -1043,11 +1063,20 @@ class ModernWhatsAppApp(
             self.tab_frames[tab_id].grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
 
         # Highlight active nav item in the sidebar
+        is_dark = ctk.get_appearance_mode().lower() == "dark"
         for nid, btn in self.nav_buttons.items():
             if nid == tab_id:
-                btn.configure(fg_color=COLORS.get("sidebar_active", "#00A884"), text_color="#FFFFFF")
+                active_text = COLORS.get("primary", "#00FF9D") if is_dark else "#FFFFFF"
+                btn.configure(
+                    fg_color=COLORS.get("sidebar_active", "#1C2A4A"),
+                    text_color=active_text
+                )
             else:
-                btn.configure(fg_color="transparent", text_color=COLORS.get("sidebar_text", "#FFFFFF"))
+                inactive_text = COLORS.get("text_muted", "#94A3B8") if is_dark else COLORS.get("sidebar_text", "#E9EDEF")
+                btn.configure(
+                    fg_color="transparent",
+                    text_color=inactive_text
+                )
 
     # ─── Main Tab (3-Column Workspace) ───────────────────────────────────────
 

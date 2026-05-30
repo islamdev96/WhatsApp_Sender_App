@@ -42,45 +42,57 @@ class ScheduleCampaignDialog(ctk.CTkToplevel):
 
         # Campaign Name Entry
         ctk.CTkLabel(frm, text="اسم الحملة / Campaign Name:", font=("Segoe UI", 12)).pack(anchor="e", pady=(5, 2))
-        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-        self.name_entry = ctk.CTkEntry(frm, height=36, placeholder_text=f"حملة مجدولة - {now_str}")
+        self.user_edited_name = False
+        future_dt = datetime.datetime.now() + datetime.timedelta(minutes=10)
+        is_ar = self.parent.current_lang.get() == "ar"
+        if is_ar:
+            default_name = f"حملة مجدولة - {future_dt.strftime('%Y-%m-%d %H:%M')}"
+        else:
+            default_name = f"Scheduled Campaign - {future_dt.strftime('%Y-%m-%d %H:%M')}"
+            
+        self.name_entry = ctk.CTkEntry(frm, height=36)
+        self.name_entry.insert(0, default_name)
         self.name_entry.pack(fill="x", pady=(0, 10))
+        self.name_entry.bind("<Key>", self._on_name_entry_typed)
 
         # DateTime Selection Row
         picker_frame = ctk.CTkFrame(frm, fg_color="transparent")
         picker_frame.pack(fill="x", pady=10)
 
-        now = datetime.datetime.now()
-        
         # Day
-        self.day_var = tk.StringVar(value=str(now.day))
+        self.day_var = tk.StringVar(value=str(future_dt.day))
         ctk.CTkLabel(picker_frame, text="اليوم / Day:", font=("Segoe UI", 11)).grid(row=0, column=4, padx=5, sticky="e")
         self.day_combo = ctk.CTkComboBox(picker_frame, width=70, values=[str(d) for d in range(1, 32)], variable=self.day_var)
         self.day_combo.grid(row=1, column=4, padx=5)
+        self.day_combo.set(str(future_dt.day))
 
         # Month
-        self.month_var = tk.StringVar(value=str(now.month))
+        self.month_var = tk.StringVar(value=str(future_dt.month))
         ctk.CTkLabel(picker_frame, text="الشهر / Month:", font=("Segoe UI", 11)).grid(row=0, column=3, padx=5, sticky="e")
         self.month_combo = ctk.CTkComboBox(picker_frame, width=75, values=[str(m) for m in range(1, 13)], variable=self.month_var)
         self.month_combo.grid(row=1, column=3, padx=5)
+        self.month_combo.set(str(future_dt.month))
 
         # Year
-        self.year_var = tk.StringVar(value=str(now.year))
+        self.year_var = tk.StringVar(value=str(future_dt.year))
         ctk.CTkLabel(picker_frame, text="السنة / Year:", font=("Segoe UI", 11)).grid(row=0, column=2, padx=5, sticky="e")
-        self.year_combo = ctk.CTkComboBox(picker_frame, width=80, values=[str(now.year), str(now.year + 1)], variable=self.year_var)
+        self.year_combo = ctk.CTkComboBox(picker_frame, width=80, values=[str(future_dt.year), str(future_dt.year + 1)], variable=self.year_var)
         self.year_combo.grid(row=1, column=2, padx=5)
+        self.year_combo.set(str(future_dt.year))
 
         # Hour
-        self.hour_var = tk.StringVar(value=str(now.hour))
+        self.hour_var = tk.StringVar(value=str(future_dt.hour))
         ctk.CTkLabel(picker_frame, text="الساعة / Hour:", font=("Segoe UI", 11)).grid(row=0, column=1, padx=5, sticky="e")
         self.hour_combo = ctk.CTkComboBox(picker_frame, width=70, values=[str(h) for h in range(24)], variable=self.hour_var)
         self.hour_combo.grid(row=1, column=1, padx=5)
+        self.hour_combo.set(str(future_dt.hour))
 
         # Minute
-        self.minute_var = tk.StringVar(value=str(now.minute))
+        self.minute_var = tk.StringVar(value=str(future_dt.minute))
         ctk.CTkLabel(picker_frame, text="الدقيقة / Min:", font=("Segoe UI", 11)).grid(row=0, column=0, padx=5, sticky="e")
         self.minute_combo = ctk.CTkComboBox(picker_frame, width=70, values=[str(m) for m in range(60)], variable=self.minute_var)
         self.minute_combo.grid(row=1, column=0, padx=5)
+        self.minute_combo.set(str(future_dt.minute))
 
         # Sending Mode selector
         ctk.CTkLabel(frm, text="وضع الإرسال / Sending Mode:", font=("Segoe UI", 12)).pack(anchor="e", pady=(15, 2))
@@ -116,6 +128,13 @@ class ScheduleCampaignDialog(ctk.CTkToplevel):
             text_color="#000000", command=self._on_schedule
         )
         btn_ok.pack(side="right")
+
+        # Traces for auto-updating Campaign Name on date-time changes
+        self.day_var.trace_add("write", self._update_campaign_name_automatically)
+        self.month_var.trace_add("write", self._update_campaign_name_automatically)
+        self.year_var.trace_add("write", self._update_campaign_name_automatically)
+        self.hour_var.trace_add("write", self._update_campaign_name_automatically)
+        self.minute_var.trace_add("write", self._update_campaign_name_automatically)
 
     def _on_schedule(self):
         try:
@@ -158,3 +177,39 @@ class ScheduleCampaignDialog(ctk.CTkToplevel):
         self.destroy()
         messagebox.showinfo("تمت الجدولة", f"تمت جدولة الحملة '{name}' بنجاح في {target_dt.strftime('%Y-%m-%d %H:%M')}.")
         self.parent.log(f"📅 تم جدولة حملة جديدة: {name} في {target_dt.strftime('%Y-%m-%d %H:%M')}")
+
+    def _on_name_entry_typed(self, event):
+        self.user_edited_name = True
+
+    def _update_campaign_name_automatically(self, *args):
+        if hasattr(self, "user_edited_name") and self.user_edited_name:
+            return
+            
+        try:
+            day = self.day_combo.get().strip()
+            month = self.month_combo.get().strip()
+            year = self.year_combo.get().strip()
+            hour = self.hour_combo.get().strip()
+            minute = self.minute_combo.get().strip()
+            
+            # Skip update if any value is empty
+            if not day or not month or not year or not hour or not minute:
+                return
+                
+            # Pad values nicely
+            d_str = f"{int(day):02d}"
+            m_str = f"{int(month):02d}"
+            y_str = f"{int(year)}"
+            h_str = f"{int(hour):02d}"
+            min_str = f"{int(minute):02d}"
+            
+            is_ar = self.parent.current_lang.get() == "ar"
+            if is_ar:
+                formatted_name = f"حملة مجدولة - {y_str}-{m_str}-{d_str} {h_str}:{min_str}"
+            else:
+                formatted_name = f"Scheduled Campaign - {y_str}-{m_str}-{d_str} {h_str}:{min_str}"
+                
+            self.name_entry.delete(0, "end")
+            self.name_entry.insert(0, formatted_name)
+        except Exception as e:
+            logger.debug("Failed to auto update campaign name: %s", e)

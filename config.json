@@ -2,20 +2,9 @@
   "appearance_mode": "light",
   "language": "ar",
   "last_contacts_file": "",
-  "last_image_file": "G:/صور/صور لاهم العروض/صور مناسبات/5.png",
-  "last_attachments": [
-    {
-      "path": "G:/صور/صور لاهم العروض/صور مناسبات/5.png",
-      "type": "image",
-      "caption": ""
-    },
-    {
-      "path": "G:/صور/صور تصلح للمتابعه/v2.mp4",
-      "type": "video",
-      "caption": ""
-    }
-  ],
-  "last_message": "الكود وتقسيمات الكود وتنظيف الاكواد والملفات وتنظيم المشروع هذا ما اريد التركيز عليه",
+  "last_image_file": "",
+  "last_attachments": [],
+  "last_message": "",
   "send_text_with_image": false,
   "background_mode": false,
   "delay_min": 30.0,
@@ -38,7 +27,7 @@
   "window_width": 1920,
   "window_height": 976,
   "default_country_code": "20",
-  "last_video_file": "G:/صور/صور تصلح للمتابعه/v2.mp4",
+  "last_video_file": "",
   "last_doc_file": "",
   "enable_auto_responder": false,
   "rotation_enabled": false,

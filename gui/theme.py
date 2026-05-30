@@ -5,45 +5,45 @@ Color palettes, typography, and error catalog.
 # ─── Color Palette (Premium) ────────────────────────────────────────────────
 PALETTE_DARK = {
     # Main branding
-    "primary":       "#00A884",  # WhatsApp Premium Teal Green
-    "primary_hover": "#008F6F",
-    "primary_dark":  "#000000",  # Pitch-black base
+    "primary":       "#00FF9D",  # Ultra-Premium Glowing Neon Emerald Green
+    "primary_hover": "#00E676",  # Soft green hover transition
+    "primary_dark":  "#070B14",  # Rich deep midnight base background
 
     # Status colors
     "danger":        "#F43F5E",
     "danger_hover":  "#E11D48",
     "warning":       "#F59E0B",
-    "success":       "#00A884",
-    "success_hover": "#008F6F",
-    "info":          "#38BDF8",
+    "success":       "#00FF9D",  # Neon green success indicator
+    "success_hover": "#00E676",
+    "info":          "#00E5FF",  # Cyber cyan info indicator
 
-    # UI Elements (High contrast, flat)
-    "card_bg":       "#000000",  # Pitch black for cards
-    "bg_dark":       "#000000",  # Pitch black for frames
-    "text_main":     "#FFFFFF",  # High-contrast white text
-    "text_muted":    "#A0A0A0",  # Muted grey text
-    "accent":        "#00E676",
-    "accent_hover":  "#00C853",
-    "border":        "#333333",  # Dark grey borders
-    "secondary":     "#121212",  # Dark buttons
-    "secondary_hover":"#1A1A1A",
-    "secondary_text":"#FFFFFF",
+    # UI Elements (Premium Midnight depth layering)
+    "card_bg":       "#121B2E",  # Floating Indigo-Slate card background
+    "bg_dark":       "#080C14",  # Deep space dark base background
+    "text_main":     "#F9FAFB",  # Crisp high-contrast frost white text
+    "text_muted":    "#94A3B8",  # Soft slate-grey text
+    "accent":        "#00FF9D",  # Glowing Neon green accent
+    "accent_hover":  "#00E676",
+    "border":        "#1E2B45",  # Subtle outline indigo border
+    "secondary":     "#17233C",  # Stylish secondary button slate-blue
+    "secondary_hover":"#203154",
+    "secondary_text":"#F9FAFB",
 
-    # Sidebar navigation
-    "sidebar_bg":     "#075E54",  # WhatsApp dark green
-    "sidebar_hover":  "#064E46",  # Slightly darker on hover
-    "sidebar_active": "#00A884",  # Active item highlight
-    "sidebar_text":   "#FFFFFF",  # White text on sidebar
-    "sidebar_icon":   "#25D366",  # WhatsApp green icons
-    "sidebar_separator": "#0A7A6B",  # Subtle separator
-    "topbar_bg":      "#111111",  # Top bar background
+    # Sidebar navigation (SaaS design, fully unified with deep base)
+    "sidebar_bg":     "#070B14",  # Match deep midnight base
+    "sidebar_hover":  "#121B2E",  # Hover matches card background
+    "sidebar_active": "#1C2A4A",  # Active item slate-indigo
+    "sidebar_text":   "#F9FAFB",
+    "sidebar_icon":   "#00FF9D",  # Glowing green icons
+    "sidebar_separator": "#121B2E",
+    "topbar_bg":      "#070B14",  # Match deep space header background
 }
 
 PALETTE_LIGHT = {
     # Main branding
     "primary":       "#008069",  # WhatsApp Premium Light Teal Green
     "primary_hover": "#006653",
-    "primary_dark":  "#F0F2F5",  # Light grey-blue
+    "primary_dark":  "#F8FAFC",  # Slate light base
 
     # Status colors
     "danger":        "#E11D48",
@@ -53,26 +53,26 @@ PALETTE_LIGHT = {
     "success_hover": "#006653",
     "info":          "#0284C7",
 
-    # UI Elements
-    "card_bg":       "#F0F2F5",
-    "bg_dark":       "#FFFFFF",
-    "text_main":     "#111B21",  # Deep charcoal text
-    "text_muted":    "#667781",  # Sleek muted grey
+    # UI Elements (Gorgeous Slate light contrast)
+    "card_bg":       "#FFFFFF",  # Layered white card background
+    "bg_dark":       "#F1F5F9",  # High-quality light slate background
+    "text_main":     "#0F172A",  # Rich deep slate text
+    "text_muted":    "#64748B",  # Slate muted text
     "accent":        "#027EB5",
     "accent_hover":  "#015F8A",
-    "border":        "#E9EDF0",
-    "secondary":     "#E9EDF0",
-    "secondary_hover":"#D1D7DB",
-    "secondary_text":"#111B21",
+    "border":        "#E2E8F0",  # High-quality light borders
+    "secondary":     "#F8FAFC",  # Elegant light buttons
+    "secondary_hover":"#E2E8F0",
+    "secondary_text":"#0F172A",
 
-    # Sidebar navigation
+    # Sidebar navigation (Premium high-contrast green theme)
     "sidebar_bg":     "#128C7E",  # WhatsApp medium green
-    "sidebar_hover":  "#0F7A6E",  # Slightly darker on hover
-    "sidebar_active": "#25D366",  # Active item highlight
-    "sidebar_text":   "#FFFFFF",  # White text on sidebar
-    "sidebar_icon":   "#E8F5E9",  # Light green icons
-    "sidebar_separator": "#1A9E8F",  # Subtle separator
-    "topbar_bg":      "#F0F2F5",  # Top bar background
+    "sidebar_hover":  "#0F7A6E",  # Darker green on hover
+    "sidebar_active": "#006653",  # Deep green for supreme active tab contrast
+    "sidebar_text":   "#E9EDEF",  # Clean silver-white text
+    "sidebar_icon":   "#E8F5E9",
+    "sidebar_separator": "#1A9E8F",
+    "topbar_bg":      "#FFFFFF",  # White topbar background
 }
 
 # Active palette (filled at runtime based on appearance mode)

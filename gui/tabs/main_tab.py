@@ -20,7 +20,7 @@ def build_main_tab(self, frame: ctk.CTkFrame) -> None:
     frame.grid_rowconfigure(0, weight=1)
 
     # ── Left Column: WhatsApp Numbers List ──
-    col_mid = ctk.CTkFrame(frame, fg_color=COLORS["card_bg"], corner_radius=12)
+    col_mid = ctk.CTkFrame(frame, fg_color=COLORS["card_bg"], corner_radius=16, border_width=1, border_color=COLORS["border"])
     col_mid.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=10)
     col_mid.grid_rowconfigure(2, weight=1)
     col_mid.grid_columnconfigure(0, weight=1)
@@ -140,8 +140,8 @@ def build_main_tab(self, frame: ctk.CTkFrame) -> None:
         command=self._refresh_main_group_combobox
     )
 
-    # Numbers Treeview Table (styled with white background and black text)
-    table_frame = ctk.CTkFrame(col_mid, fg_color="transparent")
+    # Numbers Treeview Table enclosed in a beautiful card boundary
+    table_frame = ctk.CTkFrame(col_mid, fg_color=COLORS["bg_dark"], corner_radius=12, border_width=1, border_color=COLORS["border"])
     table_frame.grid(row=3, column=0, sticky="nsew", padx=10, pady=5)
     
     columns = ("name", "phone", "var1", "status")
@@ -164,8 +164,8 @@ def build_main_tab(self, frame: ctk.CTkFrame) -> None:
     
     tbl_scroll = ctk.CTkScrollbar(table_frame, command=self.progress_tree.yview)
     self.progress_tree.configure(yscrollcommand=tbl_scroll.set)
-    tbl_scroll.pack(side="right", fill="y")
-    self.progress_tree.pack(side="left", fill="both", expand=True)
+    tbl_scroll.pack(side="right", fill="y", padx=2, pady=2)
+    self.progress_tree.pack(side="left", fill="both", expand=True, padx=2, pady=2)
 
     # Right-click context menu for Numbers Table
     from tkinter import Menu
@@ -177,38 +177,42 @@ def build_main_tab(self, frame: ctk.CTkFrame) -> None:
     
     self.progress_tree.bind("<Button-3>", self._show_numbers_context_menu)
 
-    # Stats footer for numbers
+    # Rounded metrics container frame for a stunning SaaS visual look
+    metrics_frame = ctk.CTkFrame(col_mid, fg_color=COLORS["bg_dark"], corner_radius=12, border_width=1, border_color=COLORS["border"])
+    metrics_frame.grid(row=4, column=0, sticky="ew", padx=15, pady=(5, 5))
+    metrics_frame.grid_columnconfigure(0, weight=1)
+
     self.total_counts_label = ctk.CTkLabel(
-        col_mid, text=f"{self.tr('lbl_groups')} 0 | {self.tr('lbl_contacts')} 0 | {self.tr('lbl_total')} 0",
-        font=("Segoe UI", 11), text_color=COLORS["text_muted"]
+        metrics_frame, text=f"{self.tr('lbl_groups')} 0 | {self.tr('lbl_contacts')} 0 | {self.tr('lbl_total')} 0",
+        font=("Segoe UI", 12, "bold"), text_color=COLORS["primary"]
     )
-    self.total_counts_label.grid(row=4, column=0, sticky="ew", padx=15, pady=(2, 2))
+    self.total_counts_label.pack(fill="x", padx=10, pady=(6, 6))
 
     # Progress bar
     self.progress_bar = ctk.CTkProgressBar(col_mid, height=8, corner_radius=4, progress_color=COLORS["primary"])
-    self.progress_bar.grid(row=5, column=0, sticky="ew", padx=15, pady=(2, 2))
+    self.progress_bar.grid(row=5, column=0, sticky="ew", padx=15, pady=(4, 4))
     self.progress_bar.set(0)
 
-    # Progress status and counter
-    prog_detail_frame = ctk.CTkFrame(col_mid, fg_color="transparent")
-    prog_detail_frame.grid(row=6, column=0, sticky="ew", padx=15, pady=(2, 8))
+    # Progress details card
+    prog_detail_frame = ctk.CTkFrame(col_mid, fg_color=COLORS["bg_dark"], corner_radius=12, border_width=1, border_color=COLORS["border"])
+    prog_detail_frame.grid(row=6, column=0, sticky="ew", padx=15, pady=(5, 12))
     
     self.status_label = ctk.CTkLabel(
         prog_detail_frame, text=self.tr("msg_ready_status"),
-        font=("Segoe UI", 11), text_color=COLORS["text_muted"]
+        font=("Segoe UI", 12), text_color=COLORS["text_muted"]
     )
-    self.status_label.pack(side="right")
+    self.status_label.pack(side="right", padx=12, pady=8)
     
     self.counter_label = ctk.CTkLabel(
         prog_detail_frame, text="✅ 0 | ❌ 0 | 🚫 0",
-        font=("Segoe UI", 11, "bold"), text_color=COLORS["primary"]
+        font=("Segoe UI", 12, "bold"), text_color=COLORS["primary"]
     )
-    self.counter_label.pack(side="left")
+    self.counter_label.pack(side="left", padx=12, pady=8)
 
     # =======================================================================
     # COLUMN 2: Right Column (Message editor & attachments & Send Buttons)
     # =======================================================================
-    col_right = ctk.CTkFrame(frame, corner_radius=8, border_width=1, border_color=COLORS["border"])
+    col_right = ctk.CTkFrame(frame, fg_color=COLORS["card_bg"], corner_radius=16, border_width=1, border_color=COLORS["border"])
     col_right.grid(row=0, column=1, sticky="nsew", padx=3, pady=5)
     col_right.grid_rowconfigure(0, weight=3)  # Message Editor
     col_right.grid_rowconfigure(1, weight=2)  # Attachments

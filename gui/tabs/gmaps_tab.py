@@ -88,7 +88,7 @@ def build_gmaps_tab(self, frame: ctk.CTkFrame) -> None:
     self.gmaps_tree.column("name", width=350, anchor=anchor_val)
     self.gmaps_tree.column("phone", width=250, anchor="center")
 
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.gmaps_tree.yview)
+    scrollbar = ctk.CTkScrollbar(table_frame, command=self.gmaps_tree.yview)
     self.gmaps_tree.configure(yscrollcommand=scrollbar.set)
 
     self.gmaps_tree.pack(side="left", fill="both", expand=True, padx=(10, 0), pady=10)
@@ -261,27 +261,28 @@ def build_gmaps_tab(self, frame: ctk.CTkFrame) -> None:
     def _import_to_campaign():
         items = self.gmaps_tree.get_children()
         if not items:
-            messagebox.showwarning(self.tr("msg_alert"), self.tr("filter_no_data"))
+            messagebox.showwarning(self.tr("msg_alert"), "لا توجد أرقام صالحة للاستيراد.")
             return
 
         count = 0
-        for item in items:
-            name, phone = self.gmaps_tree.item(item, "values")
-            if phone:
-                # Add to contacts manager / main campaign numbers tree
-                # Main tab contains `numbers_tree`
-                if hasattr(self, "numbers_tree"):
-                    # Check if number already in numbers_tree
-                    existing = [self.numbers_tree.item(i, "values")[1] for i in self.numbers_tree.get_children() if len(self.numbers_tree.item(i, "values")) > 1]
+        if hasattr(self, "progress_tree") and self.progress_tree:
+            existing = [self.progress_tree.item(i, "values")[1] for i in self.progress_tree.get_children() if len(self.progress_tree.item(i, "values")) > 1]
+            for item in items:
+                name, phone = self.gmaps_tree.item(item, "values")
+                if phone:
                     if phone not in existing:
-                        self.numbers_tree.insert(
-                            "", "end", values=(name, phone, self.tr("status_pending"), "—"),
+                        self.progress_tree.insert(
+                            "", "end", values=(name, phone, "", "⏳ معلق"),
                             tags=("pending",)
                         )
+                        existing.append(phone)
                         count += 1
 
-        messagebox.showinfo(self.tr("msg_done"), self.tr("dialog_add_contact_success").format(name=count))
-        self.log(f"📥 Imported {count} scraped business contacts to current campaign list.")
+            self._update_contacts_count_from_tree()
+            messagebox.showinfo(self.tr("msg_done"), f"تم استيراد {count} جهة اتصال بنجاح!")
+            self.log(f"📥 Imported {count} scraped business contacts to current campaign list.")
+        else:
+            messagebox.showerror("خطأ", "تعذر تحديد قائمة الإرسال الرئيسية.")
 
     def _export_scraped():
         items = self.gmaps_tree.get_children()

@@ -103,7 +103,7 @@ def build_numbers_filter_tab(self, frame: ctk.CTkFrame) -> None:
     self.filter_tree.column("check_time", width=200, anchor="center")
 
     # Scrollbar
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.filter_tree.yview)
+    scrollbar = ctk.CTkScrollbar(table_frame, command=self.filter_tree.yview)
     self.filter_tree.configure(yscrollcommand=scrollbar.set)
 
     self.filter_tree.pack(side="left", fill="both", expand=True, padx=(10, 0), pady=10)

@@ -117,7 +117,7 @@ def build_campaigns_tab(self, frame: ctk.CTkFrame) -> None:
         self.campaigns_tree.column(col_id, width=width, anchor="center")
 
     # Scrollbar
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.campaigns_tree.yview)
+    scrollbar = ctk.CTkScrollbar(table_frame, command=self.campaigns_tree.yview)
     self.campaigns_tree.configure(yscrollcommand=scrollbar.set)
 
     self.campaigns_tree.pack(side="left", fill="both", expand=True, padx=(10, 0), pady=10)

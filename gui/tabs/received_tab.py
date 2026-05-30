@@ -67,7 +67,7 @@ def build_received_tab(self, frame: ctk.CTkFrame) -> None:
     self.received_tree.column("sender", width=180, anchor="center")
     self.received_tree.column("message", width=400, anchor="w")
 
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.received_tree.yview)
+    scrollbar = ctk.CTkScrollbar(table_frame, command=self.received_tree.yview)
     self.received_tree.configure(yscrollcommand=scrollbar.set)
 
     self.received_tree.pack(side="left", fill="both", expand=True, padx=(10, 0), pady=10)

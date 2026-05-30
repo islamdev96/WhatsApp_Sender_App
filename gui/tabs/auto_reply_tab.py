@@ -66,7 +66,7 @@ def build_auto_reply_tab(self, frame: ctk.CTkFrame) -> None:
     self.auto_reply_tree.column("reply", width=300, anchor="w")
     self.auto_reply_tree.column("status", width=100, anchor="center")
 
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.auto_reply_tree.yview)
+    scrollbar = ctk.CTkScrollbar(table_frame, command=self.auto_reply_tree.yview)
     self.auto_reply_tree.configure(yscrollcommand=scrollbar.set)
 
     self.auto_reply_tree.pack(side="left", fill="both", expand=True, padx=(10, 0), pady=10)
