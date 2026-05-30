@@ -29,8 +29,10 @@ class MessagingMixin:
         if not self.driver:
             return "ERR_NOT_READY"
 
+        from utils.helpers import parse_spintax
         message_template = message_template or ""
         message = message_template.replace("{name}", name).strip()
+        message = parse_spintax(message)
 
         if not attachments:
             attachments = []
@@ -117,10 +119,12 @@ class MessagingMixin:
                 path = att.get("path")
                 type_ = att.get("type", "image")
 
+                from utils.helpers import parse_spintax
                 raw_caption = att.get("caption")
                 caption = None
                 if raw_caption:
                     caption = str(raw_caption).replace("{name}", name).strip()
+                    caption = parse_spintax(caption)
                 elif use_caption_mode and i == 0:
                     caption = message
 
@@ -169,12 +173,15 @@ class MessagingMixin:
                     return text_res
 
             if extra_messages:
+                from utils.helpers import parse_spintax
                 for m in extra_messages:
                     if stop_event and stop_event.is_set():
                         return "STOPPED"
                     if not m:
                         continue
-                    text_res = self._send_text(m, stop_event=stop_event)
+                    m_parsed = str(m).replace("{name}", name).strip()
+                    m_parsed = parse_spintax(m_parsed)
+                    text_res = self._send_text(m_parsed, stop_event=stop_event)
                     if text_res != "SUCCESS":
                         return text_res
                     if stop_event:
@@ -187,12 +194,15 @@ class MessagingMixin:
         if res != "SUCCESS":
             return res
         if extra_messages:
+            from utils.helpers import parse_spintax
             for m in extra_messages:
                 if stop_event and stop_event.is_set():
                     return "STOPPED"
                 if not m:
                     continue
-                text_res = self._send_text(m, stop_event=stop_event)
+                m_parsed = str(m).replace("{name}", name).strip()
+                m_parsed = parse_spintax(m_parsed)
+                text_res = self._send_text(m_parsed, stop_event=stop_event)
                 if text_res != "SUCCESS":
                     return text_res
                 if stop_event:
@@ -355,15 +365,62 @@ class MessagingMixin:
             element.send_keys(text)
 
     def _human_type(self, element, text, stop_event=None):
-        """Types text like a human with random delays."""
+        """Types text like a human with realistic word pauses, micro-delays, and randomized typos/corrections."""
+        import random
+        from selenium.webdriver.common.keys import Keys
+        
+        common_typos_map = {
+            'a': 's', 'b': 'v', 'c': 'x', 'd': 's', 'e': 'r', 'f': 'd', 'g': 'f',
+            'h': 'g', 'i': 'o', 'j': 'h', 'k': 'j', 'l': 'k', 'm': 'n', 'n': 'b',
+            'o': 'p', 'p': 'o', 'q': 'w', 'r': 't', 's': 'a', 't': 'y', 'u': 'y',
+            'v': 'c', 'w': 'q', 'x': 'z', 'y': 'u', 'z': 'x'
+        }
+        
         for char in text:
             if stop_event and stop_event.is_set():
                 break
+                
+            # Typos: ~1.5% chance for alphabetic characters to make a typo and correct it
+            char_lower = char.lower()
+            if char_lower in common_typos_map and random.random() < 0.015:
+                wrong_char = common_typos_map[char_lower]
+                if char.isupper():
+                    wrong_char = wrong_char.upper()
+                
+                # Type the wrong character
+                element.send_keys(wrong_char)
+                # Wait for realization of mistake
+                if stop_event:
+                    stop_event.wait(random.uniform(0.15, 0.35))
+                else:
+                    time.sleep(random.uniform(0.15, 0.35))
+                
+                # Backspace it
+                element.send_keys(Keys.BACKSPACE)
+                # Wait before correcting
+                if stop_event:
+                    stop_event.wait(random.uniform(0.1, 0.25))
+                else:
+                    time.sleep(random.uniform(0.1, 0.25))
+            
+            # Send correct character
             element.send_keys(char)
-            if stop_event:
-                stop_event.wait(random.uniform(0.05, 0.2))
+            
+            # Smart delay based on character type
+            if char == ' ':
+                # Word boundary: longer pause (0.2 to 0.45 seconds)
+                delay = random.uniform(0.2, 0.45)
+            elif char in ('.', ',', '!', '?'):
+                # Sentence boundary: long pause (0.4 to 0.8 seconds)
+                delay = random.uniform(0.4, 0.8)
             else:
-                time.sleep(random.uniform(0.05, 0.2))
+                # Normal character: fast micro-delay (0.05 to 0.18 seconds)
+                delay = random.uniform(0.05, 0.18)
+                
+            if stop_event:
+                stop_event.wait(delay)
+            else:
+                time.sleep(delay)
 
     def _set_clipboard_text(self, text):
         """Sets Unicode text to the Windows clipboard using ctypes."""

@@ -28,6 +28,15 @@ PALETTE_DARK = {
     "secondary":     "#121212",  # Dark buttons
     "secondary_hover":"#1A1A1A",
     "secondary_text":"#FFFFFF",
+
+    # Sidebar navigation
+    "sidebar_bg":     "#075E54",  # WhatsApp dark green
+    "sidebar_hover":  "#064E46",  # Slightly darker on hover
+    "sidebar_active": "#00A884",  # Active item highlight
+    "sidebar_text":   "#FFFFFF",  # White text on sidebar
+    "sidebar_icon":   "#25D366",  # WhatsApp green icons
+    "sidebar_separator": "#0A7A6B",  # Subtle separator
+    "topbar_bg":      "#111111",  # Top bar background
 }
 
 PALETTE_LIGHT = {
@@ -55,6 +64,15 @@ PALETTE_LIGHT = {
     "secondary":     "#E9EDF0",
     "secondary_hover":"#D1D7DB",
     "secondary_text":"#111B21",
+
+    # Sidebar navigation
+    "sidebar_bg":     "#128C7E",  # WhatsApp medium green
+    "sidebar_hover":  "#0F7A6E",  # Slightly darker on hover
+    "sidebar_active": "#25D366",  # Active item highlight
+    "sidebar_text":   "#FFFFFF",  # White text on sidebar
+    "sidebar_icon":   "#E8F5E9",  # Light green icons
+    "sidebar_separator": "#1A9E8F",  # Subtle separator
+    "topbar_bg":      "#F0F2F5",  # Top bar background
 }
 
 # Active palette (filled at runtime based on appearance mode)

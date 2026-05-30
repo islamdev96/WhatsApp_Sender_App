@@ -1,4 +1,4 @@
-"""WhatsApp Sender Pro — Tab builder methods (main, groups, templates, settings, log)."""
+"""WhatsApp Sender Pro — Tab builder methods (all tabs)."""
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, ttk
 
@@ -12,10 +12,17 @@ from gui.tabs.groups_tab import build_groups_tab
 from gui.tabs.templates_tab import build_templates_tab
 from gui.tabs.settings_tab import build_settings_tab
 from gui.tabs.log_tab import build_log_tab
+from gui.tabs.campaigns_tab import build_campaigns_tab
+from gui.tabs.auto_reply_tab import build_auto_reply_tab
+from gui.tabs.received_tab import build_received_tab
+from gui.tabs.numbers_filter_tab import build_numbers_filter_tab
+from gui.tabs.warmer_tab import build_warmer_tab
+from gui.tabs.workflows_tab import build_workflows_tab
+from gui.tabs.gmaps_tab import build_gmaps_tab
 
 
 class TabBuildersMixin:
-    """Mixin: Tab builder methods (main, groups, templates, settings, log)."""
+    """Mixin: Tab builder methods for all application tabs."""
 
     def _build_tab_main(self):
         """Build the main sending tab: contacts table, message editor, attachments."""
@@ -40,6 +47,41 @@ class TabBuildersMixin:
         """Build the event log/diagnostic tab."""
         frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         build_log_tab(self, frame)
+
+    def _build_tab_campaigns(self):
+        """Build the sent campaigns history tab."""
+        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        build_campaigns_tab(self, frame)
+
+    def _build_tab_auto_reply(self):
+        """Build the standalone auto-reply rules tab."""
+        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        build_auto_reply_tab(self, frame)
+
+    def _build_tab_received(self):
+        """Build the received messages tab."""
+        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        build_received_tab(self, frame)
+
+    def _build_tab_filter(self):
+        """Build the numbers filter/validation tab."""
+        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        build_numbers_filter_tab(self, frame)
+
+    def _build_tab_warmer(self):
+        """Build the account warmer tab."""
+        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        build_warmer_tab(self, frame)
+
+    def _build_tab_workflows(self):
+        """Build the workflows / drip campaigns tab."""
+        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        build_workflows_tab(self, frame)
+
+    def _build_tab_gmaps(self):
+        """Build the Google Maps scraper tab."""
+        frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        build_gmaps_tab(self, frame)
 
     # ═══════════════════════════════════════════════════════════════════════
     #  UI HELPERS

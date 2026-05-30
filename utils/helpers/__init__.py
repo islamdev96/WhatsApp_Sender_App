@@ -13,6 +13,7 @@ from utils.helpers.contacts_io import (
 from utils.helpers.proxy import check_proxy, create_proxy_extension, cleanup_proxy_extension
 from utils.helpers.fingerprint import generate_random_fingerprint
 from utils.helpers.cleanup import cleanup_old_reports
+from utils.helpers.text import parse_spintax
 
 __all__ = [
     "normalize_phone", "_normalize_phone",
@@ -20,4 +21,5 @@ __all__ = [
     "read_contacts_auto", "create_contacts_template",
     "check_proxy", "create_proxy_extension", "cleanup_proxy_extension",
     "generate_random_fingerprint", "cleanup_old_reports",
+    "parse_spintax",
 ]

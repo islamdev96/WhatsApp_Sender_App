@@ -172,8 +172,10 @@ class ModernWhatsAppApp(
 
     def _refresh_theme(self):
         # Update key widgets after palette change
-        if hasattr(self, "toolbar_frame"):
-            self.toolbar_frame.configure(fg_color=COLORS["primary_dark"])
+        if hasattr(self, "topbar_frame"):
+            self.topbar_frame.configure(fg_color=COLORS.get("topbar_bg", COLORS["primary_dark"]))
+        if hasattr(self, "sidebar_frame"):
+            self.sidebar_frame.configure(fg_color=COLORS.get("sidebar_bg", "#075E54"))
         if hasattr(self, "bottom_bar"):
             self.bottom_bar.configure(fg_color=COLORS["primary_dark"])
         if hasattr(self, "session_status_label"):
@@ -181,9 +183,9 @@ class ModernWhatsAppApp(
         if hasattr(self, "nav_buttons") and hasattr(self, "current_tab"):
             for nid, btn in self.nav_buttons.items():
                 if nid == self.current_tab:
-                    btn.configure(fg_color=COLORS["primary"], text_color="#FFFFFF", font=("Segoe UI", 11, "bold"))
+                    btn.configure(fg_color=COLORS.get("sidebar_active", "#00A884"), text_color="#FFFFFF")
                 else:
-                    btn.configure(fg_color="transparent", text_color=COLORS["text_muted"], font=("Segoe UI", 11))
+                    btn.configure(fg_color="transparent", text_color=COLORS.get("sidebar_text", "#FFFFFF"))
         if hasattr(self, "attachment_manager"):
             self.attachment_manager.apply_theme(COLORS)
         if hasattr(self, "message_editor"):
@@ -193,13 +195,6 @@ class ModernWhatsAppApp(
         if hasattr(self, "btn_stop"):
             self.btn_stop.configure(fg_color=COLORS["danger"], hover_color=COLORS["danger_hover"], text_color="#FFFFFF")
 
-        # Dynamic updates for new top toolbar widgets
-        if hasattr(self, "btn_tb_login"):
-            self.btn_tb_login.configure(fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"], text_color=COLORS["secondary_text"])
-        if hasattr(self, "btn_tb_send_settings"):
-            self.btn_tb_send_settings.configure(text_color=COLORS["text_muted"])
-        if hasattr(self, "btn_tb_logout"):
-            self.btn_tb_logout.configure(fg_color="#D32F2F", hover_color="#B71C1C", text_color="#FFFFFF")
         if hasattr(self, "btn_theme_toggle"):
             is_dark = ctk.get_appearance_mode().lower() == "dark"
             is_ar = self.current_lang.get() == "ar"
@@ -219,25 +214,40 @@ class ModernWhatsAppApp(
         # Instantiate backward compatibility state variables
         self.bg_mode_var = ctk.BooleanVar(value=self.config.get("background_mode", False))
         self.use_valid_after_check_var = ctk.BooleanVar(value=self.config.get("use_valid_after_check", False))
-        # Configure Main Grid Rows (Toolbar -> Main Area -> Bottom Bar)
-        self.grid_rowconfigure(0, weight=0)  # Top Toolbar
-        self.grid_rowconfigure(1, weight=1)  # Main Content
-        self.grid_rowconfigure(2, weight=0)  # Bottom Status Bar
+        self.turbo_mode_var = ctk.BooleanVar(value=self.config.get("turbo_mode", False))
+
+        # Main window grid structure:
+        # Row 0: Top Bar
+        # Row 1: Middle Frame (Sidebar + Content Area)
+        # Row 2: Bottom Status Bar
+        self.grid_rowconfigure(0, weight=0)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=0)
         self.grid_columnconfigure(0, weight=1)
 
         # ── 1. Native Windows Menu Bar ──
         self._build_menu_bar()
 
-        # ── 2. Top Horizontal Toolbar ──
-        self._build_top_toolbar()
+        # ── 2. Top Bar ──
+        self._build_top_bar()
 
-        # ── 3. Main Content Frame ──
-        self.main_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
-        self.main_frame.grid(row=1, column=0, sticky="nsew")
+        # ── 3. Middle Frame (Sidebar + Main Frame) ──
+        self.middle_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        self.middle_frame.grid(row=1, column=0, sticky="nsew")
+        self.middle_frame.grid_rowconfigure(0, weight=1)
+        self.middle_frame.grid_columnconfigure(0, weight=0) # Sidebar column
+        self.middle_frame.grid_columnconfigure(1, weight=1) # Content column
+
+        # ── 4. Build Sidebar Frame ──
+        self._build_sidebar()
+
+        # ── 5. Main Content Frame ──
+        self.main_frame = ctk.CTkFrame(self.middle_frame, corner_radius=0, fg_color="transparent")
+        self.main_frame.grid(row=0, column=1, sticky="nsew")
         self.main_frame.grid_rowconfigure(0, weight=1)
         self.main_frame.grid_columnconfigure(0, weight=1)
 
-        # ── 4. Bottom Status Bar ──
+        # ── 6. Bottom Status Bar ──
         self._build_bottom_bar()
 
         # ── Tabs (frames) ──
@@ -247,6 +257,13 @@ class ModernWhatsAppApp(
         self._build_tab_templates()
         self._build_tab_settings()
         self._build_tab_log()
+        self._build_tab_campaigns()
+        self._build_tab_auto_reply()
+        self._build_tab_received()
+        self._build_tab_filter()
+        self._build_tab_warmer()
+        self._build_tab_workflows()
+        self._build_tab_gmaps()
 
         # Show main tab by default
         self._switch_tab("main")
@@ -304,92 +321,44 @@ class ModernWhatsAppApp(
 
         self.configure(menu=menu_bar)
 
-    # ─── Top Horizontal Toolbar ──────────────────────────────────────────────
+    # ─── Top Header Bar ──────────────────────────────────────────────
 
-    def _build_top_toolbar(self):
-        # Toolbar Main Container Frame
-        """Build the top toolbar with profile selector and action buttons."""
-        self.toolbar_frame = ctk.CTkFrame(self, height=72, corner_radius=0, fg_color=COLORS["primary_dark"])
-        self.toolbar_frame.grid(row=0, column=0, sticky="ew")
-        self.toolbar_frame.grid_propagate(False)
+    def _build_top_bar(self):
+        """Build the top header with branding, profile, theme, and language controls."""
+        self.topbar_frame = ctk.CTkFrame(self, height=60, corner_radius=0, fg_color=COLORS.get("topbar_bg", COLORS["primary_dark"]))
+        self.topbar_frame.grid(row=0, column=0, sticky="ew")
+        self.topbar_frame.grid_propagate(False)
 
-        tb_content = ctk.CTkFrame(self.toolbar_frame, fg_color="transparent")
-        tb_content.pack(fill="both", expand=True, padx=10, pady=5)
+        is_ar = self.current_lang.get() == "ar"
+        side_lbl = "right" if is_ar else "left"
+        side_opp = "left" if is_ar else "right"
 
-        # 1. Login / Open WhatsApp button
-        self.btn_tb_login = ctk.CTkButton(
-            tb_content, text=self.tr("open_whatsapp"),
-            font=("Segoe UI", 11, "bold"),
-            width=95, height=52, corner_radius=8,
-            fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
-            text_color=COLORS["secondary_text"],
-            command=self._login_action
+        # App Logo / Branding
+        branding_frame = ctk.CTkFrame(self.topbar_frame, fg_color="transparent")
+        branding_frame.pack(side=side_lbl, fill="y", padx=15)
+        
+        logo_label = ctk.CTkLabel(branding_frame, text="🟢", font=("Segoe UI", 16))
+        logo_label.pack(side=side_lbl, padx=5, pady=15)
+        
+        title_label = ctk.CTkLabel(
+            branding_frame, text="Auto WhatsApp Business Sender Turbo Pro v17.0",
+            font=("Segoe UI", 13, "bold"), text_color=COLORS["text_main"]
         )
-        self.btn_tb_login.pack(side="right", padx=3)
+        title_label.pack(side=side_lbl, padx=5, pady=15)
 
-        # 2. Tabs Navigation Buttons
-        nav_items = [
-            (self.tr("new_campaign"), "main"),
-            (self.tr("groups_grabber"), "groups"),
-            (self.tr("templates"), "templates"),
-            (self.tr("tab_events"), "log"),
-        ]
+        # Controls Container
+        controls_container = ctk.CTkFrame(self.topbar_frame, fg_color="transparent")
+        controls_container.pack(side=side_opp, fill="y", padx=10)
 
-        self.nav_buttons = {}
-        for text, tab_id in nav_items:
-            btn = ctk.CTkButton(
-                tb_content, text=text,
-                font=("Segoe UI", 11),
-                width=90, height=52, corner_radius=8,
-                fg_color="transparent",
-                text_color=COLORS["text_muted"],
-                hover_color=COLORS["bg_dark"],
-                command=lambda t=tab_id: self._switch_tab(t)
-            )
-            btn.pack(side="right", padx=3)
-            self.nav_buttons[tab_id] = btn
+        # Profile Selector
+        lbl_profile = ctk.CTkLabel(controls_container, text=self.tr("lbl_account") + ":", font=("Segoe UI", 11), text_color=COLORS["text_muted"])
+        lbl_profile.pack(side=side_lbl, padx=5, pady=15)
 
-        # 3. Help Shortcut Button
-        self.btn_tb_help = ctk.CTkButton(
-            tb_content, text=self.tr("help"),
-            font=("Segoe UI", 11),
-            width=70, height=52, corner_radius=8,
-            fg_color="transparent",
-            text_color=COLORS["text_muted"],
-            hover_color=COLORS["bg_dark"],
-            command=self._show_help_dialog
-        )
-        self.btn_tb_help.pack(side="right", padx=3)
-
-        # 4. Settings Popup Button next to the tabs
-        self.btn_tb_send_settings = ctk.CTkButton(
-            tb_content, text="⚙️ " + self.tr("dialog_settings"),
-            font=("Segoe UI", 11, "bold"),
-            width=100, height=52, corner_radius=8,
-            fg_color="transparent",
-            text_color=COLORS["text_muted"],
-            hover_color=COLORS["bg_dark"],
-            command=self._open_sending_settings_dialog
-        )
-        self.btn_tb_send_settings.pack(side="right", padx=3)
-
-        # 5. Red Logout button (placed far left)
-        self.btn_tb_logout = ctk.CTkButton(
-            tb_content, text=self.tr("logout"),
-            font=("Segoe UI", 12, "bold"),
-            width=110, height=40, corner_radius=8,
-            fg_color="#D32F2F", hover_color="#B71C1C",
-            text_color="#FFFFFF",
-            command=self._logout_action
-        )
-        self.btn_tb_logout.pack(side="left", padx=10, pady=6)
-
-        # 6. Profile selector combobox (placed next to logout)
         self.profile_combo = ctk.CTkComboBox(
-            tb_content, values=self._get_profiles(),
+            controls_container, values=self._get_profiles(),
             variable=self.profile_var,
             command=self._on_profile_change,
-            width=120, height=36,
+            width=120, height=32,
             fg_color=COLORS["card_bg"],
             border_color=COLORS["border"],
             button_color=COLORS["primary"],
@@ -398,46 +367,152 @@ class ModernWhatsAppApp(
             dropdown_fg_color=COLORS["card_bg"],
             dropdown_text_color=COLORS["text_main"]
         )
-        self.profile_combo.pack(side="left", padx=5, pady=8)
+        self.profile_combo.pack(side=side_lbl, padx=3, pady=14)
         
         self.btn_add_profile = ctk.CTkButton(
-            tb_content, text="➕", font=("Segoe UI", 12, "bold"),
-            width=28, height=36, corner_radius=6,
+            controls_container, text="➕", font=("Segoe UI", 11, "bold"),
+            width=28, height=32, corner_radius=6,
             fg_color=COLORS["secondary"], hover_color=COLORS["secondary_hover"],
             text_color=COLORS["secondary_text"],
             command=self._on_add_profile_click
         )
-        self.btn_add_profile.pack(side="left", padx=2, pady=8)
-        
-        lbl_profile = ctk.CTkLabel(tb_content, text=self.tr("lbl_account"), font=("Segoe UI", 11), text_color=COLORS["text_muted"])
-        lbl_profile.pack(side="left", padx=2)
-        
-        # 7. Language Toggle Button
-        lang_text = "🇬🇧 EN" if self.current_lang.get() == "ar" else "🇸🇦 AR"
+        self.btn_add_profile.pack(side=side_lbl, padx=3, pady=14)
+
+        # Separator
+        sep = ctk.CTkLabel(controls_container, text="|", text_color=COLORS["border"])
+        sep.pack(side=side_lbl, padx=8, pady=15)
+
+        # Turbo Mode Switch
+        turbo_txt = "🚀 Turbo" if not is_ar else "🚀 توربو"
+        self.turbo_switch = ctk.CTkSwitch(
+            controls_container, text=turbo_txt,
+            variable=self.turbo_mode_var,
+            command=self._toggle_turbo_mode,
+            progress_color=COLORS["primary"],
+            text_color=COLORS["text_main"],
+            font=("Segoe UI", 11, "bold")
+        )
+        self.turbo_switch.pack(side=side_lbl, padx=8, pady=15)
+
+        # Language Toggle Button
+        lang_text = "🇬🇧 EN" if is_ar else "🇸🇦 AR"
         self.btn_lang_toggle = ctk.CTkButton(
-            tb_content, text=lang_text,
-            font=("Segoe UI", 12, "bold"),
-            width=60, height=36, corner_radius=8,
+            controls_container, text=lang_text,
+            font=("Segoe UI", 11, "bold"),
+            width=55, height=32, corner_radius=8,
             fg_color=COLORS["card_bg"], hover_color=COLORS["border"],
             text_color=COLORS["text_main"],
             command=self._toggle_language
         )
-        self.btn_lang_toggle.pack(side="left", padx=10, pady=8)
+        self.btn_lang_toggle.pack(side=side_lbl, padx=5, pady=14)
 
-        # 8. Theme Toggle Button
+        # Theme Toggle Button
         theme_icon = "☀️ Light" if self.config.get("appearance_mode", "dark") == "dark" else "🌙 Dark"
-        if self.current_lang.get() == "ar":
+        if is_ar:
             theme_icon = "☀️ مضيء" if self.config.get("appearance_mode", "dark") == "dark" else "🌙 مظلم"
             
         self.btn_theme_toggle = ctk.CTkButton(
-            tb_content, text=theme_icon,
-            font=("Segoe UI", 12, "bold"),
-            width=80, height=36, corner_radius=8,
+            controls_container, text=theme_icon,
+            font=("Segoe UI", 11, "bold"),
+            width=75, height=32, corner_radius=8,
             fg_color=COLORS["card_bg"], hover_color=COLORS["border"],
             text_color=COLORS["text_main"],
             command=self._toggle_appearance_menu
         )
-        self.btn_theme_toggle.pack(side="left", padx=5, pady=8)
+        self.btn_theme_toggle.pack(side=side_lbl, padx=5, pady=14)
+
+    # ─── Left Sidebar Navigation ──────────────────────────────────────────────
+
+    def _build_sidebar(self):
+        """Build the left sidebar vertical navigation menu."""
+        self.sidebar_frame = ctk.CTkFrame(
+            self.middle_frame, width=220, corner_radius=0,
+            fg_color=COLORS.get("sidebar_bg", "#075E54")
+        )
+        self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
+        self.sidebar_frame.grid_propagate(False)
+
+        nav_container = ctk.CTkScrollableFrame(
+            self.sidebar_frame, fg_color="transparent", corner_radius=0,
+            scrollbar_button_color=COLORS.get("sidebar_separator", "#0A7A6B"),
+            scrollbar_button_hover_color=COLORS.get("sidebar_hover", "#064E46")
+        )
+        nav_container.pack(fill="both", expand=True, padx=5, pady=(10, 5))
+
+        sidebar_items = [
+            ("open_whatsapp", "🌐", self._login_action),
+            ("new_campaign", "📣", "main"),
+            ("sent_campaigns", "📊", "campaigns"),
+            ("auto_reply", "🤖", "auto_reply"),
+            ("received", "📥", "received"),
+            ("filter_numbers", "🔍", "filter"),
+            ("groups_grabber", "👥", "groups"),
+            ("gmaps", "🗺️", "gmaps"),
+            ("warmer", "🔥", "warmer"),
+            ("workflows", "🧭", "workflows"),
+            ("templates", "📝", "templates"),
+            ("settings", "⚙️", self._open_sending_settings_dialog),
+            ("log", "📋", "log"),
+            ("help", "❓", self._show_help_dialog),
+        ]
+
+        self.nav_buttons = {}
+        for key, emoji, target in sidebar_items:
+            btn_text = f"{emoji} {self.tr(key)}"
+            
+            if isinstance(target, str):
+                cmd = lambda t=target: self._switch_tab(t)
+            else:
+                cmd = target
+
+            btn = ctk.CTkButton(
+                nav_container, text=btn_text,
+                font=("Segoe UI", 11, "bold"),
+                anchor="w",
+                height=38,
+                corner_radius=6,
+                fg_color="transparent",
+                text_color=COLORS.get("sidebar_text", "#FFFFFF"),
+                hover_color=COLORS.get("sidebar_hover", "#064E46"),
+                command=cmd
+            )
+            btn.pack(fill="x", pady=2, padx=5)
+            
+            if isinstance(target, str):
+                self.nav_buttons[target] = btn
+
+        logout_btn = ctk.CTkButton(
+            self.sidebar_frame, text="🔴 " + self.tr("logout"),
+            font=("Segoe UI", 12, "bold"),
+            height=40,
+            corner_radius=8,
+            fg_color="#D32F2F", hover_color="#B71C1C",
+            text_color="#FFFFFF",
+            command=self._logout_action
+        )
+        logout_btn.pack(side="bottom", fill="x", padx=10, pady=10)
+
+    def _toggle_turbo_mode(self):
+        """Toggle turbo speed mode on/off."""
+        is_turbo = self.turbo_mode_var.get()
+        self.config.set("turbo_mode", is_turbo)
+        self.config.save()
+        if is_turbo:
+            self.log("🚀 تم تفعيل وضع توربو السريع! تم تقليل الفواصل الزمنية إلى الحد الأدنى.")
+            if hasattr(self, "delay_min_entry"):
+                self.delay_min_entry.delete(0, "end")
+                self.delay_min_entry.insert(0, "1")
+            if hasattr(self, "delay_max_entry"):
+                self.delay_max_entry.delete(0, "end")
+                self.delay_max_entry.insert(0, "3")
+        else:
+            self.log("ℹ️ تم إيقاف وضع توربو. تم استعادة السرعة الطبيعية.")
+            if hasattr(self, "delay_min_entry"):
+                self.delay_min_entry.delete(0, "end")
+                self.delay_min_entry.insert(0, "8")
+            if hasattr(self, "delay_max_entry"):
+                self.delay_max_entry.delete(0, "end")
+                self.delay_max_entry.insert(0, "15")
 
     def _open_sending_settings_dialog(self):
         """Open the unified sending settings dialog containing all application settings in one single place."""
@@ -842,14 +917,14 @@ class ModernWhatsAppApp(
         """Completely rebuild the UI to apply language changes instantly."""
         self._save_current_state()
         
-        if hasattr(self, "toolbar_frame") and self.toolbar_frame:
+        if hasattr(self, "topbar_frame") and self.topbar_frame:
             try:
-                self.toolbar_frame.destroy()
+                self.topbar_frame.destroy()
             except Exception:
                 pass
-        if hasattr(self, "main_frame") and self.main_frame:
+        if hasattr(self, "middle_frame") and self.middle_frame:
             try:
-                self.main_frame.destroy()
+                self.middle_frame.destroy()
             except Exception:
                 pass
         if hasattr(self, "bottom_bar") and self.bottom_bar:
@@ -886,18 +961,26 @@ class ModernWhatsAppApp(
         self.session_status_label.pack(side="left", padx=5)
 
     def _switch_tab(self, tab_id):
-        """Switch visible tab and highlight the active menu button."""
+        """Switch visible tab and highlight the active menu button in the sidebar."""
         self.current_tab = tab_id
-        for fid, frame in self.tab_frames.items():
-            frame.grid_forget()
-        self.tab_frames[tab_id].grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        for fid, frame in list(self.tab_frames.items()):
+            try:
+                if frame.winfo_exists():
+                    frame.grid_forget()
+                else:
+                    # Remove destroyed frames so they don't cause issues again
+                    del self.tab_frames[fid]
+            except Exception:
+                pass
+        if tab_id in self.tab_frames and self.tab_frames[tab_id].winfo_exists():
+            self.tab_frames[tab_id].grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
 
-        # Highlight active nav item
+        # Highlight active nav item in the sidebar
         for nid, btn in self.nav_buttons.items():
             if nid == tab_id:
-                btn.configure(fg_color=COLORS["primary"], text_color="#FFFFFF", font=("Segoe UI", 11, "bold"))
+                btn.configure(fg_color=COLORS.get("sidebar_active", "#00A884"), text_color="#FFFFFF")
             else:
-                btn.configure(fg_color="transparent", text_color=COLORS["text_muted"], font=("Segoe UI", 11))
+                btn.configure(fg_color="transparent", text_color=COLORS.get("sidebar_text", "#FFFFFF"))
 
     # ─── Main Tab (3-Column Workspace) ───────────────────────────────────────
 

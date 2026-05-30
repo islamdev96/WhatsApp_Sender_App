@@ -11,7 +11,7 @@
   "delay_max": 120.0,
   "batch_size": 30,
   "batch_pause_min": 60,
-  "batch_pause_max": 120,
+  "batch_pause_max": 120.0,
   "max_retries": 2,
   "retry_delay_min": 3,
   "retry_delay_max": 6,
@@ -55,5 +55,22 @@
       "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
       "resolution": "1366,768"
     }
-  }
+  },
+  "turbo_mode": false,
+  "friendly_after": 5,
+  "friendly_count": 15,
+  "friendly_wait": 1,
+  "sleep_enabled": true,
+  "friendly_enabled": false,
+  "friendly_numbers_list": [
+    "201012345678",
+    "201112345678"
+  ],
+  "friendly_messages_list": [
+    "سلام كيف حالك؟",
+    "الحمد لله تمام",
+    "أهلاً بك"
+  ],
+  "friendly_numbers": "201012345678,201112345678",
+  "friendly_messages": "سلام كيف حالك؟,الحمد لله تمام,أهلاً بك"
 }
