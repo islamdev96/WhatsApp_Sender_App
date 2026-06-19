@@ -95,6 +95,61 @@ public class WhatsAppAutomationService : IWhatsAppService
         Log("INFO", "CoreWebView2 instance linked to automation service.");
     }
 
+    // ── Dispatcher UI Thread Safety Marshalling Helpers ──
+    private async Task<string> ExecuteScriptSafeAsync(string js)
+    {
+        if (_coreWebView2 == null) return string.Empty;
+
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess())
+        {
+            return await _coreWebView2.ExecuteScriptAsync(js);
+        }
+        else
+        {
+            return await dispatcher.InvokeAsync(async () =>
+            {
+                return await _coreWebView2.ExecuteScriptAsync(js);
+            }).Task.Unwrap();
+        }
+    }
+
+    private async Task<string> CallDevToolsProtocolMethodSafeAsync(string methodName, string parametersAsJson)
+    {
+        if (_coreWebView2 == null) return string.Empty;
+
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess())
+        {
+            return await _coreWebView2.CallDevToolsProtocolMethodAsync(methodName, parametersAsJson);
+        }
+        else
+        {
+            return await dispatcher.InvokeAsync(async () =>
+            {
+                return await _coreWebView2.CallDevToolsProtocolMethodAsync(methodName, parametersAsJson);
+            }).Task.Unwrap();
+        }
+    }
+
+    private void NavigateSafe(string url)
+    {
+        if (_coreWebView2 == null) return;
+
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess())
+        {
+            _coreWebView2.Navigate(url);
+        }
+        else
+        {
+            dispatcher.Invoke(() =>
+            {
+                _coreWebView2.Navigate(url);
+            });
+        }
+    }
+
     public async Task<bool> IsLoggedInAsync()
     {
         if (_coreWebView2 == null) return false;
@@ -102,7 +157,7 @@ public class WhatsAppAutomationService : IWhatsAppService
         try
         {
             var js = $"!!document.querySelector(\"{_selectors.ChatListPane.Replace("\"", "\\\"")}\")";
-            var result = await _coreWebView2.ExecuteScriptAsync(js);
+            var result = await ExecuteScriptSafeAsync(js);
             return result == "true";
         }
         catch (Exception ex)
@@ -118,7 +173,7 @@ public class WhatsAppAutomationService : IWhatsAppService
 
         Log("STEP", $"Opening chat for: {phone}");
         var url = $"https://web.whatsapp.com/send?phone={phone}";
-        _coreWebView2.Navigate(url);
+        NavigateSafe(url);
 
         var start = DateTime.Now;
         var timeout = TimeSpan.FromSeconds(45);
@@ -216,45 +271,53 @@ public class WhatsAppAutomationService : IWhatsAppService
     private async Task<bool> SendTextOnlyAsync(string message, CancellationToken ct)
     {
         if (_coreWebView2 == null) return false;
-
         Log("STEP", "Sending text message...");
-        var escapedMsg = JsonEncodedText.Encode(message).ToString();
+
+        // Pass text as safe JSON to script
+        var msgJson = JsonSerializer.Serialize(message);
+        var inputSel = JsonSerializer.Serialize(_selectors.MessageInputBox);
+        var sendSel = JsonSerializer.Serialize(_selectors.SendButton);
 
         var js = $@"
-            (function() {{
-                var input = document.querySelector(""{_selectors.MessageInputBox.Replace("\"", "\\\"")}"");
-                if (!input) return false;
-                
-                input.focus();
-                input.innerHTML = ""{escapedMsg}"";
-                var event = document.createEvent('HTMLEvents');
-                event.initEvent('input', true, true);
-                input.dispatchEvent(event);
-                
-                setTimeout(function() {{
-                    var sendBtn = document.querySelector(""{_selectors.SendButton.Replace("\"", "\\\"")}"");
-                    if (sendBtn) {{
-                        sendBtn.click();
-                    }} else {{
-                        var enterEvent = new KeyboardEvent('keydown', {{
-                            bubbles: true, cancelable: true, keyCode: 13, key: 'Enter'
-                        }});
-                        input.dispatchEvent(enterEvent);
-                    }}
-                }}, 300);
-                
-                return true;
-            }})();";
+        (async function() {{
+            const input = document.querySelector({inputSel});
+            if (!input) return 'NO_INPUT';
+            input.focus();
 
-        var result = await _coreWebView2.ExecuteScriptAsync(js);
-        if (result == "true")
+            // Clear any existing content
+            document.execCommand('selectAll', false, null);
+            document.execCommand('delete', false, null);
+
+            // Insert text line by line with proper line breaks
+            const text = {msgJson};
+            const lines = text.split('\n');
+            for (let i = 0; i < lines.length; i++) {{
+                if (i > 0) document.execCommand('insertLineBreak');
+                if (lines[i].length) document.execCommand('insertText', false, lines[i]);
+            }}
+
+            // Wait for the Send button to become enabled (up to ~3 seconds)
+            for (let t = 0; t < 30; t++) {{
+                const btn = document.querySelector({sendSel});
+                if (btn && btn.getAttribute('aria-disabled') !== 'true' && !btn.disabled) {{
+                    btn.click();
+                    return 'SENT';
+                }}
+                await new Promise(r => setTimeout(r, 100));
+            }}
+            return 'BTN_DISABLED';
+        }})();";
+
+        var result = await ExecuteScriptSafeAsync(js);
+        var clean = result?.Trim('"');
+        if (clean == "SENT")
         {
-            await Task.Delay(1000, ct);
+            await Task.Delay(800, ct);
             Log("INFO", "Text message sent successfully.");
             return true;
         }
 
-        Log("ERROR", "Failed to send text message.");
+        Log("ERROR", $"Failed to send text. Reason: {clean}");
         return false;
     }
 
@@ -281,7 +344,7 @@ public class WhatsAppAutomationService : IWhatsAppService
                     }}
                     return false;
                 }})();";
-            await _coreWebView2.ExecuteScriptAsync(jsMenu);
+            await ExecuteScriptSafeAsync(jsMenu);
             await Task.Delay(1000, ct); // Wait for menu to load inputs
         }
 
@@ -320,19 +383,25 @@ public class WhatsAppAutomationService : IWhatsAppService
         if (!string.IsNullOrEmpty(captionText))
         {
             Log("INFO", "Writing caption...");
-            var escapedCaption = JsonEncodedText.Encode(captionText).ToString();
+            var captionJson = JsonSerializer.Serialize(captionText);
+            var captionBoxSel = JsonSerializer.Serialize(_selectors.CaptionBox);
             var jsCaption = $@"
                 (function() {{
-                    var captionBox = document.querySelector(""{_selectors.CaptionBox.Replace("\"", "\\\"")}"");
-                    if (!captionBox) return false;
-                    captionBox.focus();
-                    captionBox.innerHTML = ""{escapedCaption}"";
-                    var event = document.createEvent('HTMLEvents');
-                    event.initEvent('input', true, true);
-                    captionBox.dispatchEvent(event);
+                    const input = document.querySelector({captionBoxSel});
+                    if (!input) return false;
+                    input.focus();
+                    document.execCommand('selectAll', false, null);
+                    document.execCommand('delete', false, null);
+
+                    const text = {captionJson};
+                    const lines = text.split('\n');
+                    for (let i = 0; i < lines.length; i++) {{
+                        if (i > 0) document.execCommand('insertLineBreak');
+                        if (lines[i].length) document.execCommand('insertText', false, lines[i]);
+                    }}
                     return true;
                 }})();";
-            await _coreWebView2.ExecuteScriptAsync(jsCaption);
+            await ExecuteScriptSafeAsync(jsCaption);
             await Task.Delay(500, ct);
         }
 
@@ -348,7 +417,7 @@ public class WhatsAppAutomationService : IWhatsAppService
                 return false;
             }})();";
 
-        var sendClicked = await _coreWebView2.ExecuteScriptAsync(jsSend);
+        var sendClicked = await ExecuteScriptSafeAsync(jsSend);
         if (sendClicked == "true")
         {
             // Wait for preview to disappear
@@ -376,13 +445,13 @@ public class WhatsAppAutomationService : IWhatsAppService
         try
         {
             // 1. Get the DOM document root
-            var docResult = await _coreWebView2.CallDevToolsProtocolMethodAsync("DOM.getDocument", "{}");
+            var docResult = await CallDevToolsProtocolMethodSafeAsync("DOM.getDocument", "{}");
             using var doc = JsonDocument.Parse(docResult);
             var rootNodeId = doc.RootElement.GetProperty("root").GetProperty("nodeId").GetInt32();
 
             // 2. Query selector to find the input element's nodeId
             var queryParams = JsonSerializer.Serialize(new { nodeId = rootNodeId, selector = selector });
-            var queryResult = await _coreWebView2.CallDevToolsProtocolMethodAsync("DOM.querySelector", queryParams);
+            var queryResult = await CallDevToolsProtocolMethodSafeAsync("DOM.querySelector", queryParams);
             using var query = JsonDocument.Parse(queryResult);
             var nodeId = query.RootElement.GetProperty("nodeId").GetInt32();
 
@@ -398,7 +467,7 @@ public class WhatsAppAutomationService : IWhatsAppService
                 nodeId = nodeId, 
                 files = new[] { Path.GetFullPath(filePath) } 
             });
-            await _coreWebView2.CallDevToolsProtocolMethodAsync("DOM.setFileInputFiles", setFilesParams);
+            await CallDevToolsProtocolMethodSafeAsync("DOM.setFileInputFiles", setFilesParams);
 
             // 4. Dispatch change event to the input element so React processes it
             var dispatchJs = $@"
@@ -412,7 +481,7 @@ public class WhatsAppAutomationService : IWhatsAppService
                     }}
                     return false;
                 }})();";
-            await _coreWebView2.ExecuteScriptAsync(dispatchJs);
+            await ExecuteScriptSafeAsync(dispatchJs);
 
             Log("INFO", $"Successfully set file input '{selector}' to path '{filePath}' using CDP.");
             return true;
@@ -430,7 +499,7 @@ public class WhatsAppAutomationService : IWhatsAppService
         try
         {
             var js = $"!!document.querySelector(\"{selector.Replace("\"", "\\\"")}\")";
-            var result = await _coreWebView2.ExecuteScriptAsync(js);
+            var result = await ExecuteScriptSafeAsync(js);
             return result == "true";
         }
         catch
@@ -449,15 +518,22 @@ public class WhatsAppAutomationService : IWhatsAppService
             var js = $@"
                 (function() {{
                     var markers = {markersArrayJson};
-                    var bodyText = document.body ? document.body.innerText : '';
+                    
+                    // Look for modal/dialog container (WhatsApp Web uses data-animate-modal-popup or role='dialog' for alerts)
+                    var modal = document.querySelector(""div[data-animate-modal-popup='true'], div[role='dialog']"");
+                    if (!modal) {{
+                        return false; // No alert modal, so number is not flagged as invalid
+                    }}
+                    
+                    var targetText = modal.innerText || modal.textContent || '';
                     for (var i = 0; i < markers.length; i++) {{
-                        if (bodyText.indexOf(markers[i]) >= 0) {{
+                        if (targetText.indexOf(markers[i]) >= 0) {{
                             return true;
                         }}
                     }}
                     return false;
                 }})();";
-            var result = await _coreWebView2.ExecuteScriptAsync(js);
+            var result = await ExecuteScriptSafeAsync(js);
             return result == "true";
         }
         catch
@@ -490,7 +566,7 @@ public class WhatsAppAutomationService : IWhatsAppService
                     document.dispatchEvent(escEvent);
                     return false;
                 }})();";
-            await _coreWebView2.ExecuteScriptAsync(js);
+            await ExecuteScriptSafeAsync(js);
             await Task.Delay(500);
         }
         catch (Exception ex)

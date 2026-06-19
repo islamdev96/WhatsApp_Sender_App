@@ -45,16 +45,36 @@ public partial class CampaignsTabViewModel : ObservableObject
     [RelayCommand]
     public void LoadCampaigns()
     {
-        var list = _repo.GetAll();
-        CampaignsList = new ObservableCollection<Campaign>(list);
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess())
+        {
+            var list = _repo.GetAll();
+            CampaignsList = new ObservableCollection<Campaign>(list);
 
-        TotalCampaigns = list.Count;
-        TotalSent = list.Sum(c => c.Sent);
-        TotalFailed = list.Sum(c => c.Failed);
+            TotalCampaigns = list.Count;
+            TotalSent = list.Sum(c => c.Sent);
+            TotalFailed = list.Sum(c => c.Failed);
 
-        int total = TotalSent + TotalFailed;
-        double rate = total > 0 ? (double)TotalSent / total * 100.0 : 0.0;
-        SuccessRatePercent = $"{rate:F0}%";
+            int total = TotalSent + TotalFailed;
+            double rate = total > 0 ? (double)TotalSent / total * 100.0 : 0.0;
+            SuccessRatePercent = $"{rate:F0}%";
+        }
+        else
+        {
+            dispatcher.Invoke(() =>
+            {
+                var list = _repo.GetAll();
+                CampaignsList = new ObservableCollection<Campaign>(list);
+
+                TotalCampaigns = list.Count;
+                TotalSent = list.Sum(c => c.Sent);
+                TotalFailed = list.Sum(c => c.Failed);
+
+                int total = TotalSent + TotalFailed;
+                double rate = total > 0 ? (double)TotalSent / total * 100.0 : 0.0;
+                SuccessRatePercent = $"{rate:F0}%";
+            });
+        }
     }
 
     [RelayCommand]
@@ -372,7 +392,18 @@ public partial class SchedulerTabViewModel : ObservableObject
     [RelayCommand]
     public void LoadScheduled()
     {
-        ScheduledCampaigns = new ObservableCollection<ScheduledCampaign>(_repo.GetAll());
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess())
+        {
+            ScheduledCampaigns = new ObservableCollection<ScheduledCampaign>(_repo.GetAll());
+        }
+        else
+        {
+            dispatcher.Invoke(() =>
+            {
+                ScheduledCampaigns = new ObservableCollection<ScheduledCampaign>(_repo.GetAll());
+            });
+        }
     }
 
     [RelayCommand]
