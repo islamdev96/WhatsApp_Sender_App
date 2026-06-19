@@ -39,6 +39,7 @@ public partial class MainWindowViewModel : ObservableObject
     public WarmerTabViewModel WarmerTab { get; }
     public WorkflowsTabViewModel WorkflowsTab { get; }
     public GMapsTabViewModel GMapsTab { get; }
+    public NumbersFilterTabViewModel NumbersFilterTab { get; }
 
     [ObservableProperty]
     private bool _isActivated;
@@ -112,9 +113,10 @@ public partial class MainWindowViewModel : ObservableObject
         SchedulerTab = new SchedulerTabViewModel(ScheduledRepo);
         AutoReplyTab = new AutoReplyTabViewModel();
         ReceivedTab = new ReceivedTabViewModel();
-        WarmerTab = new WarmerTabViewModel();
+        WarmerTab = new WarmerTabViewModel(WhatsAppService, Spintax);
         WorkflowsTab = new WorkflowsTabViewModel();
         GMapsTab = new GMapsTabViewModel();
+        NumbersFilterTab = new NumbersFilterTabViewModel(WhatsAppService);
 
         // Start Scheduler Polling Loop
         Scheduler.Start(async (scheduledCamp, contacts) =>
@@ -296,6 +298,14 @@ public partial class MainWindowViewModel : ObservableObject
     private void OpenWorkflows()
     {
         var win = new WorkflowsWindow { DataContext = WorkflowsTab };
+        win.Owner = Application.Current.MainWindow;
+        win.Show();
+    }
+
+    [RelayCommand]
+    private void OpenNumbersFilter()
+    {
+        var win = new NumbersFilterWindow { DataContext = NumbersFilterTab };
         win.Owner = Application.Current.MainWindow;
         win.Show();
     }

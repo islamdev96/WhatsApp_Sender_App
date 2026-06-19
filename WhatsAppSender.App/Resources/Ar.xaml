@@ -180,6 +180,7 @@
     <system:String x:Key="TbLogs">سجل الأخطاء</system:String>
     <system:String x:Key="TbWarmer">تهيئة الحسابات</system:String>
     <system:String x:Key="TbWorkflows">مسارات العمل</system:String>
+    <system:String x:Key="TbFilter">الفلترة</system:String>
 
     <!-- Status Bar -->
     <system:String x:Key="StatusConnection">الحالة:</system:String>

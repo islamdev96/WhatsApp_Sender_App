@@ -289,7 +289,7 @@ public partial class MainTabViewModel : ObservableObject
         }
     }
 
-    private void UpdateCounters()
+    public void UpdateCounters()
     {
         TotalCount = ContactsList.Count;
         ContactsCount = ContactsList.Count;

@@ -180,6 +180,7 @@
     <system:String x:Key="TbLogs">Logs</system:String>
     <system:String x:Key="TbWarmer">Warmer</system:String>
     <system:String x:Key="TbWorkflows">Workflows</system:String>
+    <system:String x:Key="TbFilter">Filter</system:String>
 
     <!-- Status Bar -->
     <system:String x:Key="StatusConnection">Connection:</system:String>

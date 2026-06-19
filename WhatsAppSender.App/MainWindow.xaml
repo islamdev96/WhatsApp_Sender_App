@@ -85,6 +85,7 @@
                         <MenuItem Header="{DynamicResource TabTemplates}" Command="{Binding OpenTemplatesManagerCommand}"/>
                         <MenuItem Header="{DynamicResource TabScheduled}" Command="{Binding OpenSchedulerCommand}"/>
                         <MenuItem Header="{DynamicResource TabGMaps}" Command="{Binding OpenGMapsScraperCommand}"/>
+                        <MenuItem Header="{DynamicResource TabFilter}" Command="{Binding OpenNumbersFilterCommand}"/>
                         <MenuItem Header="{DynamicResource TabWarmer}" Command="{Binding OpenWarmerCommand}"/>
                         <MenuItem Header="{DynamicResource TabWorkflows}" Command="{Binding OpenWorkflowsCommand}"/>
                         <MenuItem Header="{DynamicResource TabLogs}" Command="{Binding OpenLogsCommand}"/>
@@ -145,6 +146,13 @@
                             <StackPanel>
                                 <TextBlock Text="🗺️" FontSize="20" HorizontalAlignment="Center"/>
                                 <TextBlock Text="{DynamicResource TbGMaps}" FontSize="11" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <!-- Numbers Filter -->
+                        <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding OpenNumbersFilterCommand}">
+                            <StackPanel>
+                                <TextBlock Text="🔍" FontSize="20" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbFilter}" FontSize="11" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                         <!-- Warmer -->
