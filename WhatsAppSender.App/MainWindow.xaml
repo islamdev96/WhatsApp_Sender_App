@@ -70,16 +70,16 @@
 
             <DockPanel>
                 <!-- 1. Top Menu Bar -->
-                <Menu DockPanel.Dock="Top" Background="{DynamicResource BrushPanelBackground}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="0,0,0,1" Padding="5,2">
-                    <MenuItem Header="{DynamicResource MenuFile}" Foreground="{DynamicResource BrushTextPrimary}">
+                <Menu DockPanel.Dock="Top">
+                    <MenuItem Header="{DynamicResource MenuFile}">
                         <MenuItem Header="{DynamicResource MenuExit}" Click="Exit_Click"/>
                     </MenuItem>
-                    <MenuItem Header="{DynamicResource MenuSettings}" Foreground="{DynamicResource BrushTextPrimary}">
+                    <MenuItem Header="{DynamicResource MenuSettings}">
                         <MenuItem Header="{DynamicResource BtnToggleLang}" Command="{Binding ToggleLanguageCommand}"/>
                         <MenuItem Header="{DynamicResource BtnToggleTheme}" Command="{Binding ToggleThemeCommand}"/>
                         <MenuItem Header="{DynamicResource BtnToggleBrowser}" Command="{Binding ToggleBrowserCommand}"/>
                     </MenuItem>
-                    <MenuItem Header="{DynamicResource MenuTools}" Foreground="{DynamicResource BrushTextPrimary}">
+                    <MenuItem Header="{DynamicResource MenuTools}">
                         <MenuItem Header="{DynamicResource TabCampaignsHistory}" Command="{Binding OpenCampaignsHistoryCommand}"/>
                         <MenuItem Header="{DynamicResource TabContacts}" Command="{Binding OpenContactsManagerCommand}"/>
                         <MenuItem Header="{DynamicResource TabTemplates}" Command="{Binding OpenTemplatesManagerCommand}"/>
@@ -91,83 +91,85 @@
                     </MenuItem>
                 </Menu>
 
-                <!-- 2. Iconic Toolbar -->
-                <ToolBarTray DockPanel.Dock="Top" Background="{DynamicResource BrushPrimaryBackground}">
-                    <ToolBar Background="Transparent" ClipToBounds="False" Band="0" BandIndex="0">
+                <!-- 2. Modern Flat Toolbar Tray -->
+                <Border DockPanel.Dock="Top" Background="{DynamicResource BrushPanelBackground}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="0,0,0,1" Padding="10,6">
+                    <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <!-- Open WhatsApp Browser -->
-                        <Button Command="{Binding ToggleBrowserCommand}" ToolTip="{DynamicResource BtnToggleBrowser}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="🌐 " FontSize="14" VerticalAlignment="Center"/>
-                                <TextBlock Text="{DynamicResource TbOpenWhatsApp}" VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding ToggleBrowserCommand}">
+                            <StackPanel>
+                                <TextBlock Text="🌐" FontSize="20" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbOpenWhatsApp}" FontSize="11" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Separator Background="{DynamicResource BrushBorder}"/>
+                        <Border Width="1" Height="30" Background="{DynamicResource BrushBorder}" Margin="6,0" VerticalAlignment="Center"/>
+                        
                         <!-- New Campaign (Clears current numbers) -->
-                        <Button Command="{Binding MainTab.ClearListCommand}" ToolTip="{DynamicResource TbNewCampaign}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="➕ " FontSize="14" VerticalAlignment="Center"/>
-                                <TextBlock Text="{DynamicResource TbNewCampaign}" VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding MainTab.ClearListCommand}">
+                            <StackPanel>
+                                <TextBlock Text="➕" FontSize="20" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbNewCampaign}" FontSize="11" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                         <!-- Campaigns History -->
-                        <Button Command="{Binding OpenCampaignsHistoryCommand}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="📊 " FontSize="14" VerticalAlignment="Center"/>
-                                <TextBlock Text="{DynamicResource TbHistory}" VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding OpenCampaignsHistoryCommand}">
+                            <StackPanel>
+                                <TextBlock Text="📊" FontSize="20" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbHistory}" FontSize="11" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                         <!-- Contacts manager -->
-                        <Button Command="{Binding OpenContactsManagerCommand}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="👥 " FontSize="14" VerticalAlignment="Center"/>
-                                <TextBlock Text="{DynamicResource TbContacts}" VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding OpenContactsManagerCommand}">
+                            <StackPanel>
+                                <TextBlock Text="👥" FontSize="20" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbContacts}" FontSize="11" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                         <!-- Templates -->
-                        <Button Command="{Binding OpenTemplatesManagerCommand}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="📝 " FontSize="14" VerticalAlignment="Center"/>
-                                <TextBlock Text="{DynamicResource TbTemplates}" VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding OpenTemplatesManagerCommand}">
+                            <StackPanel>
+                                <TextBlock Text="📝" FontSize="20" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbTemplates}" FontSize="11" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                         <!-- Scheduler -->
-                        <Button Command="{Binding OpenSchedulerCommand}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="📅 " FontSize="14" VerticalAlignment="Center"/>
-                                <TextBlock Text="{DynamicResource TbScheduler}" VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding OpenSchedulerCommand}">
+                            <StackPanel>
+                                <TextBlock Text="📅" FontSize="20" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbScheduler}" FontSize="11" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Separator Background="{DynamicResource BrushBorder}"/>
+                        <Border Width="1" Height="30" Background="{DynamicResource BrushBorder}" Margin="6,0" VerticalAlignment="Center"/>
+                        
                         <!-- GMaps Scraper -->
-                        <Button Command="{Binding OpenGMapsScraperCommand}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="🗺️ " FontSize="14" VerticalAlignment="Center"/>
-                                <TextBlock Text="{DynamicResource TbGMaps}" VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding OpenGMapsScraperCommand}">
+                            <StackPanel>
+                                <TextBlock Text="🗺️" FontSize="20" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbGMaps}" FontSize="11" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                         <!-- Warmer -->
-                        <Button Command="{Binding OpenWarmerCommand}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="🔥 " FontSize="14" VerticalAlignment="Center"/>
-                                <TextBlock Text="{DynamicResource TbWarmer}" VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding OpenWarmerCommand}">
+                            <StackPanel>
+                                <TextBlock Text="🔥" FontSize="20" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbWarmer}" FontSize="11" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                         <!-- Workflows -->
-                        <Button Command="{Binding OpenWorkflowsCommand}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="⛓️ " FontSize="14" VerticalAlignment="Center"/>
-                                <TextBlock Text="{DynamicResource TbWorkflows}" VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding OpenWorkflowsCommand}">
+                            <StackPanel>
+                                <TextBlock Text="⛓️" FontSize="20" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbWorkflows}" FontSize="11" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                         <!-- System Logs -->
-                        <Button Command="{Binding OpenLogsCommand}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="⚙️ " FontSize="14" VerticalAlignment="Center"/>
-                                <TextBlock Text="{DynamicResource TbLogs}" VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource ToolbarButtonStyle}" Command="{Binding OpenLogsCommand}">
+                            <StackPanel>
+                                <TextBlock Text="⚙️" FontSize="20" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbLogs}" FontSize="11" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                    </ToolBar>
-                </ToolBarTray>
+                    </WrapPanel>
+                </Border>
 
                 <!-- 3. Bottom Status Bar -->
                 <StatusBar DockPanel.Dock="Bottom" Background="{DynamicResource BrushPanelBackground}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="0,1,0,0" Height="30" Padding="5,0">
