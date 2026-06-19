@@ -822,7 +822,7 @@
                     </Border>
 
                     <!-- WebView2 instance -->
-                    <wv2:WebView2 x:Name="webView" Grid.Row="1" Source="https://web.whatsapp.com"/>
+                    <wv2:WebView2 x:Name="webView" Grid.Row="1"/>
                 </Grid>
             </Border>
         </Grid>

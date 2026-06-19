@@ -41,6 +41,9 @@ public partial class MainWindow : Window
             // Ensure WebView2 is initialized
             await webView.EnsureCoreWebView2Async(env);
 
+            // Set the source programmatically
+            webView.Source = new Uri("https://web.whatsapp.com");
+
             // Link the initialized CoreWebView2 instance to our automation service
             viewModel.WhatsAppService.SetCoreWebView2(webView.CoreWebView2);
             
