@@ -24,6 +24,22 @@ public class ContactSendingRow
     public string Status { get; set; } = "Pending"; // Pending, Sending, Success, Failed, Invalid
 }
 
+public class AttachmentRow
+{
+    public string FileName { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
+    public string Caption { get; set; } = string.Empty;
+}
+
+public partial class MessageTabItem : ObservableObject
+{
+    [ObservableProperty]
+    private string _header = string.Empty;
+
+    [ObservableProperty]
+    private string _text = string.Empty;
+}
+
 public partial class MainTabViewModel : ObservableObject
 {
     private readonly ContactsRepository _contactsRepo;
@@ -49,7 +65,10 @@ public partial class MainTabViewModel : ObservableObject
     private string _sourceMode = "File/Manual"; // File/Manual vs Saved Group
 
     [ObservableProperty]
-    private string _messageText = string.Empty;
+    private ObservableCollection<MessageTabItem> _messageTabs = new();
+
+    [ObservableProperty]
+    private MessageTabItem? _selectedMessageTab;
 
     [ObservableProperty]
     private bool _sendTextWithImage = false;
@@ -82,6 +101,15 @@ public partial class MainTabViewModel : ObservableObject
     private int _totalCount = 0;
 
     [ObservableProperty]
+    private int _contactsCount = 0;
+
+    [ObservableProperty]
+    private int _groupsCount = 0;
+
+    [ObservableProperty]
+    private ObservableCollection<AttachmentRow> _attachmentsList = new();
+
+    [ObservableProperty]
     private double _progressBarValue = 0;
 
     [ObservableProperty]
@@ -101,6 +129,9 @@ public partial class MainTabViewModel : ObservableObject
         _spintaxEngine = spintaxEngine;
 
         LoadSavedGroups();
+
+        _messageTabs.Add(new MessageTabItem { Header = "Message 1", Text = string.Empty });
+        _selectedMessageTab = _messageTabs[0];
     }
 
     public void LoadSavedGroups()
@@ -229,18 +260,63 @@ public partial class MainTabViewModel : ObservableObject
     [RelayCommand]
     private void TestSpintax()
     {
-        if (string.IsNullOrEmpty(MessageText)) return;
-        var parsed = _spintaxEngine.Parse(MessageText);
+        if (SelectedMessageTab == null || string.IsNullOrEmpty(SelectedMessageTab.Text)) return;
+        var parsed = _spintaxEngine.Parse(SelectedMessageTab.Text);
         MessageBox.Show(parsed, "معاينة النص الدوار / Spintax Preview", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    [RelayCommand]
+    private void AddMessageTab()
+    {
+        var count = MessageTabs.Count + 1;
+        var newTab = new MessageTabItem { Header = $"Message {count}", Text = string.Empty };
+        MessageTabs.Add(newTab);
+        SelectedMessageTab = newTab;
+    }
+
+    [RelayCommand]
+    private void RemoveMessageTab()
+    {
+        if (MessageTabs.Count > 1 && SelectedMessageTab != null)
+        {
+            var index = MessageTabs.IndexOf(SelectedMessageTab);
+            MessageTabs.Remove(SelectedMessageTab);
+            for (int i = 0; i < MessageTabs.Count; i++)
+            {
+                MessageTabs[i].Header = $"Message {i + 1}";
+            }
+            SelectedMessageTab = MessageTabs[Math.Min(index, MessageTabs.Count - 1)];
+        }
     }
 
     private void UpdateCounters()
     {
         TotalCount = ContactsList.Count;
+        ContactsCount = ContactsList.Count;
+        GroupsCount = SourceMode == "Saved Group" ? 1 : 0;
         SentCount = ContactsList.Count(c => c.Status == "Sent" || c.Status == "Success");
         FailedCount = ContactsList.Count(c => c.Status == "Failed");
         InvalidCount = ContactsList.Count(c => c.Status == "Invalid");
         ProgressBarValue = TotalCount > 0 ? (double)(SentCount + FailedCount + InvalidCount) / TotalCount * 100.0 : 0;
+    }
+
+    partial void OnAttachmentPathChanged(string value)
+    {
+        AttachmentsList.Clear();
+        if (!string.IsNullOrEmpty(value))
+        {
+            var ext = Path.GetExtension(value).ToLower();
+            string type = "Document";
+            if (ext == ".jpg" || ext == ".png" || ext == ".webp" || ext == ".jpeg") type = "Image";
+            else if (ext == ".mp4" || ext == ".avi" || ext == ".mov") type = "Video";
+
+            AttachmentsList.Add(new AttachmentRow
+            {
+                FileName = Path.GetFileName(value),
+                Type = type,
+                Caption = string.Empty
+            });
+        }
     }
 
     [RelayCommand]
@@ -321,12 +397,20 @@ public partial class MainTabViewModel : ObservableObject
             });
         };
 
+        var messageList = MessageTabs.Select(t => t.Text).Where(txt => !string.IsNullOrWhiteSpace(txt)).ToList();
+        if (messageList.Count == 0)
+        {
+            MessageBox.Show("الرجاء كتابة نص رسالة واحدة على الأقل / Please write at least one message template.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Warning);
+            IsSending = false;
+            return;
+        }
+
         try
         {
             await _runner.RunCampaignAsync(
                 campaign,
                 contactsToRun,
-                MessageText,
+                messageList,
                 string.IsNullOrEmpty(AttachmentPath) ? null : AttachmentPath,
                 attType,
                 null,

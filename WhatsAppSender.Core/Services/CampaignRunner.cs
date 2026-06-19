@@ -35,7 +35,7 @@ public class CampaignRunner
     public async Task RunCampaignAsync(
         Campaign campaign,
         List<Contact> contacts,
-        string messageTemplate,
+        List<string> messageTemplates,
         string? attachmentPath,
         string? attachmentType,
         string? caption,
@@ -65,6 +65,7 @@ public class CampaignRunner
 
         try
         {
+            var rng = new Random();
             for (int i = 0; i < contacts.Count; i++)
             {
                 if (ct.IsCancellationRequested)
@@ -74,6 +75,11 @@ public class CampaignRunner
                 }
 
                 var contact = contacts[i];
+
+                // Pick a random message template from the list
+                var messageTemplate = (messageTemplates != null && messageTemplates.Count > 0)
+                    ? messageTemplates[rng.Next(messageTemplates.Count)]
+                    : string.Empty;
 
                 // 1. Personalize message using variables (e.g., {name})
                 var personalized = messageTemplate.Replace("{name}", contact.Name ?? string.Empty);

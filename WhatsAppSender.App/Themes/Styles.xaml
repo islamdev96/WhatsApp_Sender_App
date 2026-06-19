@@ -108,7 +108,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
                     <Border x:Name="border" CornerRadius="6" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
-                        <ScrollViewer x:Name="PART_ContentHost" Focusable="false" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"/>
+                        <ScrollViewer x:Name="PART_ContentHost" Focusable="false" Margin="8,6"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsFocused" Value="True">
@@ -200,10 +200,12 @@
                     <Border x:Name="border" CornerRadius="6" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="6"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <ContentPresenter Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                            <!-- Active Tab Indicator Line -->
+                            <Border x:Name="indicator" Grid.Column="0" Background="{DynamicResource BrushAccent}" CornerRadius="2" Width="4" Height="20" HorizontalAlignment="Left" Visibility="Collapsed"/>
+                            <ContentPresenter Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0"/>
                         </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
@@ -214,6 +216,7 @@
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="border" Property="Background" Value="{DynamicResource BrushListSelectedBackground}"/>
                             <Setter Property="Foreground" Value="{DynamicResource BrushAccent}"/>
+                            <Setter TargetName="indicator" Property="Visibility" Value="Visible"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

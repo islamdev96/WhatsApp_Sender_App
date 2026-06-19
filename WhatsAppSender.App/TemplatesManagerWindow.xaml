@@ -1,0 +1,66 @@
+<Window x:Class="WhatsAppSender.App.TemplatesManagerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource L_TemplatesTitle}" Height="550" Width="850"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource BrushPrimaryBackground}"
+        Foreground="{DynamicResource BrushTextPrimary}">
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="4*"/>
+            <ColumnDefinition Width="6*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Left: Templates list -->
+        <Border Grid.Column="0" Style="{StaticResource CardPanel}" Margin="0,0,10,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="{DynamicResource L_TemplatesTitle}" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                <ListView Grid.Row="1" ItemsSource="{Binding TemplatesList}" SelectedItem="{Binding SelectedTemplate}">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="{DynamicResource ColTemplateName}" DisplayMemberBinding="{Binding Name}" Width="200"/>
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+
+                <Grid Grid.Row="2" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0" Content="{DynamicResource BtnEditSelectedTemplate}" Command="{Binding LoadSelectedTemplateCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,5,0" Height="36"/>
+                    <Button Grid.Column="1" Content="{DynamicResource BtnDeleteSelectedTemplate}" Command="{Binding DeleteTemplateCommand}" Style="{StaticResource DangerButton}" Margin="5,0,0,0" Height="36"/>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Right: Editor -->
+        <Border Grid.Column="1" Style="{StaticResource CardPanel}" Margin="10,0,0,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="{DynamicResource L_TemplateEditorTitle}" FontSize="16" FontWeight="Bold" Margin="0,0,0,15"/>
+
+                <TextBlock Grid.Row="1" Text="{DynamicResource L_TemplateNameLabel}" Margin="0,0,0,4"/>
+                <TextBox Grid.Row="2" Text="{Binding TemplateName, UpdateSourceTrigger=PropertyChanged}" Height="34" Margin="0,0,0,10"/>
+
+                <TextBox Grid.Row="3" Text="{Binding TemplateBody, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" Margin="0,0,0,15" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto"/>
+
+                <Button Grid.Row="4" Content="{DynamicResource BtnSaveTemplate}" Command="{Binding SaveTemplateCommand}" Height="40"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

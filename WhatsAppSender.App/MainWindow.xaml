@@ -7,7 +7,7 @@
         xmlns:local="clr-namespace:WhatsAppSender.App"
         xmlns:vm="clr-namespace:WhatsAppSender.App.ViewModels"
         mc:Ignorable="d"
-        Title="{DynamicResource AppTitle}" Height="760" Width="1280"
+        Title="{DynamicResource AppTitle}" Height="800" Width="1350"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource BrushPrimaryBackground}"
         Foreground="{DynamicResource BrushTextPrimary}">
@@ -40,17 +40,17 @@
             <Border Width="450" Height="400" Style="{DynamicResource CardPanel}" VerticalAlignment="Center" HorizontalAlignment="Center">
                 <StackPanel VerticalAlignment="Center" Margin="10">
                     <TextBlock Text="WhatsApp Sender Pro" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource BrushAccent}" HorizontalAlignment="Center" Margin="0,0,0,5"/>
-                    <TextBlock Text="تنشيط الترخيص / License Activation" FontSize="14" Foreground="{DynamicResource BrushTextSecondary}" HorizontalAlignment="Center" Margin="0,0,0,25"/>
+                    <TextBlock Text="{DynamicResource L_ActivationTitle}" FontSize="14" Foreground="{DynamicResource BrushTextSecondary}" HorizontalAlignment="Center" Margin="0,0,0,25"/>
 
-                    <TextBlock Text="معرّف الجهاز (HWID):" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                    <TextBlock Text="{DynamicResource L_HWIDLabel}" FontWeight="SemiBold" Margin="0,0,0,5"/>
                     <TextBox Text="{Binding Hwid, Mode=OneWay}" IsReadOnly="True" Margin="0,0,0,15" Background="{DynamicResource BrushPrimaryBackground}"/>
 
-                    <TextBlock Text="مفتاح التنشيط / Activation Key:" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                    <TextBlock Text="{DynamicResource L_ActivationKeyLabel}" FontWeight="SemiBold" Margin="0,0,0,5"/>
                     <TextBox Text="{Binding ActivationKey, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10"/>
 
                     <TextBlock Text="{Binding ActivationError}" Foreground="#EF4444" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,15" HorizontalAlignment="Center"/>
 
-                    <Button Content="تفعيل / Activate" Command="{Binding ActivateCommand}" Height="42"/>
+                    <Button Content="{DynamicResource BtnActivate}" Command="{Binding ActivateCommand}" Height="42"/>
                 </StackPanel>
             </Border>
         </Grid>
@@ -68,763 +68,465 @@
                 </Style>
             </Grid.Style>
 
-            <Grid.ColumnDefinitions>
-                <!-- Column 0: Sidebar Navigation -->
-                <ColumnDefinition Width="230"/>
-                <!-- Column 1: Active Tab View Content -->
-                <ColumnDefinition Width="*"/>
-                <!-- Column 2: Splitter -->
-                <ColumnDefinition Width="Auto"/>
-                <!-- Column 3: Collapsible WebView2 browser -->
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
+            <DockPanel>
+                <!-- 1. Top Menu Bar -->
+                <Menu DockPanel.Dock="Top" Background="{DynamicResource BrushPanelBackground}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="0,0,0,1" Padding="5,2">
+                    <MenuItem Header="{DynamicResource MenuFile}" Foreground="{DynamicResource BrushTextPrimary}">
+                        <MenuItem Header="{DynamicResource MenuExit}" Click="Exit_Click"/>
+                    </MenuItem>
+                    <MenuItem Header="{DynamicResource MenuSettings}" Foreground="{DynamicResource BrushTextPrimary}">
+                        <MenuItem Header="{DynamicResource BtnToggleLang}" Command="{Binding ToggleLanguageCommand}"/>
+                        <MenuItem Header="{DynamicResource BtnToggleTheme}" Command="{Binding ToggleThemeCommand}"/>
+                        <MenuItem Header="{DynamicResource BtnToggleBrowser}" Command="{Binding ToggleBrowserCommand}"/>
+                    </MenuItem>
+                    <MenuItem Header="{DynamicResource MenuTools}" Foreground="{DynamicResource BrushTextPrimary}">
+                        <MenuItem Header="{DynamicResource TabCampaignsHistory}" Command="{Binding OpenCampaignsHistoryCommand}"/>
+                        <MenuItem Header="{DynamicResource TabContacts}" Command="{Binding OpenContactsManagerCommand}"/>
+                        <MenuItem Header="{DynamicResource TabTemplates}" Command="{Binding OpenTemplatesManagerCommand}"/>
+                        <MenuItem Header="{DynamicResource TabScheduled}" Command="{Binding OpenSchedulerCommand}"/>
+                        <MenuItem Header="{DynamicResource TabGMaps}" Command="{Binding OpenGMapsScraperCommand}"/>
+                        <MenuItem Header="{DynamicResource TabWarmer}" Command="{Binding OpenWarmerCommand}"/>
+                        <MenuItem Header="{DynamicResource TabWorkflows}" Command="{Binding OpenWorkflowsCommand}"/>
+                        <MenuItem Header="{DynamicResource TabLogs}" Command="{Binding OpenLogsCommand}"/>
+                    </MenuItem>
+                </Menu>
 
-            <!-- 1. SIDEBAR PANEL -->
-            <Border Grid.Column="0" Background="{DynamicResource BrushPanelBackground}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="0,0,1,0">
-                <Grid Margin="12,20,12,15">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+                <!-- 2. Iconic Toolbar -->
+                <ToolBarTray DockPanel.Dock="Top" Background="{DynamicResource BrushPrimaryBackground}">
+                    <ToolBar Background="Transparent" ClipToBounds="False" Band="0" BandIndex="0">
+                        <!-- Open WhatsApp Browser -->
+                        <Button Command="{Binding ToggleBrowserCommand}" ToolTip="{DynamicResource BtnToggleBrowser}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🌐 " FontSize="14" VerticalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbOpenWhatsApp}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Separator Background="{DynamicResource BrushBorder}"/>
+                        <!-- New Campaign (Clears current numbers) -->
+                        <Button Command="{Binding MainTab.ClearListCommand}" ToolTip="{DynamicResource TbNewCampaign}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="➕ " FontSize="14" VerticalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbNewCampaign}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <!-- Campaigns History -->
+                        <Button Command="{Binding OpenCampaignsHistoryCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📊 " FontSize="14" VerticalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbHistory}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <!-- Contacts manager -->
+                        <Button Command="{Binding OpenContactsManagerCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="👥 " FontSize="14" VerticalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbContacts}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <!-- Templates -->
+                        <Button Command="{Binding OpenTemplatesManagerCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📝 " FontSize="14" VerticalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbTemplates}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <!-- Scheduler -->
+                        <Button Command="{Binding OpenSchedulerCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📅 " FontSize="14" VerticalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbScheduler}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Separator Background="{DynamicResource BrushBorder}"/>
+                        <!-- GMaps Scraper -->
+                        <Button Command="{Binding OpenGMapsScraperCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🗺️ " FontSize="14" VerticalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbGMaps}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <!-- Warmer -->
+                        <Button Command="{Binding OpenWarmerCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🔥 " FontSize="14" VerticalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbWarmer}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <!-- Workflows -->
+                        <Button Command="{Binding OpenWorkflowsCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="⛓️ " FontSize="14" VerticalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbWorkflows}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <!-- System Logs -->
+                        <Button Command="{Binding OpenLogsCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="⚙️ " FontSize="14" VerticalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource TbLogs}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </ToolBar>
+                </ToolBarTray>
 
-                    <!-- Sidebar Header -->
-                    <StackPanel Grid.Row="0" Margin="0,0,0,25">
-                        <TextBlock Text="WhatsApp Sender" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource BrushAccent}" HorizontalAlignment="Center"/>
-                        <TextBlock Text="PRO EDITION v2.0" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource BrushTextSecondary}" HorizontalAlignment="Center"/>
-                    </StackPanel>
-
-                    <!-- Navigation Sidebar Items -->
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel>
-                            <!-- Tab Button: Campaign sending -->
-                            <RadioButton Content="🚀  الحملة الإعلانية" Style="{StaticResource NavButton}" IsChecked="True" Command="{Binding NavigateCommand}" CommandParameter="Main"/>
-                            <RadioButton Content="📊  سجل الحملات" Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="Campaigns"/>
-                            <RadioButton Content="👥  الأرقام والمجموعات" Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="Contacts"/>
-                            <RadioButton Content="📝  قوالب الرسائل" Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="Templates"/>
-                            <RadioButton Content="📅  الجدولة الزمنية" Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="Scheduler"/>
-                            <RadioButton Content="🤖  الرد التلقائي" Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="AutoReply"/>
-                            <RadioButton Content="📥  صندوق الوارد" Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="Received"/>
-                            
-                            <!-- Placeholder features for completeness -->
-                            <RadioButton Content="🔍  فلترة الأرقام" Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="Filter"/>
-                            <RadioButton Content="🔥  تهيئة الحسابات" Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="Warmer"/>
-                            <RadioButton Content="⛓️  مسارات العمل" Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="Workflows"/>
-                            <RadioButton Content="🗺️  سحب خرائط جوجل" Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="GMaps"/>
-                            <RadioButton Content="⚙️  سجلات النظام" Style="{StaticResource NavButton}" Command="{Binding NavigateCommand}" CommandParameter="Logs"/>
+                <!-- 3. Bottom Status Bar -->
+                <StatusBar DockPanel.Dock="Bottom" Background="{DynamicResource BrushPanelBackground}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="0,1,0,0" Height="30" Padding="5,0">
+                    <StatusBarItem>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{DynamicResource StatusConnection}" Foreground="{DynamicResource BrushTextSecondary}" Margin="5,0"/>
+                            <!-- Connection state dot indicator -->
+                            <Ellipse Width="10" Height="10" Margin="5,0" Fill="{Binding ConnectionStatusBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding ConnectionStatusText}" Foreground="{DynamicResource BrushTextPrimary}" FontWeight="SemiBold"/>
                         </StackPanel>
-                    </ScrollViewer>
+                    </StatusBarItem>
+                    <Separator Background="{DynamicResource BrushBorder}"/>
+                    <StatusBarItem>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📋 " VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding MainTab.StatusMessage}" Foreground="{DynamicResource BrushTextPrimary}"/>
+                        </StackPanel>
+                    </StatusBarItem>
+                    <Separator Background="{DynamicResource BrushBorder}"/>
+                    <StatusBarItem HorizontalAlignment="Right">
+                        <TextBlock Text="{DynamicResource StatusLicense}" Foreground="{DynamicResource BrushTextSecondary}" Margin="0,0,10,0"/>
+                    </StatusBarItem>
+                </StatusBar>
 
-                    <!-- Sidebar Footer Controls -->
-                    <StackPanel Grid.Row="2" Margin="0,15,0,0">
-                        <Button Content="تبديل اللغة / EN/AR" Style="{StaticResource SecondaryButton}" Command="{Binding ToggleLanguageCommand}" Height="34" Padding="5,0" Margin="0,0,0,5"/>
-                        <Button Content="تغيير المظهر / Dark/Light" Style="{StaticResource SecondaryButton}" Command="{Binding ToggleThemeCommand}" Height="34" Padding="5,0" Margin="0,0,0,5"/>
-                        <Button Content="إظهار/إخفاء المتصفح / Browser" Command="{Binding ToggleBrowserCommand}" Height="34" Padding="5,0"/>
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <!-- 2. MAIN ACTIVE TAB WORKSPACE CONTENT -->
-            <Grid Grid.Column="1" Margin="20">
-                <!-- ──────────────── TAB 1: MAIN SEND CAMPAIGN PANEL ──────────────── -->
-                <Grid DataContext="{Binding MainTab}">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding DataContext.CurrentTabName, RelativeSource={RelativeSource AncestorType=Window}}" Value="Main">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-
+                <!-- 4. Central resizable Workspace (Grid) -->
+                <Grid>
                     <Grid.ColumnDefinitions>
-                        <!-- Left Pane: Contact list & progress -->
-                        <ColumnDefinition Width="4.5*"/>
-                        <!-- Right Pane: Message Template & Controls -->
-                        <ColumnDefinition Width="5.5*"/>
+                        <!-- Left pane: 3-column sending board -->
+                        <ColumnDefinition Width="*"/>
+                        <!-- Splitter between dashboard and browser -->
+                        <ColumnDefinition Width="Auto"/>
+                        <!-- Right pane: Collapsible browser -->
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left: Numbers and Progress -->
-                    <Border Grid.Column="0" Style="{StaticResource CardPanel}" Margin="0,0,10,0">
-                        <Grid>
+                    <!-- A. Central Dashboard split into 3 columns -->
+                    <Grid Grid.Column="0" Margin="10">
+                        <Grid.ColumnDefinitions>
+                            <!-- Column 0: Left Column (Auto Reply + Received Inbox) -->
+                            <ColumnDefinition Width="3*"/>
+                            <!-- Splitter 1 -->
+                            <ColumnDefinition Width="Auto"/>
+                            <!-- Column 1: Center Column (WhatsApp target list) -->
+                            <ColumnDefinition Width="3.5*"/>
+                            <!-- Splitter 2 -->
+                            <ColumnDefinition Width="Auto"/>
+                            <!-- Column 2: Right Column (Message tab editor + Attachments + Sending controls) -->
+                            <ColumnDefinition Width="3.8*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- ================= COLUMN 0 (Left Column) ================= -->
+                        <Grid Grid.Column="0">
                             <Grid.RowDefinitions>
+                                <!-- Auto reply chatbot rules -->
+                                <RowDefinition Height="1*"/>
+                                <!-- Splitter -->
                                 <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
+                                <!-- Inbox incoming messages -->
+                                <RowDefinition Height="1*"/>
                             </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" Text="📋 قائمة الأرقام والجهات المستهدفة" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
+                            <!-- Auto Reply rules display -->
+                            <Border Grid.Row="0" Style="{StaticResource CardPanel}" Margin="0,0,0,5" Padding="15">
+                                <Grid DataContext="{Binding AutoReplyTab}">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{DynamicResource L_AutoReplyTitle}" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        <CheckBox Grid.Column="1" Content="{DynamicResource L_EnableAutoReply}" IsChecked="{Binding AutoReplyEnabled}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                    </Grid>
+                                    <ListView Grid.Row="1" ItemsSource="{Binding RulesList}">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="{DynamicResource ColRuleName}" DisplayMemberBinding="{Binding RuleName}" Width="90"/>
+                                                <GridViewColumn Header="{DynamicResource ColKeywords}" DisplayMemberBinding="{Binding Keywords}" Width="110"/>
+                                                <GridViewColumn Header="{DynamicResource ColRuleEnabled}" DisplayMemberBinding="{Binding Enabled}" Width="70"/>
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Grid>
+                            </Border>
 
-                            <!-- Import Toolbar -->
-                            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10" FlowDirection="RightToLeft">
-                                <Button Content="استيراد CSV" Command="{Binding ImportCSVCommand}" Style="{StaticResource SecondaryButton}" Padding="10,5" Margin="0,0,5,0"/>
-                                <Button Content="+" Command="{Binding AddManualCommand}" ToolTip="إضافة رقم يدوي" Width="35" Style="{StaticResource SecondaryButton}" Margin="0,0,5,0"/>
-                                <Button Content="-" Command="{Binding RemoveSelectedCommand}" ToolTip="حذف المحدد" Width="35" Style="{StaticResource DangerButton}" Margin="0,0,5,0"/>
-                                <Button Content="مسح" Command="{Binding ClearListCommand}" ToolTip="مسح القائمة" Style="{StaticResource DangerButton}" Padding="10,5"/>
-                            </StackPanel>
+                            <!-- Vertical splitter inside Left Column -->
+                            <GridSplitter Grid.Row="1" Height="4" HorizontalAlignment="Stretch" Background="{DynamicResource BrushBorder}"/>
 
-                            <!-- Group select Segmented combo -->
-                            <Grid Grid.Row="2" Margin="0,0,0,10">
+                            <!-- Received Messages Log (Inbox) -->
+                            <Border Grid.Row="2" Style="{StaticResource CardPanel}" Margin="0,5,0,0" Padding="15">
+                                <Grid DataContext="{Binding ReceivedTab}">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Text="{DynamicResource L_InboxTitle}" FontSize="14" FontWeight="Bold" Margin="0,0,0,8"/>
+                                    <ListView Grid.Row="1" ItemsSource="{Binding MessagesList}">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="{DynamicResource ColInboxDate}" DisplayMemberBinding="{Binding Date}" Width="90"/>
+                                                <GridViewColumn Header="{DynamicResource ColInboxSender}" DisplayMemberBinding="{Binding Sender}" Width="90"/>
+                                                <GridViewColumn Header="{DynamicResource ColInboxMessage}" DisplayMemberBinding="{Binding Message}" Width="120"/>
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <!-- Splitter 1 -->
+                        <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" Background="{DynamicResource BrushBorder}"/>
+
+                        <!-- ================= COLUMN 1 (Center Column) ================= -->
+                        <Border Grid.Column="2" Style="{StaticResource CardPanel}" Margin="0" Padding="15" DataContext="{Binding MainTab}">
+                            <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
-                                
-                                <ComboBox Grid.Row="0" ItemsSource="{Binding SavedGroups}" SelectedItem="{Binding SelectedGroup}" HorizontalAlignment="Stretch" Margin="0,0,0,5" Height="34"/>
 
-                                <!-- Contact ListView -->
-                                <ListView Grid.Row="1" ItemsSource="{Binding ContactsList}" SelectedItem="{Binding SelectedContact}" Margin="0,5,0,0">
+                                <TextBlock Grid.Row="0" Text="{DynamicResource L_TargetListTitle}" FontSize="14" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                                <!-- Import Actions Toolbar -->
+                                <Grid Grid.Row="1" Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Content="{DynamicResource BtnImportCSV}" Command="{Binding ImportCSVCommand}" Style="{StaticResource SecondaryButton}" Padding="5,4" Margin="0,0,4,0" Height="32"/>
+                                    <Button Grid.Column="1" Content="+" Command="{Binding AddManualCommand}" ToolTip="{DynamicResource TooltipAddManual}" Width="32" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0" Height="32"/>
+                                    <Button Grid.Column="2" Content="-" Command="{Binding RemoveSelectedCommand}" ToolTip="{DynamicResource TooltipRemoveSelected}" Width="32" Style="{StaticResource DangerButton}" Margin="0,0,4,0" Height="32"/>
+                                    <Button Grid.Column="3" Content="🗑️" Command="{Binding ClearListCommand}" ToolTip="{DynamicResource TooltipClearList}" Style="{StaticResource DangerButton}" Width="32" Height="32"/>
+                                </Grid>
+
+                                <!-- Target Groups Selection -->
+                                <TextBlock Grid.Row="2" Text="{DynamicResource TabContacts}" Margin="0,0,0,4" Foreground="{DynamicResource BrushTextSecondary}"/>
+                                <ComboBox Grid.Row="3" ItemsSource="{Binding SavedGroups}" SelectedItem="{Binding SelectedGroup}" HorizontalAlignment="Stretch" Height="34" Margin="0,0,0,8"/>
+
+                                <!-- Targets DataGrid -->
+                                <ListView Grid.Row="4" ItemsSource="{Binding ContactsList}" SelectedItem="{Binding SelectedContact}" Height="300" Margin="0,0,0,10">
                                     <ListView.View>
                                         <GridView>
-                                            <GridViewColumn Header="الاسم / Name" DisplayMemberBinding="{Binding Name}" Width="110"/>
-                                            <GridViewColumn Header="الهاتف / Phone" DisplayMemberBinding="{Binding Phone}" Width="120"/>
-                                            <GridViewColumn Header="الحالة / Status" DisplayMemberBinding="{Binding Status}" Width="80"/>
+                                            <GridViewColumn Header="{DynamicResource ColName}" DisplayMemberBinding="{Binding Name}" Width="100"/>
+                                            <GridViewColumn Header="{DynamicResource ColPhone}" DisplayMemberBinding="{Binding Phone}" Width="120"/>
+                                            <GridViewColumn Header="{DynamicResource ColStatus}" DisplayMemberBinding="{Binding Status}" Width="80"/>
                                         </GridView>
                                     </ListView.View>
                                 </ListView>
+
+                                <!-- Counters Info -->
+                                <Border Grid.Row="5" Background="{DynamicResource BrushPrimaryBackground}" CornerRadius="8" Padding="10" Margin="0,0,0,10">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <TextBlock Text="Total: " Foreground="{DynamicResource BrushTextSecondary}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding TotalCount}" Foreground="{DynamicResource BrushTextPrimary}" FontWeight="Bold" Margin="0,0,15,0"/>
+                                        
+                                        <TextBlock Text="Contacts: " Foreground="{DynamicResource BrushTextSecondary}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding ContactsCount}" Foreground="{DynamicResource BrushTextPrimary}" FontWeight="Bold" Margin="0,0,15,0"/>
+
+                                        <TextBlock Text="Groups: " Foreground="{DynamicResource BrushTextSecondary}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding GroupsCount}" Foreground="{DynamicResource BrushTextPrimary}" FontWeight="Bold"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Progress bar -->
+                                <ProgressBar Grid.Row="6" Value="{Binding ProgressBarValue}" Height="10"/>
                             </Grid>
+                        </Border>
 
-                            <!-- Metrics footer -->
-                            <Border Grid.Row="3" Background="{DynamicResource BrushPrimaryBackground}" CornerRadius="8" Padding="10" Margin="0,0,0,8">
-                                <TextBlock Text="{Binding TotalCount, StringFormat='إجمالي الجهات: {0}'}" FontWeight="Bold" HorizontalAlignment="Center"/>
-                            </Border>
+                        <!-- Splitter 2 -->
+                        <GridSplitter Grid.Column="3" Width="4" HorizontalAlignment="Stretch" Background="{DynamicResource BrushBorder}"/>
 
-                            <ProgressBar Grid.Row="4" Value="{Binding ProgressBarValue}" Height="10" Margin="0,0,0,8"/>
-
-                            <Grid Grid.Row="5">
-                                <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource BrushTextSecondary}" VerticalAlignment="Center"/>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                                    <TextBlock Text="{Binding SentCount, StringFormat='✅ {0} '}" Foreground="#00E676" FontWeight="Bold"/>
-                                    <TextBlock Text="{Binding FailedCount, StringFormat='❌ {0} '}" Foreground="#EF4444" FontWeight="Bold"/>
-                                    <TextBlock Text="{Binding InvalidCount, StringFormat='🚫 {0}'}" Foreground="#EAB308" FontWeight="Bold"/>
-                                </StackPanel>
-                            </Grid>
-                        </Grid>
-                    </Border>
-
-                    <!-- Right: Editor & Send Options -->
-                    <Border Grid.Column="1" Style="{StaticResource CardPanel}" Margin="10,0,0,0">
-                        <Grid>
+                        <!-- ================= COLUMN 2 (Right Column) ================= -->
+                        <Grid Grid.Column="4" DataContext="{Binding MainTab}">
                             <Grid.RowDefinitions>
+                                <!-- Message tab editor -->
+                                <RowDefinition Height="6.5*"/>
+                                <!-- Attachments -->
                                 <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
+                                <!-- Sending control triggers -->
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" Text="📝 محتوى الرسالة والمرفقات" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
-
-                            <TextBox Grid.Row="1" Text="{Binding MessageText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" Margin="0,0,0,8" Height="220" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto"/>
-
-                            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,10" FlowDirection="RightToLeft">
-                                <CheckBox Content="تفعيل Spintax" IsChecked="{Binding EnableSpintax}" Margin="0,0,15,0" VerticalAlignment="Center"/>
-                                <Button Content="معاينة النص" Command="{Binding TestSpintaxCommand}" Style="{StaticResource SecondaryButton}" Height="30" Padding="10,0"/>
-                            </StackPanel>
-
-                            <!-- Media attachment panel -->
-                            <Border Grid.Row="3" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,15">
+                            <!-- Message tab editor card -->
+                            <Border Grid.Row="0" Style="{StaticResource CardPanel}" Margin="0,0,0,10" Padding="15">
                                 <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
 
-                                    <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="📎 ملفات مرفقة / Attachments" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                                    <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding AttachmentPath}" IsReadOnly="True" VerticalAlignment="Center" Margin="0,0,10,0" Height="34"/>
-                                    <Button Grid.Row="1" Grid.Column="1" Content="اختر ملف" Command="{Binding BrowseAttachmentCommand}" Style="{StaticResource SecondaryButton}" Height="34"/>
+                                    <!-- Editor Header with "+" and "-" tab actions -->
+                                    <Grid Grid.Row="0" Margin="0,0,0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{DynamicResource L_MessageEditorTitle}" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <Button Content="+" Command="{Binding AddMessageTabCommand}" ToolTip="{DynamicResource TooltipAddTab}" Width="30" Height="26" Style="{StaticResource SecondaryButton}" Padding="0" Margin="0,0,4,0"/>
+                                            <Button Content="-" Command="{Binding RemoveMessageTabCommand}" ToolTip="{DynamicResource TooltipRemoveTab}" Width="30" Height="26" Style="{StaticResource DangerButton}" Padding="0"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Message formatting toolbar -->
+                                    <Grid Grid.Row="1" Margin="0,0,0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                            <Button Content="B" Click="FormatText_Click" CommandParameter="*" ToolTip="Bold" Width="26" Height="26" Style="{StaticResource SecondaryButton}" Padding="0" Margin="0,0,4,0" FontFamily="Consolas" FontWeight="Bold"/>
+                                            <Button Content="I" Click="FormatText_Click" CommandParameter="_" ToolTip="Italic" Width="26" Height="26" Style="{StaticResource SecondaryButton}" Padding="0" Margin="0,0,4,0" FontFamily="Consolas" FontStyle="Italic"/>
+                                            <Button Content="S" Click="FormatText_Click" CommandParameter="~" ToolTip="Strikethrough" Width="26" Height="26" Style="{StaticResource SecondaryButton}" Padding="0" Margin="0,0,8,0" FontFamily="Consolas"/>
+                                        </StackPanel>
+                                        <!-- Insert Variable Menu -->
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button Content="{DynamicResource ColName}" Click="InsertVar_Click" CommandParameter="{}{name}" Height="26" Padding="5,0" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"/>
+                                            <Button Content="Var1" Click="InsertVar_Click" CommandParameter="{}{var1}" Height="26" Padding="5,0" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"/>
+                                            <Button Content="Var2" Click="InsertVar_Click" CommandParameter="{}{var2}" Height="26" Padding="5,0" Style="{StaticResource SecondaryButton}"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Multi message tab editor -->
+                                    <TabControl Grid.Row="2" ItemsSource="{Binding MessageTabs}" SelectedItem="{Binding SelectedMessageTab}">
+                                        <TabControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Header}"/>
+                                            </DataTemplate>
+                                        </TabControl.ItemTemplate>
+                                        <TabControl.ContentTemplate>
+                                            <DataTemplate>
+                                                <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" Margin="0,5,0,0"/>
+                                            </DataTemplate>
+                                        </TabControl.ContentTemplate>
+                                    </TabControl>
+
+                                    <!-- Spintax preview toggle -->
+                                    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,0" FlowDirection="RightToLeft">
+                                        <CheckBox Content="{DynamicResource L_EnableSpintax}" IsChecked="{Binding EnableSpintax}" Margin="0,0,15,0" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                        <Button Content="{DynamicResource BtnPreviewText}" Command="{Binding TestSpintaxCommand}" Style="{StaticResource SecondaryButton}" Height="28" Padding="8,0"/>
+                                    </StackPanel>
                                 </Grid>
                             </Border>
 
-                            <!-- Delays and Send action triggers -->
-                            <StackPanel Grid.Row="4">
-                                <Grid Margin="0,0,0,15">
+                            <!-- Attachment panel -->
+                            <Border Grid.Row="1" Style="{StaticResource CardPanel}" Margin="0,0,0,10" Padding="15">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{DynamicResource L_AttachmentsTitle}" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        <Button Grid.Column="1" Content="📎" Command="{Binding BrowseAttachmentCommand}" ToolTip="{DynamicResource BtnSelectFile}" Style="{StaticResource SecondaryButton}" Width="32" Height="26" Padding="0" Margin="0,0,4,0"/>
+                                        <TextBlock Grid.Column="2" Text="≡" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource BrushTextSecondary}" VerticalAlignment="Center" Margin="5,0"/>
+                                    </Grid>
+                                    <ListView Grid.Row="1" ItemsSource="{Binding AttachmentsList}" Height="80">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="{DynamicResource ColName}" DisplayMemberBinding="{Binding FileName}" Width="150"/>
+                                                <GridViewColumn Header="{DynamicResource ColStatus}" DisplayMemberBinding="{Binding Type}" Width="70"/>
+                                                <GridViewColumn Header="Caption" DisplayMemberBinding="{Binding Caption}" Width="80"/>
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Grid>
+                            </Border>
+
+                            <!-- Delays and Sending controls -->
+                            <StackPanel Grid.Row="2">
+                                <Grid Margin="0,0,0,10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
-                                        <TextBlock Text="أقل تأخير (ثانية) / Min Delay" Margin="0,0,0,4"/>
-                                        <TextBox Text="{Binding MinDelay}" Height="34"/>
+                                    <StackPanel Grid.Column="0" Margin="0,0,5,0">
+                                        <TextBlock Text="{DynamicResource L_MinDelay}" Margin="0,0,0,4" Foreground="{DynamicResource BrushTextSecondary}"/>
+                                        <TextBox Text="{Binding MinDelay, UpdateSourceTrigger=PropertyChanged}" Height="34"/>
                                     </StackPanel>
-                                    <StackPanel Grid.Column="1" Margin="10,0,0,0">
-                                        <TextBlock Text="أقصى تأخير (ثانية) / Max Delay" Margin="0,0,0,4"/>
-                                        <TextBox Text="{Binding MaxDelay}" Height="34"/>
+                                    <StackPanel Grid.Column="1" Margin="5,0,0,0">
+                                        <TextBlock Text="{DynamicResource L_MaxDelay}" Margin="0,0,0,4" Foreground="{DynamicResource BrushTextSecondary}"/>
+                                        <TextBox Text="{Binding MaxDelay, UpdateSourceTrigger=PropertyChanged}" Height="34"/>
                                     </StackPanel>
                                 </Grid>
 
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="1*"/>
+                                        <ColumnDefinition Width="1*"/>
                                     </Grid.ColumnDefinitions>
-                                    <Button Grid.Column="0" Content="🚀 إرسال الآن / Send" Command="{Binding StartCampaignCommand}" Height="44" Margin="0,0,5,0"/>
-                                    <Button Grid.Column="1" Content="🛑 إيقاف / Pause" Command="{Binding StopCampaignCommand}" Style="{StaticResource DangerButton}" Height="44" Margin="5,0,0,0"/>
+                                    <Button Grid.Column="0" Content="{DynamicResource BtnSendNow}" Command="{Binding StartCampaignCommand}" Height="44" Margin="0,0,5,0"/>
+                                    <Button Grid.Column="1" Content="{DynamicResource BtnPauseNow}" Command="{Binding StopCampaignCommand}" Style="{StaticResource DangerButton}" Height="44" Margin="5,0,0,0"/>
                                 </Grid>
                             </StackPanel>
                         </Grid>
-                    </Border>
-                </Grid>
-
-                <!-- ──────────────── TAB 2: SENT CAMPAIGNS HISTORIES ──────────────── -->
-                <Grid DataContext="{Binding CampaignsTab}">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding DataContext.CurrentTabName, RelativeSource={RelativeSource AncestorType=Window}}" Value="Campaigns">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <TextBlock Grid.Row="0" Text="📊 تقارير الحملات المرسلة" Style="{DynamicResource TextBlockHeading}"/>
-
-                    <Grid Grid.Row="1" Margin="0,0,0,15">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <Border Grid.Column="0" Style="{StaticResource CardPanel}" Margin="0,0,10,0">
-                            <StackPanel>
-                                <TextBlock Text="إجمالي الحملات" Foreground="{DynamicResource BrushTextSecondary}"/>
-                                <TextBlock Text="{Binding TotalCampaigns}" FontSize="24" FontWeight="Bold"/>
-                            </StackPanel>
-                        </Border>
-                        <Border Grid.Column="1" Style="{StaticResource CardPanel}" Margin="10,0,10,0">
-                            <StackPanel>
-                                <TextBlock Text="رسائل مرسلة" Foreground="{DynamicResource BrushTextSecondary}"/>
-                                <TextBlock Text="{Binding TotalSent}" FontSize="24" FontWeight="Bold" Foreground="#00E676"/>
-                            </StackPanel>
-                        </Border>
-                        <Border Grid.Column="2" Style="{StaticResource CardPanel}" Margin="10,0,10,0">
-                            <StackPanel>
-                                <TextBlock Text="رسائل فشلت" Foreground="{DynamicResource BrushTextSecondary}"/>
-                                <TextBlock Text="{Binding TotalFailed}" FontSize="24" FontWeight="Bold" Foreground="#EF4444"/>
-                            </StackPanel>
-                        </Border>
-                        <Border Grid.Column="3" Style="{StaticResource CardPanel}" Margin="10,0,0,0">
-                            <StackPanel>
-                                <TextBlock Text="نسبة النجاح" Foreground="{DynamicResource BrushTextSecondary}"/>
-                                <TextBlock Text="{Binding SuccessRatePercent}" FontSize="24" FontWeight="Bold" Foreground="#00B0FF"/>
-                            </StackPanel>
-                        </Border>
                     </Grid>
 
-                    <ListView Grid.Row="2" ItemsSource="{Binding CampaignsList}" SelectedItem="{Binding SelectedCampaign}">
-                        <ListView.View>
-                            <GridView>
-                                <GridViewColumn Header="رقم / ID" DisplayMemberBinding="{Binding Id}" Width="60"/>
-                                <GridViewColumn Header="اسم الحملة / Campaign" DisplayMemberBinding="{Binding Name}" Width="200"/>
-                                <GridViewColumn Header="التاريخ / Date" DisplayMemberBinding="{Binding Date}" Width="160"/>
-                                <GridViewColumn Header="الإجمالي / Total" DisplayMemberBinding="{Binding Total}" Width="80"/>
-                                <GridViewColumn Header="المرسل / Sent" DisplayMemberBinding="{Binding Sent}" Width="80"/>
-                                <GridViewColumn Header="الفاشل / Failed" DisplayMemberBinding="{Binding Failed}" Width="80"/>
-                                <GridViewColumn Header="غير الصالح / Invalid" DisplayMemberBinding="{Binding Invalid}" Width="80"/>
-                                <GridViewColumn Header="نسبة النجاح / Success Rate" DisplayMemberBinding="{Binding SuccessRate, StringFormat={}{0:F1}%}" Width="110"/>
-                            </GridView>
-                        </ListView.View>
-                    </ListView>
+                    <!-- Splitter between central dashboard and WebView2 browser -->
+                    <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" Background="{DynamicResource BrushBorder}">
+                        <GridSplitter.Style>
+                            <Style TargetType="GridSplitter">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsBrowserVisible}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </GridSplitter.Style>
+                    </GridSplitter>
 
-                    <StackPanel Grid.Row="3" Orientation="Horizontal" FlowDirection="RightToLeft" Margin="0,15,0,0">
-                        <Button Content="تحديث البيانات" Command="{Binding LoadCampaignsCommand}" Margin="0,0,10,0"/>
-                        <Button Content="حذف الحملة المحددة" Command="{Binding DeleteCampaignCommand}" Style="{StaticResource DangerButton}"/>
-                    </StackPanel>
-                </Grid>
+                    <!-- B. Collapsible WebView2 Browser panel -->
+                    <Border Grid.Column="2" Background="{DynamicResource BrushPanelBackground}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1,0,0,0">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Width" Value="480"/>
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsBrowserVisible}" Value="False">
+                                        <Setter Property="Width" Value="0"/>
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
 
-                <!-- ──────────────── TAB 3: GROUPS & CONTACTS MANAGER ──────────────── -->
-                <Grid DataContext="{Binding ContactsTab}">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding DataContext.CurrentTabName, RelativeSource={RelativeSource AncestorType=Window}}" Value="Contacts">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="4*"/>
-                        <ColumnDefinition Width="6*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Left: Groups List -->
-                    <Border Grid.Column="0" Style="{StaticResource CardPanel}" Margin="0,0,10,0">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" Text="👥 المجموعات المحفوظة" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
+                            <Border Grid.Row="0" Background="{DynamicResource BrushPrimaryBackground}" Padding="10" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="0,0,0,1">
+                                <TextBlock Text="{DynamicResource L_BrowserTitle}" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            </Border>
 
-                            <ListView Grid.Row="1" ItemsSource="{Binding GroupsList}" SelectedItem="{Binding SelectedGroup}">
-                                <ListView.View>
-                                    <GridView>
-                                        <GridViewColumn Header="الاسم" DisplayMemberBinding="{Binding Name}" Width="140"/>
-                                        <GridViewColumn Header="تاريخ الإنشاء" DisplayMemberBinding="{Binding Created}" Width="120"/>
-                                    </GridView>
-                                </ListView.View>
-                            </ListView>
-
-                            <StackPanel Grid.Row="2" Margin="0,10,0,0">
-                                <TextBlock Text="إضافة مجموعة جديدة:" Margin="0,0,0,4"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Grid.Column="0" Text="{Binding NewGroupName, UpdateSourceTrigger=PropertyChanged}" Height="34" Margin="0,0,5,0"/>
-                                    <Button Grid.Column="1" Content="إضافة" Command="{Binding AddGroupCommand}" Height="34"/>
-                                </Grid>
-                                <Button Content="حذف المجموعة المحددة" Command="{Binding DeleteGroupCommand}" Style="{StaticResource DangerButton}" Margin="0,8,0,0" Height="34"/>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-
-                    <!-- Right: Group details -->
-                    <Border Grid.Column="1" Style="{StaticResource CardPanel}" Margin="10,0,0,0">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" Text="{Binding SelectedGroup.Name, StringFormat='📋 جهات اتصال في مجموعة: {0}'}" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
-
-                            <ListView Grid.Row="1" ItemsSource="{Binding SelectedGroup.Contacts}">
-                                <ListView.View>
-                                    <GridView>
-                                        <GridViewColumn Header="الاسم" DisplayMemberBinding="{Binding Name}" Width="160"/>
-                                        <GridViewColumn Header="رقم الهاتف" DisplayMemberBinding="{Binding Phone}" Width="200"/>
-                                    </GridView>
-                                </ListView.View>
-                            </ListView>
-
-                            <!-- Add Contact Form -->
-                            <StackPanel Grid.Row="2" Margin="0,10,0,0">
-                                <TextBlock Text="إضافة رقم إلى المجموعة:" FontWeight="SemiBold" Margin="0,0,0,5"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Grid.Column="0" Text="{Binding NewContactName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,5,0" Height="34"/>
-                                    <TextBox Grid.Column="1" Text="{Binding NewContactPhone, UpdateSourceTrigger=PropertyChanged}" Margin="5,0,5,0" Height="34"/>
-                                    <Button Grid.Column="2" Content="حفظ الرقم" Command="{Binding AddContactCommand}" Height="34"/>
-                                </Grid>
-                            </StackPanel>
+                            <!-- WebView2 instance -->
+                            <wv2:WebView2 x:Name="webView" Grid.Row="1"/>
                         </Grid>
                     </Border>
                 </Grid>
-
-                <!-- ──────────────── TAB 4: TEMPLATES MANAGER ──────────────── -->
-                <Grid DataContext="{Binding TemplatesTab}">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding DataContext.CurrentTabName, RelativeSource={RelativeSource AncestorType=Window}}" Value="Templates">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="4*"/>
-                        <ColumnDefinition Width="6*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Left: Templates list -->
-                    <Border Grid.Column="0" Style="{StaticResource CardPanel}" Margin="0,0,10,0">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" Text="📝 القوالب المحفوظة" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
-
-                            <ListView Grid.Row="1" ItemsSource="{Binding TemplatesList}" SelectedItem="{Binding SelectedTemplate}">
-                                <ListView.View>
-                                    <GridView>
-                                        <GridViewColumn Header="الاسم" DisplayMemberBinding="{Binding Name}" Width="200"/>
-                                    </GridView>
-                                </ListView.View>
-                            </ListView>
-
-                            <Grid Grid.Row="2" Margin="0,10,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Button Grid.Column="0" Content="تعديل المحدد" Command="{Binding LoadSelectedTemplateCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,5,0" Height="36"/>
-                                <Button Grid.Column="1" Content="حذف المحدد" Command="{Binding DeleteTemplateCommand}" Style="{StaticResource DangerButton}" Margin="5,0,0,0" Height="36"/>
-                            </Grid>
-                        </Grid>
-                    </Border>
-
-                    <!-- Right: Editor -->
-                    <Border Grid.Column="1" Style="{StaticResource CardPanel}" Margin="10,0,0,0">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" Text="✍️ محرر القالب" FontSize="16" FontWeight="Bold" Margin="0,0,0,15"/>
-
-                            <TextBlock Grid.Row="1" Text="اسم القالب / Name:" Margin="0,0,0,4"/>
-                            <TextBox Grid.Row="2" Text="{Binding TemplateName, UpdateSourceTrigger=PropertyChanged}" Height="34" Margin="0,0,0,10"/>
-
-                            <TextBox Grid.Row="3" Text="{Binding TemplateBody, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" Margin="0,0,0,15" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto"/>
-
-                            <Button Grid.Row="4" Content="حفظ القالب / Save Template" Command="{Binding SaveTemplateCommand}" Height="40"/>
-                        </Grid>
-                    </Border>
-                </Grid>
-
-                <!-- ──────────────── TAB 5: SCHEDULER PERSISTED QUEUE ──────────────── -->
-                <Grid DataContext="{Binding SchedulerTab}">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding DataContext.CurrentTabName, RelativeSource={RelativeSource AncestorType=Window}}" Value="Scheduler">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <TextBlock Grid.Row="0" Text="📅 الجدولة الزمنية للحملات" Style="{DynamicResource TextBlockHeading}"/>
-
-                    <ListView Grid.Row="1" ItemsSource="{Binding ScheduledCampaigns}" SelectedItem="{Binding SelectedCampaign}">
-                        <ListView.View>
-                            <GridView>
-                                <GridViewColumn Header="رقم" DisplayMemberBinding="{Binding Id}" Width="50"/>
-                                <GridViewColumn Header="اسم الحملة" DisplayMemberBinding="{Binding Name}" Width="180"/>
-                                <GridViewColumn Header="تاريخ ووقت الإرسال" DisplayMemberBinding="{Binding ScheduledTime}" Width="160"/>
-                                <GridViewColumn Header="المجموعة المستهدفة" DisplayMemberBinding="{Binding GroupName}" Width="140"/>
-                                <GridViewColumn Header="طريقة الإرسال" DisplayMemberBinding="{Binding SendingMode}" Width="90"/>
-                                <GridViewColumn Header="الحالة / Status" DisplayMemberBinding="{Binding Status}" Width="100"/>
-                            </GridView>
-                        </ListView.View>
-                    </ListView>
-
-                    <StackPanel Grid.Row="2" Orientation="Horizontal" FlowDirection="RightToLeft" Margin="0,15,0,0">
-                        <Button Content="تحديث الجدولة" Command="{Binding LoadScheduledCommand}" Margin="0,0,10,0"/>
-                        <Button Content="إلغاء المحددة" Command="{Binding CancelCampaignCommand}" Style="{StaticResource DangerButton}" Margin="0,0,10,0"/>
-                        <Button Content="حذف من السجل" Command="{Binding DeleteCampaignCommand}" Style="{StaticResource DangerButton}"/>
-                    </StackPanel>
-                </Grid>
-
-                <!-- ──────────────── TAB 6: AUTO REPLY CHATBOT ──────────────── -->
-                <Grid DataContext="{Binding AutoReplyTab}">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding DataContext.CurrentTabName, RelativeSource={RelativeSource AncestorType=Window}}" Value="AutoReply">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <TextBlock Grid.Row="0" Text="🤖 قواعد الرد التلقائي" Style="{DynamicResource TextBlockHeading}"/>
-
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,15">
-                        <CheckBox Content="تفعيل الرد التلقائي النشط" IsChecked="{Binding AutoReplyEnabled}" FontSize="13" FontWeight="Bold"/>
-                    </StackPanel>
-
-                    <ListView Grid.Row="2" ItemsSource="{Binding RulesList}" SelectedItem="{Binding SelectedRule}">
-                        <ListView.View>
-                            <GridView>
-                                <GridViewColumn Header="اسم القاعدة" DisplayMemberBinding="{Binding RuleName}" Width="160"/>
-                                <GridViewColumn Header="الكلمات المفتاحية" DisplayMemberBinding="{Binding Keywords}" Width="220"/>
-                                <GridViewColumn Header="الرد التلقائي" DisplayMemberBinding="{Binding Reply}" Width="350"/>
-                                <GridViewColumn Header="الحالة" DisplayMemberBinding="{Binding Enabled}" Width="90"/>
-                            </GridView>
-                        </ListView.View>
-                    </ListView>
-
-                    <Grid Grid.Row="3" Margin="0,15,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Add Quick Auto-Reply Rule Panel -->
-                        <Border Grid.Column="0" Style="{StaticResource CardPanel}" Margin="0,0,10,0">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="2*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBox Grid.Column="0" Text="{Binding RuleName}" Margin="0,0,5,0" Height="34"/>
-                                <TextBox Grid.Column="1" Text="{Binding RuleKeywords}" Margin="5,0,5,0" Height="34"/>
-                                <TextBox Grid.Column="2" Text="{Binding RuleReply}" Margin="5,0,10,0" Height="34"/>
-                                <Button Grid.Column="3" Content="إضافة قاعدة" Command="{Binding AddRuleCommand}" Height="34"/>
-                            </Grid>
-                        </Border>
-
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" FlowDirection="RightToLeft">
-                            <Button Content="تفعيل/تعطيل" Command="{Binding ToggleRuleCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,10,0" Height="38"/>
-                            <Button Content="حذف القاعدة" Command="{Binding DeleteRuleCommand}" Style="{StaticResource DangerButton}" Height="38"/>
-                        </StackPanel>
-                    </Grid>
-                </Grid>
-
-                <!-- ──────────────── TAB 7: INCOMING INBOX MESSAGE LOGS ──────────────── -->
-                <Grid DataContext="{Binding ReceivedTab}">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding DataContext.CurrentTabName, RelativeSource={RelativeSource AncestorType=Window}}" Value="Received">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <TextBlock Grid.Row="0" Text="📥 الرسائل الواردة من العملاء" Style="{DynamicResource TextBlockHeading}"/>
-
-                    <ListView Grid.Row="1" ItemsSource="{Binding MessagesList}">
-                        <ListView.View>
-                            <GridView>
-                                <GridViewColumn Header="التاريخ" DisplayMemberBinding="{Binding Date}" Width="150"/>
-                                <GridViewColumn Header="المرسل" DisplayMemberBinding="{Binding Sender}" Width="180"/>
-                                <GridViewColumn Header="الرسالة" DisplayMemberBinding="{Binding Message}" Width="450"/>
-                            </GridView>
-                        </ListView.View>
-                    </ListView>
-
-                    <StackPanel Grid.Row="2" Orientation="Horizontal" FlowDirection="RightToLeft" Margin="0,15,0,0">
-                        <Button Content="مسح السجل" Command="{Binding ClearAllCommand}" Style="{StaticResource DangerButton}"/>
-                    </StackPanel>
-                </Grid>
-
-                <!-- ──────────────── PLACEHOLDER TABS FOR COMPLETENESS (8, 9, 10, 11, 12) ──────────────── -->
-                <!-- Number Filter -->
-                <Grid>
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding CurrentTabName}" Value="Filter">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-                    <StackPanel>
-                        <TextBlock Text="🔍 فلترة وتدقيق أرقام الهواتف" Style="{DynamicResource TextBlockHeading}"/>
-                        <TextBlock Text="هذه الأداة تمكنك من التحقق مما إذا كانت قائمة أرقام الهواتف تملك حسابات واتساب نشطة قبل بدء الإرسال." Style="{DynamicResource TextBlockSubheading}" TextWrapping="Wrap"/>
-                        <Border Style="{StaticResource CardPanel}" Margin="0,20,0,0">
-                            <TextBlock Text="(سيتم تضمين الفلترة الذكية في التحديث التلقائي لمحرك WebView2)" Foreground="{DynamicResource BrushTextSecondary}" HorizontalAlignment="Center" Margin="10"/>
-                        </Border>
-                    </StackPanel>
-                </Grid>
-
-                <!-- Warmer Tab -->
-                <Grid DataContext="{Binding WarmerTab}">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding DataContext.CurrentTabName, RelativeSource={RelativeSource AncestorType=Window}}" Value="Warmer">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-                    <StackPanel>
-                        <TextBlock Text="🔥 تهيئة وتسخين الحسابات (Chat Warmer)" Style="{DynamicResource TextBlockHeading}"/>
-                        <TextBlock Text="أداة تفاعلية لتبادل الرسائل العشوائية والذكية بين حساباتك المختلفة لرفع موثوقية الأرقام وتقليل احتمالات الحظر." Style="{DynamicResource TextBlockSubheading}" TextWrapping="Wrap"/>
-                        <Border Style="{StaticResource CardPanel}" Margin="0,20,0,0">
-                            <TextBlock Text="(لوحة المحاكاة النشطة جاهزة للربط مع مثيلات الحسابات)" Foreground="{DynamicResource BrushTextSecondary}" HorizontalAlignment="Center"/>
-                        </Border>
-                    </StackPanel>
-                </Grid>
-
-                <!-- Workflows -->
-                <Grid DataContext="{Binding WorkflowsTab}">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding DataContext.CurrentTabName, RelativeSource={RelativeSource AncestorType=Window}}" Value="Workflows">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-                    <StackPanel>
-                        <TextBlock Text="⛓️ مسارات الإرسال المتتالية (Workflows Builder)" Style="{DynamicResource TextBlockHeading}"/>
-                        <TextBlock Text="صمم مسارات إرسال ذكية للعميل على مدار أيام (مثال: رسالة ترحيب في اليوم الأول، رسالة عرض في اليوم الثالث، ومتابعة في اليوم الخامس)." Style="{DynamicResource TextBlockSubheading}" TextWrapping="Wrap"/>
-                        <Border Style="{StaticResource CardPanel}" Margin="0,20,0,0">
-                            <TextBlock Text="(المخطط المتتالي والمؤقتات المحددة جاهزة للحفظ في جداول wa_workflows)" Foreground="{DynamicResource BrushTextSecondary}" HorizontalAlignment="Center"/>
-                        </Border>
-                    </StackPanel>
-                </Grid>
-
-                <!-- Google Maps Scraper -->
-                <Grid DataContext="{Binding GMapsTab}">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding DataContext.CurrentTabName, RelativeSource={RelativeSource AncestorType=Window}}" Value="GMaps">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-                    <StackPanel>
-                        <TextBlock Text="🗺️ مستخرج البيانات من خرائط جوجل (Google Maps Scraper)" Style="{DynamicResource TextBlockHeading}"/>
-                        <TextBlock Text="ابحث عن الأنشطة التجارية في أي مدينة واستخرج أسماءهم وأرقام هواتفهم بنقرة واحدة لتصديرهم مباشرة إلى قائمة الإرسال." Style="{DynamicResource TextBlockSubheading}" TextWrapping="Wrap"/>
-                        <Border Style="{StaticResource CardPanel}" Margin="0,20,0,0">
-                            <StackPanel>
-                                <TextBox Text="{Binding SearchQuery}" Height="38" Margin="0,0,0,15"/>
-                                <Button Content="بدء البحث والاستخراج" Height="40"/>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </Grid>
-
-                <!-- System Logs -->
-                <Grid DataContext="{Binding LogsTab}">
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding DataContext.CurrentTabName, RelativeSource={RelativeSource AncestorType=Window}}" Value="Logs">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <TextBlock Grid.Row="0" Text="⚙️ سجل العمليات والأخطاء (System Diagnostics)" Style="{DynamicResource TextBlockHeading}"/>
-
-                    <ListView Grid.Row="1" ItemsSource="{Binding LogsList}">
-                        <ListView.View>
-                            <GridView>
-                                <GridViewColumn Header="الوقت" DisplayMemberBinding="{Binding Time}" Width="100"/>
-                                <GridViewColumn Header="المستوى" DisplayMemberBinding="{Binding Level}" Width="100"/>
-                                <GridViewColumn Header="البيان" DisplayMemberBinding="{Binding Message}" Width="580"/>
-                            </GridView>
-                        </ListView.View>
-                    </ListView>
-
-                    <StackPanel Grid.Row="2" Orientation="Horizontal" FlowDirection="RightToLeft" Margin="0,15,0,0">
-                        <Button Content="مسح السجل" Command="{Binding ClearLogsCommand}" Style="{StaticResource DangerButton}"/>
-                    </StackPanel>
-                </Grid>
-            </Grid>
-
-            <!-- 3. SPLITTER -->
-            <GridSplitter Grid.Column="2" Width="4" HorizontalAlignment="Stretch" Background="{DynamicResource BrushBorder}">
-                <GridSplitter.Style>
-                    <Style TargetType="GridSplitter">
-                        <Setter Property="Visibility" Value="Visible"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsBrowserVisible}" Value="False">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </GridSplitter.Style>
-            </GridSplitter>
-
-            <!-- 4. COLLAPSIBLE BROWSER WINDOW PANEL (WebView2) -->
-            <Border Grid.Column="3" Background="{DynamicResource BrushPanelBackground}" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="1,0,0,0">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Setter Property="Width" Value="480"/>
-                        <Setter Property="Visibility" Value="Visible"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsBrowserVisible}" Value="False">
-                                <Setter Property="Width" Value="0"/>
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-
-                    <Border Grid.Row="0" Background="{DynamicResource BrushPrimaryBackground}" Padding="10" BorderBrush="{DynamicResource BrushBorder}" BorderThickness="0,0,0,1">
-                        <TextBlock Text="متصفح واتساب ويب المدمج / WhatsApp Session Panel" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center"/>
-                    </Border>
-
-                    <!-- WebView2 instance -->
-                    <wv2:WebView2 x:Name="webView" Grid.Row="1"/>
-                </Grid>
-            </Border>
+            </DockPanel>
         </Grid>
     </Grid>
 </Window>

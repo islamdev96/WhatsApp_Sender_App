@@ -1,20 +1,29 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:system="clr-namespace:System;assembly=mscorlib">
-    <system:String x:Key="AppTitle">برنامج إرسال الواتساب برو</system:String>
-    <system:String x:Key="TabCampaigns">الحملات الإعلانية</system:String>
-    <system:String x:Key="TabContacts">المجموعات والأرقام</system:String>
-    <system:String x:Key="TabTemplates">القوالب الجاهزة</system:String>
-    <system:String x:Key="TabScheduled">الجدولة الزمنية</system:String>
-    <system:String x:Key="TabAutoReply">الرد التلقائي</system:String>
-    <system:String x:Key="TabReceived">الوارد</system:String>
-    <system:String x:Key="TabFilter">فلترة الأرقام</system:String>
-    <system:String x:Key="TabWarmer">تهيئة الحسابات (Warmer)</system:String>
-    <system:String x:Key="TabWorkflows">مسارات العمل (Workflows)</system:String>
-    <system:String x:Key="TabGMaps">سحب خرائط جوجل</system:String>
-    <system:String x:Key="TabSettings">الإعدادات</system:String>
-    <system:String x:Key="TabLogs">سجلات النظام</system:String>
+    <!-- App Title -->
+    <system:String x:Key="AppTitle">برنامج إرسال الواتساب برو | WhatsApp Sender Pro</system:String>
     
+    <!-- Sidebar Tabs -->
+    <system:String x:Key="TabCampaigns">🚀  الحملة الإعلانية</system:String>
+    <system:String x:Key="TabCampaignsHistory">📊  سجل الحملات</system:String>
+    <system:String x:Key="TabContacts">👥  الأرقام والمجموعات</system:String>
+    <system:String x:Key="TabTemplates">📝  قوالب الرسائل</system:String>
+    <system:String x:Key="TabScheduled">📅  الجدولة الزمنية</system:String>
+    <system:String x:Key="TabAutoReply">🤖  الرد التلقائي</system:String>
+    <system:String x:Key="TabReceived">📥  صندوق الوارد</system:String>
+    <system:String x:Key="TabFilter">🔍  فلترة الأرقام</system:String>
+    <system:String x:Key="TabWarmer">🔥  تهيئة الحسابات</system:String>
+    <system:String x:Key="TabWorkflows">⛓️  مسارات العمل</system:String>
+    <system:String x:Key="TabGMaps">🗺️  سحب خرائط جوجل</system:String>
+    <system:String x:Key="TabLogs">⚙️  سجلات النظام</system:String>
+    
+    <!-- Sidebar Footer Buttons -->
+    <system:String x:Key="BtnToggleLang">تبديل اللغة / EN/AR</system:String>
+    <system:String x:Key="BtnToggleTheme">تغيير المظهر / Theme</system:String>
+    <system:String x:Key="BtnToggleBrowser">إظهار/إخفاء المتصفح</system:String>
+
+    <!-- General Buttons & Labels -->
     <system:String x:Key="BtnStart">ابدأ</system:String>
     <system:String x:Key="BtnStop">إيقاف</system:String>
     <system:String x:Key="BtnSave">حفظ</system:String>
@@ -24,8 +33,166 @@
     <system:String x:Key="BtnImport">استيراد</system:String>
     <system:String x:Key="BtnExport">تصدير</system:String>
     <system:String x:Key="Status">الحالة</system:String>
-    <system:String x:Key="SettingsLanguage">اللغة</system:String>
-    <system:String x:Key="SettingsTheme">المظهر</system:String>
-    <system:String x:Key="SettingsDark">داكن</system:String>
-    <system:String x:Key="SettingsLight">فاتح</system:String>
+
+    <!-- Activation Screen -->
+    <system:String x:Key="L_ActivationTitle">تنشيط الترخيص / Activation</system:String>
+    <system:String x:Key="L_HWIDLabel">معرّف الجهاز (HWID):</system:String>
+    <system:String x:Key="L_ActivationKeyLabel">مفتاح التنشيط / Activation Key:</system:String>
+    <system:String x:Key="BtnActivate">تفعيل / Activate</system:String>
+
+    <!-- Tab 1: Campaigns sending -->
+    <system:String x:Key="L_TargetListTitle">📋 قائمة الأرقام والجهات المستهدفة</system:String>
+    <system:String x:Key="BtnImportCSV">استيراد CSV</system:String>
+    <system:String x:Key="TooltipAddManual">إضافة رقم يدوي</system:String>
+    <system:String x:Key="TooltipRemoveSelected">حذف المحدد</system:String>
+    <system:String x:Key="TooltipClearList">مسح القائمة</system:String>
+    <system:String x:Key="ColName">الاسم</system:String>
+    <system:String x:Key="ColPhone">الهاتف</system:String>
+    <system:String x:Key="ColStatus">الحالة</system:String>
+    <system:String x:Key="L_TotalCount">إجمالي الجهات: {0}</system:String>
+    
+    <system:String x:Key="L_MessageEditorTitle">📝 محتوى الرسالة والمرفقات</system:String>
+    <system:String x:Key="L_EnableSpintax">تفعيل Spintax</system:String>
+    <system:String x:Key="BtnPreviewText">معاينة النص</system:String>
+    <system:String x:Key="L_AttachmentsTitle">📎 ملفات مرفقة / Attachments</system:String>
+    <system:String x:Key="BtnSelectFile">اختر ملف</system:String>
+    <system:String x:Key="L_MinDelay">أقل تأخير (ثانية)</system:String>
+    <system:String x:Key="L_MaxDelay">أقصى تأخير (ثانية)</system:String>
+    <system:String x:Key="BtnSendNow">🚀 إرسال الآن</system:String>
+    <system:String x:Key="BtnPauseNow">🛑 إيقاف مؤقت</system:String>
+
+    <!-- Tab 2: Campaigns History -->
+    <system:String x:Key="L_HistoryTitle">📊 تقارير الحملات المرسلة</system:String>
+    <system:String x:Key="L_TotalCampaigns">إجمالي الحملات</system:String>
+    <system:String x:Key="L_TotalSent">رسائل مرسلة</system:String>
+    <system:String x:Key="L_TotalFailed">رسائل فشلت</system:String>
+    <system:String x:Key="L_SuccessRate">نسبة النجاح</system:String>
+    <system:String x:Key="ColId">رقم / ID</system:String>
+    <system:String x:Key="ColCampaignName">اسم الحملة</system:String>
+    <system:String x:Key="ColDate">التاريخ</system:String>
+    <system:String x:Key="ColTotal">الإجمالي</system:String>
+    <system:String x:Key="ColSent">المرسل</system:String>
+    <system:String x:Key="ColFailed">الفاشل</system:String>
+    <system:String x:Key="ColInvalid">غير الصالح</system:String>
+    <system:String x:Key="ColSuccessRate">نسبة النجاح</system:String>
+    <system:String x:Key="BtnRefreshData">تحديث البيانات</system:String>
+    <system:String x:Key="BtnDeleteSelectedCampaign">حذف الحملة المحددة</system:String>
+
+    <!-- Tab 3: Contacts & Groups -->
+    <system:String x:Key="L_GroupsTitle">👥 المجموعات المحفوظة</system:String>
+    <system:String x:Key="ColGroupName">الاسم</system:String>
+    <system:String x:Key="ColCreated">تاريخ الإنشاء</system:String>
+    <system:String x:Key="L_AddNewGroup">إضافة مجموعة جديدة:</system:String>
+    <system:String x:Key="BtnAddGroup">إضافة</system:String>
+    <system:String x:Key="BtnDeleteSelectedGroup">حذف المجموعة المحددة</system:String>
+    <system:String x:Key="L_GroupContacts">📋 جهات اتصال في مجموعة: {0}</system:String>
+    <system:String x:Key="ColContactName">الاسم</system:String>
+    <system:String x:Key="ColContactPhone">رقم الهاتف</system:String>
+    <system:String x:Key="L_AddContactToGroup">إضافة رقم إلى المجموعة:</system:String>
+    <system:String x:Key="BtnSaveContact">حفظ الرقم</system:String>
+
+    <!-- Tab 4: Templates -->
+    <system:String x:Key="L_TemplatesTitle">📝 القوالب المحفوظة</system:String>
+    <system:String x:Key="ColTemplateName">الاسم</system:String>
+    <system:String x:Key="BtnEditSelectedTemplate">تعديل المحدد</system:String>
+    <system:String x:Key="BtnDeleteSelectedTemplate">حذف المحدد</system:String>
+    <system:String x:Key="L_TemplateEditorTitle">✍️ محرر القالب</system:String>
+    <system:String x:Key="L_TemplateNameLabel">اسم القالب:</system:String>
+    <system:String x:Key="BtnSaveTemplate">حفظ القالب</system:String>
+
+    <!-- Tab 5: Scheduler -->
+    <system:String x:Key="L_SchedulerTitle">📅 الجدولة الزمنية للحملات</system:String>
+    <system:String x:Key="ColSchedId">رقم</system:String>
+    <system:String x:Key="ColSchedCampaign">اسم الحملة</system:String>
+    <system:String x:Key="ColSchedTime">تاريخ ووقت الإرسال</system:String>
+    <system:String x:Key="ColSchedGroup">المجموعة المستهدفة</system:String>
+    <system:String x:Key="ColSchedMode">طريقة الإرسال</system:String>
+    <system:String x:Key="ColSchedStatus">الحالة</system:String>
+    <system:String x:Key="BtnRefreshScheduler">تحديث الجدولة</system:String>
+    <system:String x:Key="BtnCancelScheduled">إلغاء المحددة</system:String>
+    <system:String x:Key="BtnDeleteScheduledHistory">حذف من السجل</system:String>
+
+    <!-- Tab 6: Auto Reply Chatbot -->
+    <system:String x:Key="L_AutoReplyTitle">🤖 قواعد الرد التلقائي</system:String>
+    <system:String x:Key="L_EnableAutoReply">تفعيل الرد التلقائي النشط</system:String>
+    <system:String x:Key="ColRuleName">اسم القاعدة</system:String>
+    <system:String x:Key="ColKeywords">الكلمات المفتاحية</system:String>
+    <system:String x:Key="ColReplyText">الرد التلقائي</system:String>
+    <system:String x:Key="ColRuleEnabled">الحالة</system:String>
+    <system:String x:Key="BtnAddRule">إضافة قاعدة</system:String>
+    <system:String x:Key="BtnToggleRule">تفعيل/تعطيل</system:String>
+    <system:String x:Key="BtnDeleteRule">حذف القاعدة</system:String>
+
+    <!-- Tab 7: Received Messages -->
+    <system:String x:Key="L_InboxTitle">📥 الرسائل الواردة من العملاء</system:String>
+    <system:String x:Key="ColInboxDate">التاريخ</system:String>
+    <system:String x:Key="ColInboxSender">المرسل</system:String>
+    <system:String x:Key="ColInboxMessage">الرسالة</system:String>
+    <system:String x:Key="BtnClearInbox">مسح السجل</system:String>
+
+    <!-- Tab 8: Numbers Filter -->
+    <system:String x:Key="L_FilterTitle">🔍 فلترة وتدقيق أرقام الهواتف</system:String>
+    <system:String x:Key="L_FilterSub">هذه الأداة تمكنك من التحقق مما إذا كانت قائمة أرقام الهواتف تملك حسابات واتساب نشطة قبل بدء الإرسال.</system:String>
+    <system:String x:Key="L_FilterPlaceholder">(سيتم تضمين الفلترة الذكية في التحديث التلقائي لمحرك WebView2)</system:String>
+
+    <!-- Tab 9: Chat Warmer -->
+    <system:String x:Key="L_WarmerTitle">🔥 تهيئة وتسخين الحسابات (Chat Warmer)</system:String>
+    <system:String x:Key="L_WarmerSub">أداة تفاعلية لتبادل الرسائل العشوائية والذكية بين حساباتك المختلفة لرفع موثوقية الأرقام وتقليل احتمالات الحظر.</system:String>
+    <system:String x:Key="L_WarmerPlaceholder">(لوحة المحاكاة النشطة جاهزة للربط مع مثيلات الحسابات)</system:String>
+
+    <!-- Tab 10: Workflows Builder -->
+    <system:String x:Key="L_WorkflowsTitle">⛓️ مسارات الإرسال المتتالية (Workflows Builder)</system:String>
+    <system:String x:Key="L_WorkflowsSub">صمم مسارات إرسال ذكية للعميل على مدار أيام (مثال: رسالة ترحيب في اليوم الأول، رسالة عرض في اليوم الثالث، ومتابعة في اليوم الخامس).</system:String>
+    <system:String x:Key="L_WorkflowsPlaceholder">(المخطط المتتالي والمؤقتات المحددة جاهزة للحفظ في جداول wa_workflows)</system:String>
+
+    <!-- Tab 11: Google Maps Scraper -->
+    <system:String x:Key="L_GMapsTitle">🗺️ مستخرج البيانات من خرائط جوجل (Google Maps Scraper)</system:String>
+    <system:String x:Key="L_GMapsSub">ابحث عن الأنشطة التجارية في أي مدينة واستخرج أسماءهم وأرقام هواتفهم بنقرة واحدة لتصديرهم مباشرة إلى قائمة الإرسال.</system:String>
+    <system:String x:Key="BtnStartScrape">بدء البحث والاستخراج</system:String>
+
+    <!-- Tab 12: System Logs -->
+    <system:String x:Key="L_LogsTitle">⚙️ سجل العمليات والأخطاء (System Diagnostics)</system:String>
+    <system:String x:Key="ColLogTime">الوقت</system:String>
+    <system:String x:Key="ColLogLevel">المستوى</system:String>
+    <system:String x:Key="ColLogMessage">البيان</system:String>
+    <system:String x:Key="BtnClearLogs">مسح السجل</system:String>
+
+    <!-- Embedded Browser title -->
+    <system:String x:Key="L_BrowserTitle">متصفح واتساب ويب المدمج / WhatsApp Session Panel</system:String>
+
+    <!-- Menu and Toolbar -->
+    <system:String x:Key="MenuFile">ملف</system:String>
+    <system:String x:Key="MenuEdit">تعديل</system:String>
+    <system:String x:Key="MenuView">عرض</system:String>
+    <system:String x:Key="MenuSettings">الإعدادات</system:String>
+    <system:String x:Key="MenuTools">أدوات</system:String>
+    <system:String x:Key="MenuAbout">حول</system:String>
+    <system:String x:Key="MenuExit">خروج</system:String>
+    <system:String x:Key="MenuHelp">مساعدة</system:String>
+
+    <system:String x:Key="TbOpenWhatsApp">فتح واتساب</system:String>
+    <system:String x:Key="TbNewCampaign">حملة جديدة</system:String>
+    <system:String x:Key="TbHistory">سجل الحملات</system:String>
+    <system:String x:Key="TbContacts">مدير الأرقام</system:String>
+    <system:String x:Key="TbTemplates">القوالب</system:String>
+    <system:String x:Key="TbScheduler">المجدول</system:String>
+    <system:String x:Key="TbGMaps">سحب الخرائط</system:String>
+    <system:String x:Key="TbLogs">سجل الأخطاء</system:String>
+    <system:String x:Key="TbWarmer">تهيئة الحسابات</system:String>
+    <system:String x:Key="TbWorkflows">مسارات العمل</system:String>
+
+    <!-- Status Bar -->
+    <system:String x:Key="StatusConnection">الحالة:</system:String>
+    <system:String x:Key="StatusReady">جاهز</system:String>
+    <system:String x:Key="StatusAccount">الحساب:</system:String>
+    <system:String x:Key="StatusLicense">الترخيص: نشط</system:String>
+
+    <!-- Formatting and message tabs -->
+    <system:String x:Key="BtnBold">B</system:String>
+    <system:String x:Key="BtnItalic">I</system:String>
+    <system:String x:Key="BtnStrike">S</system:String>
+    <system:String x:Key="BtnInsertVariable">إدراج متغير</system:String>
+    <system:String x:Key="BtnEmoji">إيموجي</system:String>
+    <system:String x:Key="TooltipAddTab">إضافة رسالة جديدة</system:String>
+    <system:String x:Key="TooltipRemoveTab">حذف الرسالة الحالية</system:String>
 </ResourceDictionary>

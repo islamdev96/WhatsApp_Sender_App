@@ -1,0 +1,72 @@
+<Window x:Class="WhatsAppSender.App.CampaignsHistoryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource L_HistoryTitle}" Height="550" Width="850"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource BrushPrimaryBackground}"
+        Foreground="{DynamicResource BrushTextPrimary}">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="{DynamicResource L_HistoryTitle}" Style="{DynamicResource TextBlockHeading}"/>
+
+        <Grid Grid.Row="1" Margin="0,0,0,15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource CardPanel}" Margin="0,0,10,0">
+                <StackPanel>
+                    <TextBlock Text="{DynamicResource L_TotalCampaigns}" Foreground="{DynamicResource BrushTextSecondary}"/>
+                    <TextBlock Text="{Binding TotalCampaigns}" FontSize="24" FontWeight="Bold"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Style="{StaticResource CardPanel}" Margin="10,0,10,0">
+                <StackPanel>
+                    <TextBlock Text="{DynamicResource L_TotalSent}" Foreground="{DynamicResource BrushTextSecondary}"/>
+                    <TextBlock Text="{Binding TotalSent}" FontSize="24" FontWeight="Bold" Foreground="#00E676"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Style="{StaticResource CardPanel}" Margin="10,0,10,0">
+                <StackPanel>
+                    <TextBlock Text="{DynamicResource L_TotalFailed}" Foreground="{DynamicResource BrushTextSecondary}"/>
+                    <TextBlock Text="{Binding TotalFailed}" FontSize="24" FontWeight="Bold" Foreground="#EF4444"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="3" Style="{StaticResource CardPanel}" Margin="10,0,0,0">
+                <StackPanel>
+                    <TextBlock Text="{DynamicResource L_SuccessRate}" Foreground="{DynamicResource BrushTextSecondary}"/>
+                    <TextBlock Text="{Binding SuccessRatePercent}" FontSize="24" FontWeight="Bold" Foreground="#00B0FF"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <ListView Grid.Row="2" ItemsSource="{Binding CampaignsList}" SelectedItem="{Binding SelectedCampaign}">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="{DynamicResource ColId}" DisplayMemberBinding="{Binding Id}" Width="60"/>
+                    <GridViewColumn Header="{DynamicResource ColCampaignName}" DisplayMemberBinding="{Binding Name}" Width="200"/>
+                    <GridViewColumn Header="{DynamicResource ColDate}" DisplayMemberBinding="{Binding Date}" Width="160"/>
+                    <GridViewColumn Header="{DynamicResource ColTotal}" DisplayMemberBinding="{Binding Total}" Width="80"/>
+                    <GridViewColumn Header="{DynamicResource ColSent}" DisplayMemberBinding="{Binding Sent}" Width="80"/>
+                    <GridViewColumn Header="{DynamicResource ColFailed}" DisplayMemberBinding="{Binding Failed}" Width="80"/>
+                    <GridViewColumn Header="{DynamicResource ColInvalid}" DisplayMemberBinding="{Binding Invalid}" Width="80"/>
+                    <GridViewColumn Header="{DynamicResource ColSuccessRate}" DisplayMemberBinding="{Binding SuccessRate, StringFormat={}{0:F1}%}" Width="110"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,15,0,0" HorizontalAlignment="Right">
+            <Button Content="{DynamicResource BtnRefreshData}" Command="{Binding LoadCampaignsCommand}" Margin="0,0,10,0"/>
+            <Button Content="{DynamicResource BtnDeleteSelectedCampaign}" Command="{Binding DeleteCampaignCommand}" Style="{StaticResource DangerButton}"/>
+        </StackPanel>
+    </Grid>
+</Window>

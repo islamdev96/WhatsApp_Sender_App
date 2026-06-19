@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using Microsoft.Web.WebView2.Core;
 using WhatsAppSender.App.ViewModels;
 
@@ -57,6 +58,35 @@ public partial class MainWindow : Window
                 "خطأ في تهيئة المتصفح / Browser Init Error",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
+        }
+    }
+
+    private void Exit_Click(object sender, RoutedEventArgs e)
+    {
+        Close();
+    }
+
+    private void InsertVar_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.CommandParameter is string varName)
+        {
+            if (DataContext is MainWindowViewModel vm && vm.MainTab.SelectedMessageTab != null)
+            {
+                var txt = vm.MainTab.SelectedMessageTab.Text ?? string.Empty;
+                vm.MainTab.SelectedMessageTab.Text = txt + varName;
+            }
+        }
+    }
+
+    private void FormatText_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.CommandParameter is string tag)
+        {
+            if (DataContext is MainWindowViewModel vm && vm.MainTab.SelectedMessageTab != null)
+            {
+                var txt = vm.MainTab.SelectedMessageTab.Text ?? string.Empty;
+                vm.MainTab.SelectedMessageTab.Text = txt + $"{tag}text{tag}";
+            }
         }
     }
 }

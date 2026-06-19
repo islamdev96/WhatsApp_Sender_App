@@ -44,6 +44,12 @@ public partial class MainWindowViewModel : ObservableObject
     private bool _isActivated;
 
     [ObservableProperty]
+    private string _connectionStatusText = "غير متصل / Disconnected";
+
+    [ObservableProperty]
+    private string _connectionStatusBrush = "#EF4444";
+
+    [ObservableProperty]
     private string _hwid = string.Empty;
 
     [ObservableProperty]
@@ -125,7 +131,7 @@ public partial class MainWindowViewModel : ObservableObject
                 await CampaignRunnerInstance.RunCampaignAsync(
                     camp,
                     contacts,
-                    scheduledCamp.Message,
+                    new List<string> { scheduledCamp.Message },
                     null, // scheduled campaign attachments are json, for simplicity start with text only first
                     null,
                     null,
@@ -145,6 +151,28 @@ public partial class MainWindowViewModel : ObservableObject
                 return false;
             }
         });
+
+        // Start Connection Monitor Timer
+        var statusTimer = new System.Windows.Threading.DispatcherTimer();
+        statusTimer.Interval = TimeSpan.FromSeconds(5);
+        statusTimer.Tick += async (s, e) =>
+        {
+            if (WhatsAppService != null)
+            {
+                bool loggedIn = await WhatsAppService.IsLoggedInAsync();
+                if (loggedIn)
+                {
+                    ConnectionStatusText = SelectedLanguage == "Ar" ? "متصل" : "Connected";
+                    ConnectionStatusBrush = "#25D366";
+                }
+                else
+                {
+                    ConnectionStatusText = SelectedLanguage == "Ar" ? "غير متصل" : "Disconnected";
+                    ConnectionStatusBrush = "#EF4444";
+                }
+            }
+        };
+        statusTimer.Start();
     }
 
     private void CheckActivation()
@@ -206,5 +234,69 @@ public partial class MainWindowViewModel : ObservableObject
     private void ToggleBrowser()
     {
         IsBrowserVisible = !IsBrowserVisible;
+    }
+
+    [RelayCommand]
+    private void OpenCampaignsHistory()
+    {
+        var win = new CampaignsHistoryWindow { DataContext = CampaignsTab };
+        win.Owner = Application.Current.MainWindow;
+        win.Show();
+    }
+
+    [RelayCommand]
+    private void OpenContactsManager()
+    {
+        var win = new ContactsManagerWindow { DataContext = ContactsTab };
+        win.Owner = Application.Current.MainWindow;
+        win.Show();
+    }
+
+    [RelayCommand]
+    private void OpenTemplatesManager()
+    {
+        var win = new TemplatesManagerWindow { DataContext = TemplatesTab };
+        win.Owner = Application.Current.MainWindow;
+        win.Show();
+    }
+
+    [RelayCommand]
+    private void OpenScheduler()
+    {
+        var win = new SchedulerWindow { DataContext = SchedulerTab };
+        win.Owner = Application.Current.MainWindow;
+        win.Show();
+    }
+
+    [RelayCommand]
+    private void OpenGMapsScraper()
+    {
+        var win = new GMapsScraperWindow { DataContext = GMapsTab };
+        win.Owner = Application.Current.MainWindow;
+        win.Show();
+    }
+
+    [RelayCommand]
+    private void OpenLogs()
+    {
+        var win = new LogsWindow { DataContext = LogsTab };
+        win.Owner = Application.Current.MainWindow;
+        win.Show();
+    }
+
+    [RelayCommand]
+    private void OpenWarmer()
+    {
+        var win = new WarmerWindow { DataContext = WarmerTab };
+        win.Owner = Application.Current.MainWindow;
+        win.Show();
+    }
+
+    [RelayCommand]
+    private void OpenWorkflows()
+    {
+        var win = new WorkflowsWindow { DataContext = WorkflowsTab };
+        win.Owner = Application.Current.MainWindow;
+        win.Show();
     }
 }
