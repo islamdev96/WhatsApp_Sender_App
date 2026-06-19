@@ -52,3 +52,25 @@ desktop.ini
 diff.txt
 error_log.txt
 debug-*.log
+
+# .NET build output
+bin/
+obj/
+publish/
+*.user
+
+# Local Portable .NET SDK
+dotnet-sdk/
+
+# WebView2 session caches
+**/WebView2/
+**/EBWebView/
+
+# Licensing keys and configs
+*.key
+activation.key
+params.bin
+
+# NuGet
+.nuget/
+*.nupkg

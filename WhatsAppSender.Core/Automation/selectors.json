@@ -1,0 +1,20 @@
+{
+  "ChatListPane": "div[aria-label='Chat list'], #pane-side, div[data-testid='chat-list']",
+  "MessageInputBox": "div[contenteditable='true'][data-tab='10'], #main footer div[contenteditable='true'][role='textbox']",
+  "SendButton": "button[aria-label='Send'], button[aria-label='إرسال'], span[data-icon='send'], span[data-icon='send-light']",
+  "AttachButton": "span[data-icon='attach-menu-plus'], span[data-icon*='attach'], div[title='Attach'], div[title='إرفاق']",
+  "FileInput": "input[type='file'][accept='*']",
+  "MediaInput": "input[type='file'][accept*='video/mp4'], input[type='file'][accept*='image']",
+  "CaptionBox": "div[data-testid='media-caption-input-container'] div[contenteditable='true'], div[role='dialog'] div[contenteditable='true']",
+  "MediaPreviewSendButton": "div[data-testid='media-viewer'] span[data-icon='send'], div[role='dialog'] span[data-icon='send'], div[role='dialog'] button[aria-label='Send'], div[role='dialog'] button[aria-label='إرسال']",
+  "InvalidNumberMarkers": [
+    "phone number shared via url is invalid",
+    "Phone number shared via url is invalid",
+    "is not on WhatsApp",
+    "غير موجود على واتساب",
+    "غير صحيح",
+    "ليس لديه واتساب",
+    "ليس لديه WhatsApp"
+  ],
+  "InvalidNumberOkButton": "div[data-animate-modal-popup='true'] div[role='button'], button[normalize-space()='موافق'], button[normalize-space()='OK']"
+}

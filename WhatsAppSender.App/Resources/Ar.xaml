@@ -1,0 +1,31 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:system="clr-namespace:System;assembly=mscorlib">
+    <system:String x:Key="AppTitle">برنامج إرسال الواتساب برو</system:String>
+    <system:String x:Key="TabCampaigns">الحملات الإعلانية</system:String>
+    <system:String x:Key="TabContacts">المجموعات والأرقام</system:String>
+    <system:String x:Key="TabTemplates">القوالب الجاهزة</system:String>
+    <system:String x:Key="TabScheduled">الجدولة الزمنية</system:String>
+    <system:String x:Key="TabAutoReply">الرد التلقائي</system:String>
+    <system:String x:Key="TabReceived">الوارد</system:String>
+    <system:String x:Key="TabFilter">فلترة الأرقام</system:String>
+    <system:String x:Key="TabWarmer">تهيئة الحسابات (Warmer)</system:String>
+    <system:String x:Key="TabWorkflows">مسارات العمل (Workflows)</system:String>
+    <system:String x:Key="TabGMaps">سحب خرائط جوجل</system:String>
+    <system:String x:Key="TabSettings">الإعدادات</system:String>
+    <system:String x:Key="TabLogs">سجلات النظام</system:String>
+    
+    <system:String x:Key="BtnStart">ابدأ</system:String>
+    <system:String x:Key="BtnStop">إيقاف</system:String>
+    <system:String x:Key="BtnSave">حفظ</system:String>
+    <system:String x:Key="BtnCancel">إلغاء</system:String>
+    <system:String x:Key="BtnDelete">حذف</system:String>
+    <system:String x:Key="BtnAdd">إضافة</system:String>
+    <system:String x:Key="BtnImport">استيراد</system:String>
+    <system:String x:Key="BtnExport">تصدير</system:String>
+    <system:String x:Key="Status">الحالة</system:String>
+    <system:String x:Key="SettingsLanguage">اللغة</system:String>
+    <system:String x:Key="SettingsTheme">المظهر</system:String>
+    <system:String x:Key="SettingsDark">داكن</system:String>
+    <system:String x:Key="SettingsLight">فاتح</system:String>
+</ResourceDictionary>
